@@ -1,0 +1,220 @@
+import 'package:get/get.dart';
+import '../../../../constant/exports.dart';
+import 'login_screen.dart';
+
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
+
+  @override
+  State<SignupScreen> createState() => _SignupScreenState();
+}
+
+class _SignupScreenState extends State<SignupScreen> {
+  final _formKey = GlobalKey<FormState>();
+
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool isCPA = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isMobile = constraints.maxWidth < 600;
+            final isTablet =
+                constraints.maxWidth >= 600 && constraints.maxWidth < 1024;
+
+            final double padding = isMobile
+                ? 16
+                : isTablet
+                ? 32
+                : 64;
+            final double maxWidth = isMobile ? double.infinity : 480;
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: padding, vertical: 32),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: maxWidth,
+                    minHeight:
+                        constraints.maxHeight - 64, // Subtract vertical padding
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        0.05.verticalSpace,
+
+                        /// 🔹 Title
+                        AppText(
+                          "Create Account",
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        0.01.verticalSpace,
+
+                        /// 🔹 Subtitle
+                        AppText(
+                          "Sign up to get started with BookSmart",
+                          fontSize: 14,
+                        ),
+                        0.08.verticalSpace,
+
+                        /// 🔹 Email
+                        AppTextField(
+                          controller: _emailController,
+                          hintText: "Email",
+                          keyboardType: TextInputType.emailAddress,
+                          maxLines: 1,
+
+                          fieldValidator: (v) {
+                            if (v == null || v.isEmpty) {
+                              return "Enter your email";
+                            }
+                            if (!v.contains("@")) return "Enter a valid email";
+                            return null;
+                          },
+                        ),
+                        0.02.verticalSpace,
+
+                        /// 🔹 Password
+                        AppTextField(
+                          controller: _passwordController,
+                          hintText: "Password",
+                          keyboardType: TextInputType.text,
+                          isSecureText: _obscurePassword,
+                          maxLines: 1,
+
+                          suffixWidget: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: theme.iconTheme.color?.withValues(
+                                alpha: 0.7,
+                              ),
+                            ),
+                            onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword,
+                            ),
+                          ),
+                          fieldValidator: (v) {
+                            if (v == null || v.isEmpty) {
+                              return "Enter your password";
+                            }
+                            if (v.length < 6) {
+                              return "Password must be at least 6 characters";
+                            }
+                            return null;
+                          },
+                        ),
+                        0.02.verticalSpace,
+
+                        /// 🔹 Confirm Password
+                        AppTextField(
+                          controller: _confirmPasswordController,
+                          hintText: "Confirm Password",
+                          keyboardType: TextInputType.text,
+                          isSecureText: _obscureConfirmPassword,
+                          maxLines: 1,
+
+                          suffixWidget: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPassword
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: theme.iconTheme.color?.withValues(
+                                alpha: 0.7,
+                              ),
+                            ),
+                            onPressed: () => setState(
+                              () => _obscureConfirmPassword =
+                                  !_obscureConfirmPassword,
+                            ),
+                          ),
+                          fieldValidator: (v) {
+                            if (v == null || v.isEmpty) {
+                              return "Confirm your password";
+                            }
+                            if (v != _passwordController.text) {
+                              return "Passwords do not match";
+                            }
+                            return null;
+                          },
+                        ),
+                        0.02.verticalSpace,
+
+                        StatefulBuilder(
+                          builder: (context, cpaState) {
+                            return SwitchListTile.adaptive(
+                              value: isCPA,
+                              title: const Text("Sign up as CPA"),
+                              visualDensity: VisualDensity.compact,
+                              dense: true,
+                              onChanged: (value) {
+                                cpaState(() {
+                                  isCPA = value;
+                                });
+                              },
+                            );
+                          },
+                        ),
+                        0.04.verticalSpace,
+
+                        /// 🔹 Sign Up Button
+                        AppButton(
+                          buttonText: "Sign Up",
+                          fontSize: 16,
+                          radius: 10,
+                          onTapFunction: () {
+                            if (isCPA) {
+                              // Get.offAllNamed(Routes.dashboardCPA);
+                              Get.offAllNamed(Routes.profileScreenCPA);
+                            } else {
+                              Get.offAllNamed(Routes.home);
+                            }
+                          },
+                        ),
+                        0.06.verticalSpace,
+
+                        /// 🔹 Footer - Login Option
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            AppText("Already have an account?", fontSize: 14),
+                            TextButton(
+                              onPressed: () =>
+                                  Get.to(() => const LoginWithEmailScreen()),
+                              child: AppText(
+                                "Sign In",
+                                fontSize: 14,
+                                color: scheme.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
