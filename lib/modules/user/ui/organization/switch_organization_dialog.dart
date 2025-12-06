@@ -15,8 +15,7 @@ void showSwitchOrganizationDialog() {
                 ? Get.theme.colorScheme.surface
                 : Colors.white,
           ),
-
-          constraints: BoxConstraints(maxWidth: 400),
+          constraints: BoxConstraints(maxWidth: 350),
           child: Material(
             color: Colors.transparent,
             child: SingleChildScrollView(
@@ -33,6 +32,7 @@ void showSwitchOrganizationDialog() {
                       showSnackBar('Switched to Organization 3');
                     },
                   ),
+                  Divider(thickness: 0.1),
                   ListTile(
                     leading: Icon(Icons.business),
                     title: Text('Organization 2'),
@@ -42,6 +42,7 @@ void showSwitchOrganizationDialog() {
                       showSnackBar('Switched to Organization 3');
                     },
                   ),
+                  Divider(thickness: 0.1),
                   ListTile(
                     leading: Icon(Icons.business),
                     title: Text('Organization 3'),

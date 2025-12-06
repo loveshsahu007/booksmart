@@ -44,19 +44,19 @@ class _OrganizationListScreenState extends State<OrganizationListScreen> {
               ListTile(
                 leading: Icon(Icons.business),
                 title: Text('Organization 1'),
-                subtitle: Text('Description of Organization 1'),
+                subtitle: Text('3322-24-43'),
               ),
               SizedBox(height: 10),
               ListTile(
                 leading: Icon(Icons.business),
                 title: Text('Organization 2'),
-                subtitle: Text('Description of Organization 2'),
+                subtitle: Text('212-324-444'),
               ),
               SizedBox(height: 10),
               ListTile(
                 leading: Icon(Icons.business),
                 title: Text('Organization 3'),
-                subtitle: Text('Description of Organization 3'),
+                subtitle: Text('123-234-4234'),
               ),
             ],
           ),

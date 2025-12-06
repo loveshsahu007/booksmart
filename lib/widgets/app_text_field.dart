@@ -1,7 +1,8 @@
 import '../constant/exports.dart';
 
 class AppTextField extends StatelessWidget {
-  final String hintText;
+  final String? hintText;
+  final String? labelText;
   final TextEditingController? controller;
   final void Function(String)? onChanged;
   final VoidCallback? onEditingComplete;
@@ -18,7 +19,8 @@ class AppTextField extends StatelessWidget {
 
   const AppTextField({
     super.key,
-    required this.hintText,
+    this.hintText,
+    this.labelText,
     this.controller,
     this.onChanged,
     this.onEditingComplete,
@@ -60,6 +62,7 @@ class AppTextField extends StatelessWidget {
           hintText: hintText,
           suffixIcon: suffixWidget,
           prefixIcon: prefixWidget,
+          labelText: hintText,
 
           // 🪄 All styling (borders, hintStyle, colors) comes from theme.inputDecorationTheme
         ),

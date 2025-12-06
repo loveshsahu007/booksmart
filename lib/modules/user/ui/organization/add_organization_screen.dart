@@ -37,8 +37,6 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
 
   final _organizationNameController = TextEditingController();
 
-  
-
   final List<String> _orgTypes = [
     'Sole Proprietorship',
     'Partnership',
@@ -96,8 +94,6 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
   final industryDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final orgDropdownKey = GlobalKey<DropdownSearchState<String>>();
 
-  // TODO: ask for EIN/TIN number
-
   @override
   void dispose() {
     _scrollController.dispose();
@@ -129,8 +125,6 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    0.03.verticalSpace,
-
                     /// 🔹 Title
                     AppText(
                       "Set Up Your Organization Profile",
@@ -144,7 +138,8 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                     /// 🔹 Organization Name
                     AppTextField(
                       controller: _organizationNameController,
-                      hintText: "Organization Name",
+                      hintText: "Organization Name *",
+                      labelText: "Organization Name *",
                       keyboardType: TextInputType.name,
                       maxLines: 1,
                       fieldValidator: (v) => (v == null || v.isEmpty)
@@ -153,9 +148,16 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                     ),
                     0.02.verticalSpace,
                     AppTextField(
-                      controller: _organizationNameController,
-                      hintText: "EIN/TIN",
-                      keyboardType: TextInputType.name,
+                      hintText: "Website (URL)",
+                      labelText: "Website (URL)",
+                      keyboardType: TextInputType.url,
+                      maxLines: 1,
+                    ),
+                    0.02.verticalSpace,
+                    AppTextField(
+                      hintText: "EIN/TIN (9 digits)",
+                      labelText: "EIN/TIN *",
+                      keyboardType: TextInputType.number,
                       maxLines: 1,
                       fieldValidator: (v) =>
                           (v == null || v.isEmpty) ? "Enter EIN/TIN" : null,
@@ -165,47 +167,64 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                     /// 🔹 Type of Organization
                     _buildFilterDropdown(
                       dropDownKey: orgDropdownKey,
-                      label: "Type of Organization",
+                      label: "Type of Organization *",
                       items: _orgTypes,
                     ),
                     0.02.verticalSpace,
 
                     _buildFilterDropdown(
-                      label: "Industry",
+                      label: "Industry *",
                       items: _industries,
                       dropDownKey: industryDropdownKey,
                     ),
+
                     0.02.verticalSpace,
 
                     /// 🔹 State / Territory
                     _buildFilterDropdown(
                       dropDownKey: stateDropdownKey,
-                      label: "State / Territory",
+                      label: "State / Territory *",
                       items: _states,
                     ),
 
                     0.02.verticalSpace,
                     AppTextField(
-                      hintText: "Street Address",
+                      hintText: "Street Address *",
+                      labelText: "Street Address *",
                       keyboardType: TextInputType.streetAddress,
                       maxLines: 1,
                       fieldValidator: (v) => null,
                     ),
                     0.02.verticalSpace,
                     AppTextField(
-                      hintText: "City",
+                      hintText: "City *",
+                      labelText: "City *",
                       maxLines: 1,
                       keyboardType: TextInputType.text,
                       fieldValidator: (v) => null,
                     ),
                     0.02.verticalSpace,
                     AppTextField(
-                      hintText: "ZIP Code",
+                      hintText: "ZIP Code*",
+                      labelText: "ZIP Code*",
                       maxLines: 1,
                       keyboardType: TextInputType.number,
                       fieldValidator: (v) => null,
                     ),
-
+                    0.02.verticalSpace,
+                    AppTextField(
+                      controller: _organizationNameController,
+                      hintText: "Phone Number",
+                      labelText: "Phone Number",
+                      keyboardType: TextInputType.phone,
+                    ),
+                    0.02.verticalSpace,
+                    AppTextField(
+                      controller: _organizationNameController,
+                      hintText: "Business Email",
+                      labelText: "Business Email",
+                      keyboardType: TextInputType.phone,
+                    ),
                     0.06.verticalSpace,
 
                     /// 🔹 Save & Cancel Buttons

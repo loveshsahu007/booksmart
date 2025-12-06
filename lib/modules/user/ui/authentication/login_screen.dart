@@ -173,7 +173,6 @@ class _LoginWithEmailScreenState extends State<LoginWithEmailScreen> {
                             Get.offAllNamed(Routes.home);
                           },
                         ),
-                        0.02.verticalSpace,
                         SignInButton(
                           Buttons.apple,
                           textStyle: TextStyle(color: Colors.black),

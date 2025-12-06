@@ -1,6 +1,7 @@
 import 'package:booksmart/modules/user/ui/bank/bank_list_screen.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/document_repository_screen.dart';
 import 'package:booksmart/modules/user/ui/organization/organization_list_screen.dart';
+import 'package:booksmart/modules/user/ui/profile_screen.dart';
 import 'package:booksmart/modules/user/ui/sponsored_offers/sponsored_offers_screen.dart';
 import 'package:booksmart/routes/routes.dart';
 import 'package:flutter/foundation.dart';
@@ -33,44 +34,58 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
+          Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              onTap: () {
+                goToUserProfileScreen();
+              },
               borderRadius: BorderRadius.circular(10),
-              boxShadow: [
-                if (!isDark)
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-              ],
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 26,
-                  backgroundColor: colorScheme.primary,
-                  child: const AppText("AC", color: Colors.white, fontSize: 14),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    if (!isDark)
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 6,
+                        offset: const Offset(0, 3),
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    AppText(
-                      "Ashley Collins",
-                      fontSize: 18,
-
-                      color: colorScheme.onSurface,
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: colorScheme.primary,
+                      child: const AppText(
+                        "AC",
+                        color: Colors.white,
+                        fontSize: 14,
+                      ),
                     ),
-                    AppText(
-                      "ashleycollins@email.com",
-                      color: colorScheme.onSurface.withValues(alpha: 0.7),
-                      fontSize: 14,
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText(
+                          "Ashley Collins",
+                          fontSize: 18,
+
+                          color: colorScheme.onSurface,
+                        ),
+                        AppText(
+                          "ashleycollins@email.com",
+                          color: colorScheme.onSurface.withValues(alpha: 0.7),
+                          fontSize: 14,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
 

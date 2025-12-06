@@ -41,8 +41,8 @@ class DashboardScreen extends StatelessWidget {
 
             AppText(
               "Business Strength",
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              fontWeight: FontWeight.w500,
               color: textPrimary,
             ),
             const SizedBox(height: 20),
@@ -88,8 +88,8 @@ class DashboardScreen extends StatelessWidget {
                     context,
                     title: "Cashflow",
                     value: "\$15,000",
-                    icon: Icons.trending_up,
-                    iconColor: colorScheme.primary,
+                    icon: Icons.thumb_up_outlined,
+                    iconColor: Colors.green,
                     trendText: "Looking good",
                     onTap: () {
                       if (kIsWeb) {
@@ -102,22 +102,27 @@ class DashboardScreen extends StatelessWidget {
                       }
                     },
                   ),
+                  // green for down
+                  // red for up
                   metricCard(
                     context,
                     title: "Debt-to-Equity",
                     value: "0.5%",
-                    icon: Icons.arrow_back,
-                    iconColor: Colors.teal,
+                    icon: Icons.arrow_downward,
+                    iconColor: Colors.green,
                     trendText: "Low risk",
                     onTap: () {
                       showSnackBar("Need Discussion");
                     },
                   ),
+                  // increase -> green
+                  // in-betwen -> orange
+                  // decrese -> red
                   metricCard(
                     context,
                     title: "Tax Deduction",
                     value: "\$10,000",
-                    icon: Icons.bar_chart_rounded,
+                    icon: Icons.trending_up,
                     iconColor: Colors.orange,
                     trendText: "Stable trend",
                     onTap: () {
@@ -131,12 +136,15 @@ class DashboardScreen extends StatelessWidget {
                       }
                     },
                   ),
+                  // strong - green
+                  // medium - orange
+                  // weak - red
                   metricCard(
                     context,
                     title: "Operating Margin",
                     value: "18%",
-                    icon: Icons.add_chart,
-                    iconColor: Colors.orange,
+                    icon: Icons.arrow_upward,
+                    iconColor: Colors.green,
                     trendText: "Strong",
                     onTap: () {
                       showSnackBar("Need Discussion");
@@ -183,13 +191,11 @@ class DashboardScreen extends StatelessWidget {
   // Components and Widgets
   // =======================
 
-
-
   Widget _insightText(String text, Color color) => AppText(
     text,
-    fontSize: 12,
+    fontSize: 15,
     color: color,
-    fontWeight: FontWeight.w500,
+    fontWeight: FontWeight.w400,
     textAlign: TextAlign.left,
   );
 
@@ -206,10 +212,36 @@ class DashboardScreen extends StatelessWidget {
           childAspectRatio: 4 / 1.6,
           physics: const NeverScrollableScrollPhysics(),
           children: [
-            _menuCard(Icons.credit_card, "Credit Card", cardColor, textColor),
-            _menuCard(Icons.security, "Your Coverage", cardColor, textColor),
-            _menuCard(Icons.pie_chart, "Reports", cardColor, textColor),
-            _menuCard(Icons.account_balance, "Accounts", cardColor, textColor),
+            _menuCard(
+              Icons.credit_card,
+              "Credit Card",
+              cardColor,
+              textColor,
+              () {
+                // navigate to
+              },
+            ),
+            _menuCard(
+              Icons.security,
+              "Your Coverage",
+              cardColor,
+              textColor,
+              () {
+                // navigate to
+              },
+            ),
+            _menuCard(Icons.pie_chart, "Reports", cardColor, textColor, () {
+              // navigate to
+            }),
+            _menuCard(
+              Icons.account_balance,
+              "Accounts",
+              cardColor,
+              textColor,
+              () {
+                // navigate to
+              },
+            ),
           ],
         );
       },
@@ -221,12 +253,13 @@ class DashboardScreen extends StatelessWidget {
     String title,
     Color cardColor,
     Color textColor,
+    Function()? onTap,
   ) {
     return InkWell(
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () {},
+          onTap: onTap,
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
@@ -284,14 +317,14 @@ class DashboardScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   FittedText(
-                    '${pointerValue.toInt()}%',
+                    '${pointerValue.toInt()}',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 40,
                       fontWeight: FontWeight.bold,
                       height: 1,
                     ),
                   ),
-                  AppText('Good', fontSize: 20, fontWeight: FontWeight.w500),
+                  AppText('Good', fontSize: 16, fontWeight: FontWeight.w500),
                 ],
               ),
             ),
@@ -313,59 +346,63 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 }
-  Widget metricCard(
-    BuildContext context, {
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color iconColor,
-    required String trendText,
-    void Function()? onTap,
-  }) {
-    double thisScreenWidth = MediaQuery.sizeOf(context).width;
 
-    final colorScheme = Theme.of(context).colorScheme;
-    return FractionallySizedBox(
-      widthFactor: thisScreenWidth > 1000 ? 0.32 : 0.48,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        margin: EdgeInsets.zero,
-        child: InkWell(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                AppText(
-                  title,
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-                AppText(
-                  value,
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-                const SizedBox(height: 3),
-                Wrap(
-                  children: [
-                    Icon(icon, color: iconColor, size: 16),
-                    const SizedBox(width: 4),
-                    AppText(
-                      trendText,
-                      fontSize: 14,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+Widget metricCard(
+  BuildContext context, {
+  required String title,
+  required String value,
+  required IconData icon,
+  required Color iconColor,
+  required String trendText,
+  void Function()? onTap,
+}) {
+  double thisScreenWidth = MediaQuery.sizeOf(context).width;
+
+  final colorScheme = Theme.of(context).colorScheme;
+  return FractionallySizedBox(
+    widthFactor: thisScreenWidth > 1000 ? 0.32 : 0.48,
+    child: Card(
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              AppText(
+                title,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: colorScheme.onSurface,
+              ),
+              const SizedBox(height: 7),
+              AppText(
+                value,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
+              const SizedBox(height: 3),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Icon(icon, color: iconColor, size: 16),
+                  const SizedBox(width: 3),
+                  AppText(
+                    trendText,
+                    fontSize: 14,
+                    color: Get.isDarkMode ? Colors.grey : Colors.black54,
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}

@@ -111,9 +111,10 @@ class _AiStrategyScreenState extends State<AiStrategyScreen> {
             const SizedBox(height: 15),
             _buildStrategyTile(
               context,
-              amount: "\$2500",
+              amount: "\$2,500",
               description:
                   "Utilize accelerated depreciation to lower your taxable income",
+              buttonLabel: "Ask BookSmart AI",
               color: greenColor,
             ),
           ],
@@ -181,11 +182,16 @@ class _AiStrategyScreenState extends State<AiStrategyScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            AppText(
-              amount,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: color ?? scheme.primary,
+            SizedBox(
+              width: 50,
+              child: FittedText(
+                amount,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: color ?? scheme.primary,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(

@@ -64,21 +64,16 @@ class _SignupScreenState extends State<SignupScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                         0.01.verticalSpace,
-
-                        /// 🔹 Subtitle
                         AppText(
                           "Sign up to get started with BookSmart",
                           fontSize: 14,
                         ),
-                        0.08.verticalSpace,
-
-                        /// 🔹 Email
+                        0.05.verticalSpace,
                         AppTextField(
                           controller: _emailController,
                           hintText: "Email",
                           keyboardType: TextInputType.emailAddress,
                           maxLines: 1,
-
                           fieldValidator: (v) {
                             if (v == null || v.isEmpty) {
                               return "Enter your email";
@@ -88,8 +83,6 @@ class _SignupScreenState extends State<SignupScreen> {
                           },
                         ),
                         0.02.verticalSpace,
-
-                        /// 🔹 Password
                         AppTextField(
                           controller: _passwordController,
                           hintText: "Password",
@@ -121,8 +114,6 @@ class _SignupScreenState extends State<SignupScreen> {
                           },
                         ),
                         0.02.verticalSpace,
-
-                        /// 🔹 Confirm Password
                         AppTextField(
                           controller: _confirmPasswordController,
                           hintText: "Confirm Password",
