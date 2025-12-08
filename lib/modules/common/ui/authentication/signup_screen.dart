@@ -1,5 +1,7 @@
+import 'package:booksmart/models/user_model.dart';
 import 'package:get/get.dart';
 import '../../../../constant/exports.dart';
+import '../../providers/auth_provider.dart';
 import 'login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -18,7 +20,15 @@ class _SignupScreenState extends State<SignupScreen> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool isCPA = true;
+  bool isCPA = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -169,25 +179,25 @@ class _SignupScreenState extends State<SignupScreen> {
                           buttonText: "Sign Up",
                           fontSize: 16,
                           radius: 10,
-                          onTapFunction: () {
-                            if (isCPA) {
-                              // Get.offAllNamed(Routes.dashboardCPA);
-                              Get.offAllNamed(Routes.profileScreenCPA);
-                            } else {
-                              Get.offAllNamed(Routes.home);
+                          onTapFunction: () async {
+                            if (_formKey.currentState!.validate()) {
+                              await signUpWithEmailPassword(
+                                email: _emailController.text.trim(),
+                                password: _passwordController.text,
+                                role: isCPA ? UserRole.cpa : UserRole.user,
+                              );
                             }
                           },
                         ),
                         0.06.verticalSpace,
 
-                        /// 🔹 Footer - Login Option
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             AppText("Already have an account?", fontSize: 14),
                             TextButton(
                               onPressed: () =>
-                                  Get.to(() => const LoginWithEmailScreen()),
+                                  Get.to(() => const LoginScreen()),
                               child: AppText(
                                 "Sign In",
                                 fontSize: 14,

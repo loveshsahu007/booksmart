@@ -1,7 +1,8 @@
 abstract class Routes {
-  static const String loginScreen = '/login';
+  static const String login = '/login';
   static const String forgotReset = '/forgot_reset';
   static const String signUp = '/sign_up';
+  static const String verifyEmail = '/verify_email';
 
   /// The bottom-bar screen for mobile and side-bar for web
   static const String home = '/';
@@ -25,6 +26,7 @@ abstract class Routes {
   static const String subscription = '/subscription';
 
   static const String aiStrategy = '/ai-strategy';
+  static const String profileScreen = '/profile-screen';
 
   /// ====
   /// =====

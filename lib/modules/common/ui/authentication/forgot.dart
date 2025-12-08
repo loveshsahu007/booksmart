@@ -178,7 +178,7 @@ class _ForgotResetPasswordScreenState extends State<ForgotResetPasswordScreen> {
                                   "Password has been reset!",
                                   snackPosition: SnackPosition.BOTTOM,
                                 );
-                                Get.offAllNamed(Routes.loginScreen);
+                                Get.offAllNamed(Routes.login);
                               } else {
                                 Get.snackbar(
                                   "Email Sent",
@@ -194,7 +194,7 @@ class _ForgotResetPasswordScreenState extends State<ForgotResetPasswordScreen> {
 
                         /// 🔹 Back to Login
                         TextButton(
-                          onPressed: () => Get.offAllNamed(Routes.loginScreen),
+                          onPressed: () => Get.offAllNamed(Routes.login),
                           child: AppText(
                             "Back to Login",
                             fontSize: 14,

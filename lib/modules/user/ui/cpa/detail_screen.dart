@@ -2,6 +2,7 @@ import 'package:booksmart/constant/exports.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../../../widgets/confirmation_dialog.dart';
 import '../../../../widgets/custom_dialog.dart';
 
 void goToCpaDetailScreen({bool shouldCloseBefore = false}) {
@@ -190,7 +191,15 @@ class CpaDetailScreen extends StatelessWidget {
           AppButton(
             buttonText: "Send Message",
             onTapFunction: () {
-              showConfirmationDialog();
+              showConfirmationDialog(
+                title: "Confirm Selection",
+                description:
+                    "Are you sure you'd like to connect with Laura Green, CPA, EA?",
+                onYes: () {
+                  Get.back();
+                  // Navigate to Access Granted screen
+                },
+              );
             },
             radius: 8,
           ),
@@ -238,29 +247,4 @@ class CpaDetailScreen extends StatelessWidget {
       backgroundColor: Colors.grey.shade800,
     );
   }
-}
-
-void showConfirmationDialog() {
-  Get.dialog(
-    AlertDialog(
-      title: AppText("Confirm Selection", fontSize: 14),
-      content: AppText(
-        "Are you sure you'd like to connect with Laura Green, CPA, EA?",
-        fontSize: 12,
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Get.back(),
-          child: AppText("Cancel", fontSize: 12),
-        ),
-        TextButton(
-          onPressed: () {
-            Get.back();
-            // Navigate to Access Granted screen
-          },
-          child: AppText("Confirm", fontSize: 12),
-        ),
-      ],
-    ),
-  );
 }

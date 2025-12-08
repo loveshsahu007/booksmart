@@ -96,7 +96,7 @@ class _SettingsScreenCPAState extends State<SettingsScreenCPA> {
           SizedBox(height: 10),
 
           buildTile("Logout", () {
-            Get.offAllNamed(Routes.loginScreen);
+            Get.offAllNamed(Routes.login);
           }, isDestructive: true),
         ],
       ),

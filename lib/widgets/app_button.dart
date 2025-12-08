@@ -2,7 +2,7 @@ import '../constant/exports.dart';
 
 class AppButton extends StatelessWidget {
   final String buttonText;
-  final void Function() onTapFunction;
+  final void Function()? onTapFunction;
   final bool isLoading;
   final Color? textColor;
   final Color? buttonColor;
@@ -16,7 +16,7 @@ class AppButton extends StatelessWidget {
   const AppButton({
     super.key,
     required this.buttonText,
-    required this.onTapFunction,
+    this.onTapFunction,
     this.isLoading = false,
     this.textColor,
     this.buttonColor,

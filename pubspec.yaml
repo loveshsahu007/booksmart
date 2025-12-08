@@ -55,6 +55,7 @@ dependencies:
   lucide_icons: ^0.257.0
   percent_indicator: ^4.2.5
   dropdown_search: ^6.0.2
+  supabase_flutter: ^2.10.3
 
 dev_dependencies:
   flutter_test:

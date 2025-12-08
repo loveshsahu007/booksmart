@@ -1,26 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
-import 'package:get/get.dart';
-
-void goToUserProfileScreen({bool shouldCloseBefore = false}) {
-  if (kIsWeb) {
-    if (shouldCloseBefore) {
-      Get.back(); // close previous dialog
-    }
-    customDialog(
-      child: const UserProfileScreen(),
-      title: 'Add Organization',
-      barrierDismissible: true,
-    );
-  } else {
-    if (shouldCloseBefore) {
-      Get.off(() => const UserProfileScreen());
-    } else {
-      Get.to(() => const UserProfileScreen());
-    }
-  }
-}
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -65,7 +44,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   children: [
                     /// 🔹 Title
                     AppText(
-                      "Set Up Your Organization Profile",
+                      "Set Up Your Profile",
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       textAlign: TextAlign.center,

@@ -1,17 +1,17 @@
+import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sign_in_button/sign_in_button.dart';
 import 'package:get/get.dart';
 import '../../../../constant/exports.dart';
-import 'sign_up.dart';
 
-class LoginWithEmailScreen extends StatefulWidget {
-  const LoginWithEmailScreen({super.key});
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
 
   @override
-  State<LoginWithEmailScreen> createState() => _LoginWithEmailScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginWithEmailScreenState extends State<LoginWithEmailScreen> {
+class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
@@ -133,12 +133,17 @@ class _LoginWithEmailScreenState extends State<LoginWithEmailScreen> {
                           fontSize: 16,
                           buttonText: "Sign In",
                           radius: 8,
-                          onTapFunction: () {
-                            Get.offAllNamed(Routes.home);
+                          onTapFunction: () async {
+                            if (_formKey.currentState!.validate()) {
+                              await signinWithEmailPassword(
+                                email: _emailController.text,
+                                password: _passwordController.text,
+                              );
+                            }
                           },
                         ),
                         0.06.verticalSpace,
-                        // Divider
+
                         Row(
                           children: [
                             Expanded(
@@ -197,8 +202,7 @@ class _LoginWithEmailScreenState extends State<LoginWithEmailScreen> {
                               ),
                             ),
                             TextButton(
-                              onPressed: () =>
-                                  Get.to(() => const SignupScreen()),
+                              onPressed: () => Get.toNamed(Routes.signUp),
                               child: AppText(
                                 "Sign Up",
                                 fontSize: 14,

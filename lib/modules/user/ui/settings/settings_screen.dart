@@ -1,12 +1,12 @@
+import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/modules/user/ui/bank/bank_list_screen.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/document_repository_screen.dart';
 import 'package:booksmart/modules/user/ui/organization/organization_list_screen.dart';
-import 'package:booksmart/modules/user/ui/profile_screen.dart';
 import 'package:booksmart/modules/user/ui/sponsored_offers/sponsored_offers_screen.dart';
-import 'package:booksmart/routes/routes.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../../routes/routes.dart';
 import '../../../../widgets/app_text.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -39,7 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             borderRadius: BorderRadius.circular(10),
             child: InkWell(
               onTap: () {
-                goToUserProfileScreen();
+                Get.toNamed(Routes.profileScreen);
               },
               borderRadius: BorderRadius.circular(10),
               child: Container(
@@ -174,8 +174,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SizedBox(height: 10),
 
           buildTile("Logout", () {
-            Get.offAllNamed(Routes.loginScreen);
+            logOut();
           }, isDestructive: true),
+
+          SizedBox(height: 100),
         ],
       ),
     );

@@ -11,10 +11,8 @@ showSnackBar(
   Get.showSnackbar(
     GetSnackBar(
       title: title,
-
       messageText: Text(
         message,
-
         textAlign: title == null ? TextAlign.center : TextAlign.left,
         maxLines: 10,
         overflow: TextOverflow.ellipsis,
