@@ -10,67 +10,64 @@ Future<dynamic> showConfirmationDialog({
     pageBuilder: (context, animation, secondaryAnimation) {
       return Align(
         alignment: Alignment.center,
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 320),
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: const [BoxShadow(color: Colors.grey, blurRadius: 10.0)],
-          ),
-          margin: const EdgeInsets.all(30),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 10),
-                  child: SizedBox(
-                    width: 30,
-                    height: 30,
-                    child: IconButton(
-                      onPressed: () {
-                        Get.back();
-                      },
-                      icon: const Icon(Icons.close),
-                      color: Colors.white,
-                      iconSize: 20,
-                      padding: EdgeInsets.zero,
+        child: Card(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 320),
+            // decoration: BoxDecoration(
+            //   color: Colors.black,
+            //   borderRadius: BorderRadius.circular(10),
+            //   boxShadow: const [BoxShadow(color: Colors.grey, blurRadius: 10.0)],
+            // ),
+            margin: const EdgeInsets.all(30),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: SizedBox(
+                      width: 30,
+                      height: 30,
+                      child: IconButton(
+                        onPressed: () {
+                          Get.back();
+                        },
+                        icon: const Icon(Icons.close),
+
+                        iconSize: 20,
+                        padding: EdgeInsets.zero,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (title.isNotEmpty) ...[
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+                if (title.isNotEmpty) ...[
+                  Text(
+                    title,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
-                const SizedBox(height: 20),
-              ],
-              if (description.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Text(
-                    description,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      height: 1.2,
-                      decoration: TextDecoration.none,
+                  const SizedBox(height: 20),
+                ],
+                if (description.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      description,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        height: 1.2,
+                        decoration: TextDecoration.none,
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                ],
+                ElevatedButton(onPressed: onYes, child: Text("Yes")),
                 const SizedBox(height: 20),
               ],
-              ElevatedButton(onPressed: onYes, child: Text("Yes")),
-              const SizedBox(height: 20),
-            ],
+            ),
           ),
         ),
       );

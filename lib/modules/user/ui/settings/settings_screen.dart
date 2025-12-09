@@ -1,3 +1,4 @@
+import 'package:booksmart/controllers/user_controller.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/modules/user/ui/bank/bank_list_screen.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/document_repository_screen.dart';
@@ -21,6 +22,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _proTips = true;
   bool _isDarkMode = Get.isDarkMode;
 
+  late final UserController _userCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _userCtrl = Get.put(UserController());
+    _userCtrl.loadCurrentUser(); // load current user info
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -34,60 +44,69 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              onTap: () {
-                Get.toNamed(Routes.profileScreen);
-              },
+          // Profile section
+          Obx(() {
+            final user = _userCtrl.user.value;
+            final initials =
+                (user != null && user.firstName != '' && user.lastName != '')
+                ? "${user.firstName![0]}${user.lastName![0]}"
+                : "NA";
+            return Material(
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [
-                    if (!isDark)
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 26,
-                      backgroundColor: colorScheme.primary,
-                      child: const AppText(
-                        "AC",
-                        color: Colors.white,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        AppText(
-                          "Ashley Collins",
-                          fontSize: 18,
-
-                          color: colorScheme.onSurface,
+              child: InkWell(
+                onTap: () {
+                  Get.toNamed(Routes.profileScreen);
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      if (!isDark)
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
                         ),
-                        AppText(
-                          "ashleycollins@email.com",
-                          color: colorScheme.onSurface.withValues(alpha: 0.7),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor: colorScheme.primary,
+                        child: AppText(
+                          initials,
+                          color: Colors.white,
                           fontSize: 14,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppText(
+                            user != null
+                                ? "${user.firstName} ${user.lastName}"
+                                : "Your Name",
+                            fontSize: 18,
+                            color: colorScheme.onSurface,
+                          ),
+                          AppText(
+                            user?.email ?? "your@email.com",
+                            color: colorScheme.onSurface.withValues(alpha: 0.7),
+                            fontSize: 14,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          }),
 
           const SizedBox(height: 10),
 
@@ -96,12 +115,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: Icon(Icons.chevron_right, size: 22),
             onTap: () {},
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
+
           SwitchListTile.adaptive(
             title: AppText(
               "Auto Review Results",
               fontSize: 14,
-
               color: colorScheme.onSurface,
             ),
             value: _autoReviewResults,
@@ -110,12 +129,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
             activeThumbColor: colorScheme.primary,
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
+
           SwitchListTile.adaptive(
             title: AppText(
               "Pro Tips",
               fontSize: 14,
-
               color: colorScheme.onSurface,
             ),
             value: _proTips,
@@ -124,12 +143,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
             activeThumbColor: colorScheme.primary,
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           SwitchListTile.adaptive(
             title: AppText(
               "Dark Mode",
-
               fontSize: 14,
               color: colorScheme.onSurface,
             ),
@@ -142,42 +160,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
             activeThumbColor: colorScheme.primary,
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           buildTile("Documents Repository", () {
-            goToDocumentRepositoryScreen(
-              shouldCloseBefore: false,
-            ); // or false depending on your needs
+            goToDocumentRepositoryScreen(shouldCloseBefore: false);
           }),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           buildTile("Sponsored Offers", () {
-            goToSponsoredOffersScreen(
-              shouldCloseBefore: false,
-            ); // or false depending on your needs
+            goToSponsoredOffersScreen(shouldCloseBefore: false);
           }),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           buildTile("Organizations", () {
             goToOrganizationListScreen();
           }),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           buildTile("Banks", () {
-            goToBanksListScreen(
-              shouldCloseBefore: false,
-            ); // or false depending on your needs
+            goToBanksListScreen(shouldCloseBefore: false);
           }),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           buildTile("Delete Account", () {}, isDestructive: false),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           buildTile("Logout", () {
             logOut();
           }, isDestructive: true),
 
-          SizedBox(height: 100),
+          const SizedBox(height: 100),
         ],
       ),
     );

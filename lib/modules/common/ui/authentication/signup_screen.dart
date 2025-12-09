@@ -14,9 +14,11 @@ class SignupScreen extends StatefulWidget {
 class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
+  final _emailController = TextEditingController(
+    text: "shahzadqaisarkhan@gmail.com",
+  );
+  final _passwordController = TextEditingController(text: "Sp17bcs052@");
+  final _confirmPasswordController = TextEditingController(text: "Sp17bcs052@");
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;

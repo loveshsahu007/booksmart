@@ -56,6 +56,7 @@ dependencies:
   percent_indicator: ^4.2.5
   dropdown_search: ^6.0.2
   supabase_flutter: ^2.10.3
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:
