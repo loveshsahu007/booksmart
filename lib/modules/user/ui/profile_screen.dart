@@ -1,10 +1,14 @@
 // File: lib/screens/profile/user_profile_screen.dart
 
+import 'dart:typed_data';
+
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/controllers/user_controller.dart';
 import 'package:booksmart/modules/common/providers/supabase_crud.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -23,6 +27,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   final _phoneCtrl = TextEditingController();
 
   final _crud = SupabaseCrudService();
+  final _imagePicker = ImagePicker();
+
+  // Profile image upload
+  XFile? _profileImage; // selected file (kept for upload)
+  Uint8List?
+  _profileImageBytes; // in-memory bytes for preview (works on web + mobile)
+  String? _profileImageUrl; // remote URL (from server)
 
   bool _loading = false;
   bool _initialLoading = true;
@@ -65,7 +76,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         single: true,
       );
 
-      // res might be maybeSingle result shaped by your SDK; normalize it.
       final Map<String, dynamic>? row = (res is Map<String, dynamic>)
           ? res
           : (res is List && res.isNotEmpty ? res.first : null);
@@ -73,11 +83,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       if (row != null) {
         _firstNameCtrl.text = (row['first_name'] ?? '') as String;
         _lastNameCtrl.text = (row['last_name'] ?? '') as String;
-        // phone_number vs phone-number — use the exact column name in your DB
         _phoneCtrl.text = (row['phone_number'] ?? '') as String;
+
+        // Load existing profile image URL
+        _profileImageUrl = row['img_url'] as String?;
       }
     } catch (e) {
-      // quietly log and show a friendly message
       debugPrint('Failed to load profile: $e');
       Get.snackbar(
         'Error',
@@ -86,6 +97,33 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       );
     } finally {
       setState(() => _initialLoading = false);
+    }
+  }
+
+  /// Pick image from gallery and store bytes for preview.
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        final bytes = await pickedFile.readAsBytes();
+
+        setState(() {
+          _profileImage = pickedFile;
+          _profileImageBytes = bytes;
+          // keep _profileImageUrl as-is (so if user cancels before saving, old URL remains)
+        });
+      }
+    } catch (e) {
+      debugPrint('Image picker error: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to pick image',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 
@@ -104,13 +142,39 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
     setState(() => _loading = true);
 
-    final payload = <String, dynamic>{
-      'first_name': _firstNameCtrl.text.trim(),
-      'last_name': _lastNameCtrl.text.trim(),
-      'phone_number': _phoneCtrl.text.trim(),
-    };
-
     try {
+      // Upload profile image if selected
+      if (_profileImage != null) {
+        // Your SupabaseCrudService.uploadFile should accept XFile and return public URL
+        final uploadedUrl = await _crud.uploadFile(
+          _profileImage!,
+          'userImages',
+        );
+
+        if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+          _profileImageUrl = uploadedUrl;
+
+          // After successful upload, clear local preview bytes to prefer showing the remote image
+          _profileImage = null;
+          _profileImageBytes = null;
+        }
+      }
+
+      // Prepare payload
+      final payload = <String, dynamic>{
+        'first_name': _firstNameCtrl.text.trim(),
+        'last_name': _lastNameCtrl.text.trim(),
+        'phone_number': _phoneCtrl.text.trim().isEmpty
+            ? null
+            : _phoneCtrl.text.trim(),
+        if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
+          'img_url': _profileImageUrl,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      // Remove null values from payload
+      payload.removeWhere((key, value) => value == null);
+
       // 1️⃣ Update in Supabase
       await _crud.update(
         table: 'users',
@@ -118,26 +182,38 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         filters: {'auth_id': authId},
       );
 
-      // 2️⃣ Update in UserController
-      final userCtrl = Get.find<UserController>();
-      if (userCtrl.hasUser) {
-        final updatedUser = userCtrl.user.value!.copyWith(
-          firstName: payload['first_name'],
-          lastName: payload['last_name'],
-          phoneNumber: payload['phone_number'],
-        );
-        userCtrl.user.value = updatedUser;
+      // 2️⃣ Update in UserController (local app state)
+      try {
+        final userCtrl = Get.find<UserController>();
+        if (userCtrl.hasUser) {
+          final updatedUser = userCtrl.user.value!.copyWith(
+            firstName: _firstNameCtrl.text.trim(),
+            lastName: _lastNameCtrl.text.trim(),
+            phoneNumber: _phoneCtrl.text.trim().isEmpty
+                ? null
+                : _phoneCtrl.text.trim(),
+            imgUrl: _profileImageUrl,
+          );
+          userCtrl.user.value = updatedUser;
+        }
+      } catch (e) {
+        // If UserController isn't found, don't crash — just log.
+        debugPrint('UserController update skipped: $e');
       }
 
-      // 3️⃣ Navigate or show success
-      Get.offAllNamed(Routes.home); // User Dashboard
-      // Optional Snackbar
-      // Get.snackbar('Success', 'Profile updated', snackPosition: SnackPosition.BOTTOM);
+      // 3️⃣ Show success message
+      Get.snackbar(
+        'Success',
+        'Profile updated successfully',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
     } catch (e) {
       debugPrint('Profile update failed: $e');
       Get.snackbar(
         'Error',
-        'Failed to update profile',
+        'Failed to update profile: ${e.toString()}',
         snackPosition: SnackPosition.BOTTOM,
       );
     } finally {
@@ -145,12 +221,62 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
+  Widget _buildProfileImageSection() {
+    ImageProvider? avatarImage;
+
+    // Prefer local preview bytes if present (user just picked an image)
+    if (_profileImageBytes != null) {
+      avatarImage = MemoryImage(_profileImageBytes!);
+    } else if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty) {
+      // Fall back to network image (uploaded previously)
+      avatarImage = NetworkImage(_profileImageUrl!);
+    } else {
+      avatarImage = null;
+    }
+
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: _pickImage,
+          child: CircleAvatar(
+            radius: 50,
+            backgroundColor: Colors.grey.shade300,
+            backgroundImage: avatarImage,
+            child: avatarImage == null
+                ? const Icon(Icons.camera_alt, size: 30, color: Colors.grey)
+                : null,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: _pickImage,
+              child: const Text('Change Profile Picture'),
+            ),
+            if (avatarImage != null)
+              TextButton(
+                onPressed: () {
+                  // remove selection & remote URL (if user wants to remove pic)
+                  setState(() {
+                    _profileImage = null;
+                    _profileImageBytes = null;
+                    _profileImageUrl = null;
+                  });
+                },
+                child: const Text('Remove'),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      appBar: kIsWeb ? null : AppBar(),
+      appBar: kIsWeb ? null : AppBar(title: const Text('My Profile')),
       body: Scrollbar(
         thumbVisibility: true,
         radius: const Radius.circular(10),
@@ -178,12 +304,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
                     0.05.verticalSpace,
 
-                    // Profile Image (tap to upload could be added later)
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: theme.colorScheme.primary,
-                      child: const Icon(Icons.camera_alt),
-                    ),
+                    // Profile Image
+                    _buildProfileImageSection(),
+
                     0.03.verticalSpace,
 
                     if (_initialLoading)
@@ -228,14 +351,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         },
                       ),
                       0.06.verticalSpace,
-
                       AppButton(
                         buttonText: _loading ? "Saving..." : "Save Changes",
                         fontSize: 16,
                         radius: 8,
                         onTapFunction: _loading ? null : _saveProfile,
                       ),
-
                       0.05.verticalSpace,
                     ],
                   ],

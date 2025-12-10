@@ -1,3 +1,8 @@
+// File: lib/screens/profile/profile_screen_cpa.dart
+
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/controllers/user_controller.dart';
 import 'package:booksmart/models/user_data_model.dart';
@@ -5,8 +10,9 @@ import 'package:booksmart/modules/common/providers/supabase_crud.dart';
 import 'package:booksmart/widgets/multiple_selection_dropdown_widget.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileScreenCPA extends StatefulWidget {
   const ProfileScreenCPA({super.key});
@@ -41,7 +47,9 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
   List<String> selectedStates = [];
 
   // File uploads
-  XFile? _profileImage;
+  XFile? _profileImage; // keep for upload
+  Uint8List? _profileImageBytes; // preview bytes (works on web + mobile)
+
   XFile? _certificationProofFile;
   XFile? _licenseCopyFile;
   String? _profileImageUrl;
@@ -220,28 +228,32 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
         _termsAgreed = (row['terms_agreed'] ?? false) as bool;
 
         // Update UserController
-        final userCtrl = Get.find<UserController>();
-        if (userCtrl.hasUser) {
-          final updatedUser = userCtrl.user.value!.copyWith(
-            firstName: firstNameCtrl.text,
-            lastName: lastNameCtrl.text,
-            email: emailCtrl.text,
-            phoneNumber: phoneCtrl.text,
-            imgUrl: _profileImageUrl,
-            middleName: middleNameCtrl.text,
-            certifications: selectedCertifications,
-            licenseNumber: licenseCtrl.text,
-            yearsOfExperience: int.tryParse(expCtrl.text),
-            professionalBio: bioCtrl.text,
-            specialties: selectedSpecialties,
-            stateFocuses: selectedStates,
-            certificationProofUrl: _certificationProofUrl,
-            licenseCopyUrl: _licenseCopyUrl,
-            termsAgreed: _termsAgreed,
-            status: (row['status'] ?? 'pending') as String,
-            role: (row['role'] ?? 'cpa') as String,
-          );
-          userCtrl.user.value = updatedUser;
+        try {
+          final userCtrl = Get.find<UserController>();
+          if (userCtrl.hasUser) {
+            final updatedUser = userCtrl.user.value!.copyWith(
+              firstName: firstNameCtrl.text,
+              lastName: lastNameCtrl.text,
+              email: emailCtrl.text,
+              phoneNumber: phoneCtrl.text,
+              imgUrl: _profileImageUrl,
+              middleName: middleNameCtrl.text,
+              certifications: selectedCertifications,
+              licenseNumber: licenseCtrl.text,
+              yearsOfExperience: int.tryParse(expCtrl.text),
+              professionalBio: bioCtrl.text,
+              specialties: selectedSpecialties,
+              stateFocuses: selectedStates,
+              certificationProofUrl: _certificationProofUrl,
+              licenseCopyUrl: _licenseCopyUrl,
+              termsAgreed: _termsAgreed,
+              status: (row['status'] ?? 'pending') as String,
+              role: (row['role'] ?? 'cpa') as String,
+            );
+            userCtrl.user.value = updatedUser;
+          }
+        } catch (e) {
+          debugPrint('UserController update skipped: $e');
         }
       } else {
         // New user - set email if available
@@ -275,80 +287,40 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
     return [];
   }
 
-  // FIXED: Proper file upload method for Supabase with Uint8List
-  Future<String?> _uploadFile(XFile file, String bucketName) async {
-    try {
-      final fileBytes = await file.readAsBytes();
-      final fileName =
-          '${_currentAuthId}_${DateTime.now().millisecondsSinceEpoch}_${path.basename(file.path)}';
-
-      // Upload binary data (Uint8List)
-      await _supabase.storage
-          .from(bucketName)
-          .uploadBinary(
-            fileName,
-            fileBytes,
-            fileOptions: FileOptions(
-              upsert: true,
-              contentType: _getMimeType(file.path),
-            ),
-          );
-
-      // Get public URL
-      final url = _supabase.storage.from(bucketName).getPublicUrl(fileName);
-      return url;
-    } catch (e) {
-      debugPrint('File upload failed: $e');
-      Get.snackbar(
-        'Upload Error',
-        'Failed to upload file: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return null;
-    }
-  }
-
-  // Helper to get MIME type from file extension
-  String _getMimeType(String filePath) {
-    final extension = path.extension(filePath).toLowerCase();
-    switch (extension) {
-      case '.jpg':
-      case '.jpeg':
-        return 'image/jpeg';
-      case '.png':
-        return 'image/png';
-      case '.gif':
-        return 'image/gif';
-      case '.pdf':
-        return 'application/pdf';
-      case '.doc':
-        return 'application/msword';
-      case '.docx':
-        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      default:
-        return 'application/octet-stream';
-    }
-  }
-
+  /// Picks images for profile or documents.
+  /// For profile images, also read bytes for preview (works on web + mobile).
   Future<void> _pickImage(ImageSource source, {bool isProfile = true}) async {
     try {
       final XFile? pickedFile = await ImagePicker().pickImage(source: source);
       if (pickedFile != null) {
-        setState(() {
-          if (isProfile) {
+        if (isProfile) {
+          final bytes = await pickedFile.readAsBytes();
+          setState(() {
             _profileImage = pickedFile;
-          } else if (_currentStep == 2) {
-            // Determine which document to upload based on context
+            _profileImageBytes = bytes;
+          });
+        } else {
+          // For documents we keep the XFile reference (no preview bytes needed)
+          setState(() {
+            // determine which document to set:
             if (_certificationProofFile == null) {
               _certificationProofFile = pickedFile;
-            } else {
+            } else if (_licenseCopyFile == null) {
               _licenseCopyFile = pickedFile;
+            } else {
+              // if both already present, replace the certification proof by default
+              _certificationProofFile = pickedFile;
             }
-          }
-        });
+          });
+        }
       }
     } catch (e) {
       debugPrint('Image picker error: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to pick image',
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 
@@ -364,20 +336,26 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
     }
 
     setState(() => _loading = true);
-
+    final crud = SupabaseCrudService();
     try {
       // Upload files if they exist
       if (_profileImage != null) {
-        _profileImageUrl = await _uploadFile(_profileImage!, 'profile-images');
+        final url = await crud.uploadFile(_profileImage!, 'userImages');
+        if (url != null && url.isNotEmpty) {
+          _profileImageUrl = url;
+          // clear preview bytes & XFile so UI shows remote image after save
+          _profileImage = null;
+          _profileImageBytes = null;
+        }
       }
       if (_certificationProofFile != null) {
-        _certificationProofUrl = await _uploadFile(
+        _certificationProofUrl = await crud.uploadFile(
           _certificationProofFile!,
           'documents',
         );
       }
       if (_licenseCopyFile != null) {
-        _licenseCopyUrl = await _uploadFile(_licenseCopyFile!, 'documents');
+        _licenseCopyUrl = await crud.uploadFile(_licenseCopyFile!, 'documents');
       }
 
       // Prepare payload
@@ -434,75 +412,79 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
       );
 
       // Update UserController
-      final userCtrl = Get.find<UserController>();
-      if (userCtrl.hasUser) {
-        final updatedUser = userCtrl.user.value!.copyWith(
-          authId: authId,
-          email: emailCtrl.text.trim(),
-          role: 'cpa',
-          firstName: firstNameCtrl.text.trim(),
-          lastName: lastNameCtrl.text.trim(),
-          middleName: middleNameCtrl.text.trim().isEmpty
-              ? null
-              : middleNameCtrl.text.trim(),
-          phoneNumber: phoneCtrl.text.trim().isEmpty
-              ? null
-              : phoneCtrl.text.trim(),
-          imgUrl: _profileImageUrl,
-          certifications: selectedCertifications,
-          licenseNumber: licenseCtrl.text.trim().isEmpty
-              ? null
-              : licenseCtrl.text.trim(),
-          yearsOfExperience: expCtrl.text.trim().isEmpty
-              ? null
-              : int.tryParse(expCtrl.text.trim()),
-          professionalBio: bioCtrl.text.trim().isEmpty
-              ? null
-              : bioCtrl.text.trim(),
-          specialties: selectedSpecialties,
-          stateFocuses: selectedStates,
-          certificationProofUrl: _certificationProofUrl,
-          licenseCopyUrl: _licenseCopyUrl,
-          termsAgreed: _termsAgreed,
-          status: 'pending',
-          updatedAt: DateTime.now(),
-        );
-        userCtrl.user.value = updatedUser;
-      } else {
-        // Create new user in controller
-        final newUser = UserModel(
-          authId: authId,
-          email: emailCtrl.text.trim(),
-          role: 'cpa',
-          firstName: firstNameCtrl.text.trim(),
-          lastName: lastNameCtrl.text.trim(),
-          middleName: middleNameCtrl.text.trim().isEmpty
-              ? null
-              : middleNameCtrl.text.trim(),
-          phoneNumber: phoneCtrl.text.trim().isEmpty
-              ? null
-              : phoneCtrl.text.trim(),
-          imgUrl: _profileImageUrl,
-          certifications: selectedCertifications,
-          licenseNumber: licenseCtrl.text.trim().isEmpty
-              ? null
-              : licenseCtrl.text.trim(),
-          yearsOfExperience: expCtrl.text.trim().isEmpty
-              ? null
-              : int.tryParse(expCtrl.text.trim()),
-          professionalBio: bioCtrl.text.trim().isEmpty
-              ? null
-              : bioCtrl.text.trim(),
-          specialties: selectedSpecialties,
-          stateFocuses: selectedStates,
-          certificationProofUrl: _certificationProofUrl,
-          licenseCopyUrl: _licenseCopyUrl,
-          termsAgreed: _termsAgreed,
-          status: 'pending',
-          createdAt: DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-        userCtrl.user.value = newUser;
+      try {
+        final userCtrl = Get.find<UserController>();
+        if (userCtrl.hasUser) {
+          final updatedUser = userCtrl.user.value!.copyWith(
+            authId: authId,
+            email: emailCtrl.text.trim(),
+            role: 'cpa',
+            firstName: firstNameCtrl.text.trim(),
+            lastName: lastNameCtrl.text.trim(),
+            middleName: middleNameCtrl.text.trim().isEmpty
+                ? null
+                : middleNameCtrl.text.trim(),
+            phoneNumber: phoneCtrl.text.trim().isEmpty
+                ? null
+                : phoneCtrl.text.trim(),
+            imgUrl: _profileImageUrl,
+            certifications: selectedCertifications,
+            licenseNumber: licenseCtrl.text.trim().isEmpty
+                ? null
+                : licenseCtrl.text.trim(),
+            yearsOfExperience: expCtrl.text.trim().isEmpty
+                ? null
+                : int.tryParse(expCtrl.text.trim()),
+            professionalBio: bioCtrl.text.trim().isEmpty
+                ? null
+                : bioCtrl.text.trim(),
+            specialties: selectedSpecialties,
+            stateFocuses: selectedStates,
+            certificationProofUrl: _certificationProofUrl,
+            licenseCopyUrl: _licenseCopyUrl,
+            termsAgreed: _termsAgreed,
+            status: 'pending',
+            updatedAt: DateTime.now(),
+          );
+          userCtrl.user.value = updatedUser;
+        } else {
+          // Create new user in controller
+          final newUser = UserModel(
+            authId: authId,
+            email: emailCtrl.text.trim(),
+            role: 'cpa',
+            firstName: firstNameCtrl.text.trim(),
+            lastName: lastNameCtrl.text.trim(),
+            middleName: middleNameCtrl.text.trim().isEmpty
+                ? null
+                : middleNameCtrl.text.trim(),
+            phoneNumber: phoneCtrl.text.trim().isEmpty
+                ? null
+                : phoneCtrl.text.trim(),
+            imgUrl: _profileImageUrl,
+            certifications: selectedCertifications,
+            licenseNumber: licenseCtrl.text.trim().isEmpty
+                ? null
+                : licenseCtrl.text.trim(),
+            yearsOfExperience: expCtrl.text.trim().isEmpty
+                ? null
+                : int.tryParse(expCtrl.text.trim()),
+            professionalBio: bioCtrl.text.trim().isEmpty
+                ? null
+                : bioCtrl.text.trim(),
+            specialties: selectedSpecialties,
+            stateFocuses: selectedStates,
+            certificationProofUrl: _certificationProofUrl,
+            licenseCopyUrl: _licenseCopyUrl,
+            termsAgreed: _termsAgreed,
+            status: 'pending',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+          userCtrl.user.value = newUser;
+        }
+      } catch (e) {
+        debugPrint('UserController update skipped: $e');
       }
 
       debugPrint('Successfully saved CPA profile to Supabase');
@@ -552,14 +534,61 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
 
     try {
       await _saveToSupabase();
-      Get.offAllNamed(Routes.profileUnderReviewCPA);
+
+      // Create user model with current data to pass to review screen
+      final userData = UserModel(
+        authId: _currentAuthId,
+        email: emailCtrl.text.trim(),
+        role: 'cpa',
+        firstName: firstNameCtrl.text.trim(),
+        lastName: lastNameCtrl.text.trim(),
+        middleName: middleNameCtrl.text.trim().isEmpty
+            ? null
+            : middleNameCtrl.text.trim(),
+        phoneNumber: phoneCtrl.text.trim().isEmpty
+            ? null
+            : phoneCtrl.text.trim(),
+        imgUrl: _profileImageUrl,
+        certifications: selectedCertifications,
+        licenseNumber: licenseCtrl.text.trim().isEmpty
+            ? null
+            : licenseCtrl.text.trim(),
+        yearsOfExperience: expCtrl.text.trim().isEmpty
+            ? null
+            : int.tryParse(expCtrl.text.trim()),
+        professionalBio: bioCtrl.text.trim().isEmpty
+            ? null
+            : bioCtrl.text.trim(),
+        specialties: selectedSpecialties,
+        stateFocuses: selectedStates,
+        certificationProofUrl: _certificationProofUrl,
+        licenseCopyUrl: _licenseCopyUrl,
+        termsAgreed: _termsAgreed,
+        status: 'pending',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      Get.toNamed(
+        Routes.profileUnderReviewCPA,
+        arguments: userData, // Pass the UserModel object
+      );
     } catch (e) {
       debugPrint('Profile submission failed: $e');
     }
   }
 
-  // FIXED: Profile image section - The key fix is here
   Widget _buildProfileImageSection() {
+    ImageProvider? avatarImage;
+
+    if (_profileImageBytes != null) {
+      avatarImage = MemoryImage(_profileImageBytes!);
+    } else if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty) {
+      avatarImage = NetworkImage(_profileImageUrl!);
+    } else {
+      avatarImage = null;
+    }
+
     return Column(
       children: [
         GestureDetector(
@@ -567,23 +596,32 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
           child: CircleAvatar(
             radius: 50,
             backgroundColor: Colors.grey.shade300,
-            // FIX: Convert XFile to File for FileImage
-            backgroundImage: _profileImage != null
-                ? FileImage(File(_profileImage!.path))
-                : (_profileImageUrl != null && _profileImageUrl!.isNotEmpty
-                      ? NetworkImage(_profileImageUrl!) as ImageProvider
-                      : null),
-            child:
-                _profileImage == null &&
-                    (_profileImageUrl == null || _profileImageUrl!.isEmpty)
+            backgroundImage: avatarImage,
+            child: avatarImage == null
                 ? const Icon(Icons.camera_alt, size: 30)
                 : null,
           ),
         ),
         const SizedBox(height: 10),
-        TextButton(
-          onPressed: () => _pickImage(ImageSource.gallery, isProfile: true),
-          child: const Text('Upload Profile Picture'),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: () => _pickImage(ImageSource.gallery, isProfile: true),
+              child: const Text('Upload Profile Picture'),
+            ),
+            if (avatarImage != null)
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _profileImage = null;
+                    _profileImageBytes = null;
+                    _profileImageUrl = null;
+                  });
+                },
+                child: const Text('Remove'),
+              ),
+          ],
         ),
       ],
     );
@@ -867,6 +905,11 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                               hint: "Select Certifications",
                               items: certificationOptions,
                               selectedItems: selectedCertifications,
+                              onChanged: (newList) {
+                                setState(
+                                  () => selectedCertifications = newList,
+                                );
+                              },
                             ),
 
                             const SizedBox(height: 15),
@@ -948,6 +991,9 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                               hint: "Select Specialties",
                               items: specialtyOptions,
                               selectedItems: selectedSpecialties,
+                              onChanged: (newList) {
+                                setState(() => selectedSpecialties = newList);
+                              },
                             ),
 
                             const SizedBox(height: 10),
@@ -964,6 +1010,9 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                               hint: "Select States Where Licensed",
                               items: usStates,
                               selectedItems: selectedStates,
+                              onChanged: (newList) {
+                                setState(() => selectedStates = newList);
+                              },
                             ),
                           ],
                         ),

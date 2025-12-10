@@ -1,6 +1,7 @@
-import 'dart:io';
-import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:path/path.dart' as path;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart'; // Add this import
 
@@ -157,61 +158,62 @@ class SupabaseCrudService {
   ///
   /// Returns:
   /// - Public URL of the uploaded file
-  Future<String> uploadFile({
-    required String bucketName,
-    required dynamic file, // File (mobile), Uint8List (web), or XFile
-    String? fileName,
-    String? folderPath,
-    String? contentType, // Optional content type
-  }) async {
+  // FIXED: Proper file upload method for Supabase with Uint8List
+  Future<String?> uploadFile(
+    XFile file,
+    String bucketName,
+  
+  ) async {
     try {
-      // Generate file name if not provided
-      String finalFileName =
-          fileName ?? 'file_${DateTime.now().millisecondsSinceEpoch}';
+      final fileBytes = await file.readAsBytes();
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_${path.basename(file.path)}';
 
-      // Add folder path if provided
-      String filePath = finalFileName;
-      if (folderPath != null) {
-        filePath = '$folderPath$finalFileName';
-      }
-
-      // Convert to Uint8List
-      Uint8List fileBytes;
-      if (file is File) {
-        final List<int> bytes = await file.readAsBytes();
-        fileBytes = Uint8List.fromList(bytes);
-      } else if (file is Uint8List) {
-        fileBytes = file;
-      } else if (file is XFile) {
-        // Handle XFile from image_picker
-        final bytes = await file.readAsBytes();
-        fileBytes = Uint8List.fromList(bytes);
-      } else {
-        throw Exception(
-          "Unsupported file type. Use File, Uint8List, or XFile.",
-        );
-      }
-
-      // Upload to Supabase Storage with file options
-      final fileOptions = FileOptions(
-        upsert: true,
-        contentType: contentType ?? 'application/octet-stream',
-      );
-
+      // Upload binary data (Uint8List)
       await _supabase.storage
           .from(bucketName)
-          .uploadBinary(filePath, fileBytes, fileOptions: fileOptions);
+          .uploadBinary(
+            fileName,
+            fileBytes,
+            fileOptions: FileOptions(
+              upsert: true,
+              contentType: _getMimeType(file.path),
+            ),
+          );
 
       // Get public URL
-      final String publicUrl = _supabase.storage
-          .from(bucketName)
-          .getPublicUrl(filePath);
-
-      debugPrint("File uploaded successfully: $publicUrl");
-      return publicUrl;
+      final url = _supabase.storage.from(bucketName).getPublicUrl(fileName);
+      return url;
     } catch (e) {
-      debugPrint("File upload failed: $e");
-      throw Exception("File upload failed: $e");
+      debugPrint('File upload failed: $e');
+      Get.snackbar(
+        'Upload Error',
+        'Failed to upload file: ${e.toString()}',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return null;
     }
+  }
+}
+
+// Helper to get MIME type from file extension
+String _getMimeType(String filePath) {
+  final extension = path.extension(filePath).toLowerCase();
+  switch (extension) {
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg';
+    case '.png':
+      return 'image/png';
+    case '.gif':
+      return 'image/gif';
+    case '.pdf':
+      return 'application/pdf';
+    case '.doc':
+      return 'application/msword';
+    case '.docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    default:
+      return 'application/octet-stream';
   }
 }

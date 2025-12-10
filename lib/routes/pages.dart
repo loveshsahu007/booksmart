@@ -1,4 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/models/user_data_model.dart';
 import 'package:booksmart/modules/cpa/ui/chat_list_screen.dart';
 import 'package:booksmart/modules/cpa/ui/profile_screen.dart';
 import 'package:booksmart/modules/cpa/ui/profile_under_review_screen.dart';
@@ -145,9 +146,20 @@ class AppPages {
     ),
 
     GetPage(name: Routes.profileScreenCPA, page: () => ProfileScreenCPA()),
-    GetPage(
-      name: Routes.profileUnderReviewCPA,
-      page: () => ProfileUnderReviewScreenCPA(),
-    ),
+GetPage(
+  name: Routes.profileUnderReviewCPA,
+  page: () {
+    // Get the arguments passed from navigation
+    final arguments = Get.arguments;
+    
+    // Check if arguments contain UserModel
+    if (arguments != null && arguments is UserModel) {
+      return ProfileUnderReviewScreenCPA(userData: arguments);
+    } else {
+      // Fallback: return empty screen or handle error
+      return const ProfileUnderReviewScreenCPA();
+    }
+  },
+),
   ];
 }
