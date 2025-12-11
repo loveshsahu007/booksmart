@@ -1,9 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:dropdown_search/dropdown_search.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
-import '../constant/app_colors.dart';
 
 class CustomDropDownWidget<T> extends StatefulWidget {
   const CustomDropDownWidget({

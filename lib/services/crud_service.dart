@@ -1,0 +1,113 @@
+import 'dart:developer';
+
+import 'package:booksmart/utils/supabase.dart';
+
+class SupabaseCrudService {
+  /// ---------------------------
+  /// CREATE (INSERT) - Add alias for create
+  /// ---------------------------
+  static Future<dynamic> create({
+    required String table,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final res = await supabase.from(table).insert(data).select().whenComplete(
+        () {
+          log("***/////***???---- Data inserted ");
+        },
+      );
+      return res; // returns inserted row(s)
+    } catch (e) {
+      throw Exception("Insert failed: $e");
+    }
+  }
+
+  /// ---------------------------
+  /// CREATE (INSERT) - Keep original
+  /// ---------------------------
+  static Future<dynamic> insert({
+    required String table,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      final res = await supabase.from(table).insert(data).select().whenComplete(
+        () {
+          log("***/////***???---- Data inserted ");
+        },
+      );
+      return res; // returns inserted row(s)
+    } catch (e) {
+      throw Exception("Insert failed: $e");
+    }
+  }
+
+  /// ---------------------------
+  /// READ (SELECT)
+  /// ---------------------------
+  static Future<dynamic> read({
+    required String table,
+    Map<String, dynamic>? filters,
+    bool single = false,
+  }) async {
+    try {
+      var query = supabase.from(table).select();
+
+      if (filters != null) {
+        filters.forEach((key, value) {
+          query = query.eq(key, value);
+        });
+      }
+
+      if (single) {
+        return await query.maybeSingle();
+      } else {
+        return await query;
+      }
+    } catch (e) {
+      throw Exception("Read failed: $e");
+    }
+  }
+
+  /// ---------------------------
+  /// UPDATE - Fix to handle lists properly
+  /// ---------------------------
+  static Future<dynamic> update({
+    required String table,
+    required Map<String, dynamic> data,
+    required Map<String, dynamic> filters,
+  }) async {
+    try {
+      var query = supabase.from(table).update(data);
+
+      filters.forEach((key, value) {
+        query = query.eq(key, value);
+      });
+
+      final res = await query.select();
+      return res;
+    } catch (e) {
+      throw Exception("Update failed: $e");
+    }
+  }
+
+  /// ---------------------------
+  /// DELETE
+  /// ---------------------------
+  static Future<dynamic> delete({
+    required String table,
+    required Map<String, dynamic> filters,
+  }) async {
+    try {
+      var query = supabase.from(table).delete();
+
+      filters.forEach((key, value) {
+        query = query.eq(key, value);
+      });
+
+      final res = await query;
+      return res;
+    } catch (e) {
+      throw Exception("Delete failed: $e");
+    }
+  }
+}

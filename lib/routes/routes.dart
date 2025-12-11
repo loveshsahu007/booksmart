@@ -26,7 +26,7 @@ abstract class Routes {
   static const String subscription = '/user/subscription';
 
   static const String aiStrategy = '/user/ai-strategy';
-  static const String profileScreen = '/user/profile';
+  static const String userProfile = '/user/profile';
 
   /// ====
   /// =====

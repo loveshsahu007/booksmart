@@ -1,18 +1,18 @@
-// File: lib/screens/profile/profile_screen_cpa.dart
-
-import 'dart:convert';
-import 'dart:typed_data';
-
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/user_controller.dart';
-import 'package:booksmart/models/user_data_model.dart';
-import 'package:booksmart/modules/common/providers/supabase_crud.dart';
+import 'package:booksmart/modules/common/providers/user_profile_provider.dart';
+import 'package:booksmart/services/storage_service.dart';
+import 'package:booksmart/supabase/buckets.dart';
+import 'package:booksmart/widgets/loading.dart';
 import 'package:booksmart/widgets/multiple_selection_dropdown_widget.dart';
+import 'package:booksmart/widgets/snackbar.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:jiffy/jiffy.dart';
+
+import '../../../constant/data.dart';
+import '../../../controllers/auth_controller.dart';
+import '../../../models/user_base_model.dart';
 
 class ProfileScreenCPA extends StatefulWidget {
   const ProfileScreenCPA({super.key});
@@ -33,7 +33,10 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
   final TextEditingController phoneCtrl = TextEditingController();
   final TextEditingController certCtrl = TextEditingController();
   final TextEditingController licenseCtrl = TextEditingController();
-  final TextEditingController expCtrl = TextEditingController();
+
+  late final TextEditingController carrerStartDateController;
+  late DateTime? startDate;
+
   final TextEditingController bioCtrl = TextEditingController();
 
   // Dropdown keys
@@ -56,100 +59,9 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
   String? _certificationProofUrl;
   String? _licenseCopyUrl;
 
-  bool _loading = false;
-  bool _initialLoading = true;
   bool _termsAgreed = false;
-  final _crud = SupabaseCrudService();
-  final _supabase = Supabase.instance.client;
 
-  // List of US states for dropdown
-  final List<String> usStates = [
-    'AL',
-    'AK',
-    'AZ',
-    'AR',
-    'CA',
-    'CO',
-    'CT',
-    'DE',
-    'FL',
-    'GA',
-    'HI',
-    'ID',
-    'IL',
-    'IN',
-    'IA',
-    'KS',
-    'KY',
-    'LA',
-    'ME',
-    'MD',
-    'MA',
-    'MI',
-    'MN',
-    'MS',
-    'MO',
-    'MT',
-    'NE',
-    'NV',
-    'NH',
-    'NJ',
-    'NM',
-    'NY',
-    'NC',
-    'ND',
-    'OH',
-    'OK',
-    'OR',
-    'PA',
-    'RI',
-    'SC',
-    'SD',
-    'TN',
-    'TX',
-    'UT',
-    'VT',
-    'VA',
-    'WA',
-    'WV',
-    'WI',
-    'WY',
-  ];
-
-  // Certification options
-  final List<String> certificationOptions = [
-    'CPA',
-    'EA',
-    'CFP',
-    'CMA',
-    'CIA',
-    'CGMA',
-    'ChFC',
-    'PFS',
-    'Other',
-  ];
-
-  // Specialty options
-  final List<String> specialtyOptions = [
-    'Individual Income Tax',
-    'Small Business Tax',
-    'Corporate Tax',
-    'Partnership & LLC Tax',
-    'Multi-State Taxation',
-    'International Tax',
-    'Trusts & Estates',
-    'Cryptocurrency Taxation',
-    'Sales & Use Tax',
-    'Payroll Tax Compliance',
-    'Tax Strategy & Planning',
-    'Bookkeeping Clean-up',
-    'Audit & Assurance',
-    'Financial Planning',
-    'Estate Planning',
-    'Business Valuation',
-    'IRS Representation',
-    'Non-Profit Accounting',
-  ];
+  CpaModel? cpa = authCpa;
 
   @override
   void initState() {
@@ -166,108 +78,40 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
     phoneCtrl.dispose();
     certCtrl.dispose();
     licenseCtrl.dispose();
-    expCtrl.dispose();
+    carrerStartDateController.dispose();
     bioCtrl.dispose();
     super.dispose();
   }
 
-  String? get _currentAuthId => _supabase.auth.currentUser?.id;
-  String? get _currentUserEmail => _supabase.auth.currentUser?.email;
-
   Future<void> _loadProfile() async {
-    setState(() => _initialLoading = true);
+    if (cpa != null) {
+      // Basic info
+      firstNameCtrl.text = cpa!.firstName;
+      lastNameCtrl.text = cpa!.lastName;
+      middleNameCtrl.text = cpa!.middleName;
+      emailCtrl.text = cpa!.email;
+      phoneCtrl.text = cpa!.phoneNumber;
+      _profileImageUrl = cpa!.imgUrl;
 
-    final authId = _currentAuthId;
-    if (authId == null) {
-      setState(() => _initialLoading = false);
-      Get.snackbar(
-        'Not signed in',
-        'Please sign in to edit your profile.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
+      // CPA fields
+      licenseCtrl.text = cpa!.licenseNumber;
+      carrerStartDateController.text = Jiffy.parseFromDateTime(
+        cpa!.careerStartDate,
+      ).yMMMd;
+      startDate = cpa!.careerStartDate;
+      bioCtrl.text = cpa!.professionalBio;
 
-    try {
-      final res = await _crud.read(
-        table: 'users',
-        filters: {'auth_id': authId},
-        single: true,
-      );
+      // Arrays (handle both List and JSON string)
+      selectedCertifications = _parseArrayField(cpa!.certifications);
+      selectedSpecialties = _parseArrayField(cpa!.specialties);
+      selectedStates = _parseArrayField(cpa!.stateFocuses);
 
-      if (res != null) {
-        final Map<String, dynamic> row = res is Map<String, dynamic>
-            ? res
-            : (res is List && res.isNotEmpty
-                  ? res.first as Map<String, dynamic>
-                  : {});
+      // Files
+      _certificationProofUrl = cpa!.certificationProofUrl;
+      _licenseCopyUrl = cpa!.licenseCopyUrl;
 
-        // Basic info
-        firstNameCtrl.text = (row['first_name'] ?? '') as String;
-        lastNameCtrl.text = (row['last_name'] ?? '') as String;
-        middleNameCtrl.text = (row['middle_name'] ?? '') as String;
-        emailCtrl.text = (row['email'] ?? _currentUserEmail ?? '') as String;
-        phoneCtrl.text = (row['phone_number'] ?? '') as String;
-        _profileImageUrl = row['img_url'] as String?;
-
-        // CPA fields
-        licenseCtrl.text = (row['license_number'] ?? '') as String;
-        expCtrl.text = (row['years_of_experience']?.toString() ?? '');
-        bioCtrl.text = (row['professional_bio'] ?? '') as String;
-
-        // Arrays (handle both List and JSON string)
-        selectedCertifications = _parseArrayField(row['certifications']);
-        selectedSpecialties = _parseArrayField(row['specialties']);
-        selectedStates = _parseArrayField(row['state_focuses']);
-
-        // Files
-        _certificationProofUrl = row['certification_proof_url'] as String?;
-        _licenseCopyUrl = row['license_copy_url'] as String?;
-
-        // Booleans
-        _termsAgreed = (row['terms_agreed'] ?? false) as bool;
-
-        // Update UserController
-        try {
-          final userCtrl = Get.find<UserController>();
-          if (userCtrl.hasUser) {
-            final updatedUser = userCtrl.user.value!.copyWith(
-              firstName: firstNameCtrl.text,
-              lastName: lastNameCtrl.text,
-              email: emailCtrl.text,
-              phoneNumber: phoneCtrl.text,
-              imgUrl: _profileImageUrl,
-              middleName: middleNameCtrl.text,
-              certifications: selectedCertifications,
-              licenseNumber: licenseCtrl.text,
-              yearsOfExperience: int.tryParse(expCtrl.text),
-              professionalBio: bioCtrl.text,
-              specialties: selectedSpecialties,
-              stateFocuses: selectedStates,
-              certificationProofUrl: _certificationProofUrl,
-              licenseCopyUrl: _licenseCopyUrl,
-              termsAgreed: _termsAgreed,
-              status: (row['status'] ?? 'pending') as String,
-              role: (row['role'] ?? 'cpa') as String,
-            );
-            userCtrl.user.value = updatedUser;
-          }
-        } catch (e) {
-          debugPrint('UserController update skipped: $e');
-        }
-      } else {
-        // New user - set email if available
-        emailCtrl.text = _currentUserEmail ?? '';
-      }
-    } catch (e) {
-      debugPrint('Failed to load profile: $e');
-      Get.snackbar(
-        'Error',
-        'Failed to load profile data',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-    } finally {
-      setState(() => _initialLoading = false);
+      // Booleans
+      _termsAgreed = cpa!.termsAgreed;
     }
   }
 
@@ -300,15 +144,12 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
             _profileImageBytes = bytes;
           });
         } else {
-          // For documents we keep the XFile reference (no preview bytes needed)
           setState(() {
-            // determine which document to set:
             if (_certificationProofFile == null) {
               _certificationProofFile = pickedFile;
             } else if (_licenseCopyFile == null) {
               _licenseCopyFile = pickedFile;
             } else {
-              // if both already present, replace the certification proof by default
               _certificationProofFile = pickedFile;
             }
           });
@@ -325,42 +166,38 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
   }
 
   Future<void> _saveToSupabase() async {
-    final authId = _currentAuthId;
-    if (authId == null) {
-      Get.snackbar(
-        'Not signed in',
-        'Please sign in to update profile.',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
-    }
-
-    setState(() => _loading = true);
-    final crud = SupabaseCrudService();
     try {
+      showLoading();
       // Upload files if they exist
       if (_profileImage != null) {
-        final url = await crud.uploadFile(_profileImage!, 'userImages');
+        final url = await uploadFileToSupabaseStorage(
+          _profileImage!,
+          SupabaseStorageBucket.userImages,
+        );
         if (url != null && url.isNotEmpty) {
           _profileImageUrl = url;
-          // clear preview bytes & XFile so UI shows remote image after save
           _profileImage = null;
           _profileImageBytes = null;
         }
       }
       if (_certificationProofFile != null) {
-        _certificationProofUrl = await crud.uploadFile(
+        final url = await uploadFileToSupabaseStorage(
           _certificationProofFile!,
-          'documents',
+          SupabaseStorageBucket.documents,
         );
+        if (url != null && url.isNotEmpty) {
+          _certificationProofUrl = url;
+          _certificationProofFile = null;
+        }
       }
       if (_licenseCopyFile != null) {
-        _licenseCopyUrl = await crud.uploadFile(_licenseCopyFile!, 'documents');
+        _licenseCopyUrl = await uploadFileToSupabaseStorage(
+          _licenseCopyFile!,
+          SupabaseStorageBucket.documents,
+        );
       }
 
-      // Prepare payload
       final payload = <String, dynamic>{
-        'auth_id': authId,
         'email': emailCtrl.text.trim(),
         'role': 'cpa',
         'first_name': firstNameCtrl.text.trim(),
@@ -381,9 +218,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
         'license_number': licenseCtrl.text.trim().isEmpty
             ? null
             : licenseCtrl.text.trim(),
-        'years_of_experience': expCtrl.text.trim().isEmpty
-            ? null
-            : int.tryParse(expCtrl.text.trim()),
+        "career_start_date": startDate?.toIso8601String(),
         'professional_bio': bioCtrl.text.trim().isEmpty
             ? null
             : bioCtrl.text.trim(),
@@ -404,107 +239,14 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
       // Remove null values from payload
       payload.removeWhere((key, value) => value == null);
 
-      // Update existing user
-      await _crud.update(
-        table: 'users',
-        data: payload,
-        filters: {'auth_id': authId},
-      );
-
-      // Update UserController
-      try {
-        final userCtrl = Get.find<UserController>();
-        if (userCtrl.hasUser) {
-          final updatedUser = userCtrl.user.value!.copyWith(
-            authId: authId,
-            email: emailCtrl.text.trim(),
-            role: 'cpa',
-            firstName: firstNameCtrl.text.trim(),
-            lastName: lastNameCtrl.text.trim(),
-            middleName: middleNameCtrl.text.trim().isEmpty
-                ? null
-                : middleNameCtrl.text.trim(),
-            phoneNumber: phoneCtrl.text.trim().isEmpty
-                ? null
-                : phoneCtrl.text.trim(),
-            imgUrl: _profileImageUrl,
-            certifications: selectedCertifications,
-            licenseNumber: licenseCtrl.text.trim().isEmpty
-                ? null
-                : licenseCtrl.text.trim(),
-            yearsOfExperience: expCtrl.text.trim().isEmpty
-                ? null
-                : int.tryParse(expCtrl.text.trim()),
-            professionalBio: bioCtrl.text.trim().isEmpty
-                ? null
-                : bioCtrl.text.trim(),
-            specialties: selectedSpecialties,
-            stateFocuses: selectedStates,
-            certificationProofUrl: _certificationProofUrl,
-            licenseCopyUrl: _licenseCopyUrl,
-            termsAgreed: _termsAgreed,
-            status: 'pending',
-            updatedAt: DateTime.now(),
-          );
-          userCtrl.user.value = updatedUser;
-        } else {
-          // Create new user in controller
-          final newUser = UserModel(
-            authId: authId,
-            email: emailCtrl.text.trim(),
-            role: 'cpa',
-            firstName: firstNameCtrl.text.trim(),
-            lastName: lastNameCtrl.text.trim(),
-            middleName: middleNameCtrl.text.trim().isEmpty
-                ? null
-                : middleNameCtrl.text.trim(),
-            phoneNumber: phoneCtrl.text.trim().isEmpty
-                ? null
-                : phoneCtrl.text.trim(),
-            imgUrl: _profileImageUrl,
-            certifications: selectedCertifications,
-            licenseNumber: licenseCtrl.text.trim().isEmpty
-                ? null
-                : licenseCtrl.text.trim(),
-            yearsOfExperience: expCtrl.text.trim().isEmpty
-                ? null
-                : int.tryParse(expCtrl.text.trim()),
-            professionalBio: bioCtrl.text.trim().isEmpty
-                ? null
-                : bioCtrl.text.trim(),
-            specialties: selectedSpecialties,
-            stateFocuses: selectedStates,
-            certificationProofUrl: _certificationProofUrl,
-            licenseCopyUrl: _licenseCopyUrl,
-            termsAgreed: _termsAgreed,
-            status: 'pending',
-            createdAt: DateTime.now(),
-            updatedAt: DateTime.now(),
-          );
-          userCtrl.user.value = newUser;
-        }
-      } catch (e) {
-        debugPrint('UserController update skipped: $e');
-      }
-
-      debugPrint('Successfully saved CPA profile to Supabase');
-      Get.snackbar(
-        'Success',
-        'Profile saved successfully',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
+      await updateUserProfile(data: payload).then((value) {
+        dismissLoadingWidget();
+        showSnackBar('Profile saved successfully');
+      });
     } catch (e) {
+      dismissLoadingWidget();
       debugPrint('Profile update failed: $e');
-      Get.snackbar(
-        'Error',
-        'Failed to save profile: ${e.toString()}',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      rethrow;
-    } finally {
-      setState(() => _loading = false);
+      showSnackBar('Failed to save profile: ${e.toString()}');
     }
   }
 
@@ -524,55 +266,16 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
     if (!_formKey.currentState!.validate()) return;
 
     if (!_termsAgreed) {
-      Get.snackbar(
-        'Agreement Required',
+      showSnackBar(
         'Please agree to the terms and conditions',
-        snackPosition: SnackPosition.BOTTOM,
+        title: 'Agreement Required',
       );
       return;
     }
 
     try {
       await _saveToSupabase();
-
-      // Create user model with current data to pass to review screen
-      final userData = UserModel(
-        authId: _currentAuthId,
-        email: emailCtrl.text.trim(),
-        role: 'cpa',
-        firstName: firstNameCtrl.text.trim(),
-        lastName: lastNameCtrl.text.trim(),
-        middleName: middleNameCtrl.text.trim().isEmpty
-            ? null
-            : middleNameCtrl.text.trim(),
-        phoneNumber: phoneCtrl.text.trim().isEmpty
-            ? null
-            : phoneCtrl.text.trim(),
-        imgUrl: _profileImageUrl,
-        certifications: selectedCertifications,
-        licenseNumber: licenseCtrl.text.trim().isEmpty
-            ? null
-            : licenseCtrl.text.trim(),
-        yearsOfExperience: expCtrl.text.trim().isEmpty
-            ? null
-            : int.tryParse(expCtrl.text.trim()),
-        professionalBio: bioCtrl.text.trim().isEmpty
-            ? null
-            : bioCtrl.text.trim(),
-        specialties: selectedSpecialties,
-        stateFocuses: selectedStates,
-        certificationProofUrl: _certificationProofUrl,
-        licenseCopyUrl: _licenseCopyUrl,
-        termsAgreed: _termsAgreed,
-        status: 'pending',
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      Get.toNamed(
-        Routes.profileUnderReviewCPA,
-        arguments: userData, // Pass the UserModel object
-      );
+      Get.toNamed(Routes.profileUnderReviewCPA);
     } catch (e) {
       debugPrint('Profile submission failed: $e');
     }
@@ -708,372 +411,359 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('CPA Profile Setup'), elevation: 0),
-      body: _initialLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 8),
-                  const AppText(
-                    "Complete your CPA profile to join our network",
-                    fontSize: 14,
-                  ),
-                  const SizedBox(height: 20),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 8),
+            const AppText(
+              "Complete your CPA profile to join our network",
+              fontSize: 14,
+            ),
+            const SizedBox(height: 20),
 
-                  Stepper(
-                    currentStep: _currentStep,
-                    onStepContinue: _nextStep,
-                    onStepTapped: (value) =>
-                        setState(() => _currentStep = value),
-                    onStepCancel: _previousStep,
-                    controlsBuilder: (context, details) {
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          if (_currentStep != 0)
-                            OutlinedButton(
-                              onPressed: details.onStepCancel,
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: Colors.grey),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+            Stepper(
+              currentStep: _currentStep,
+              onStepContinue: _nextStep,
+              onStepTapped: (value) => setState(() => _currentStep = value),
+              onStepCancel: _previousStep,
+              controlsBuilder: (context, details) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (_currentStep != 0)
+                      OutlinedButton(
+                        onPressed: details.onStepCancel,
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.grey),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text("Back"),
+                      ),
+                    const SizedBox(width: 10),
+                    AppButton(
+                      buttonText: (_currentStep == 2
+                          ? "Submit for Review"
+                          : "Next Step"),
+                      onTapFunction: details.onStepContinue!,
+                      radius: 8,
+                      fontSize: 14,
+                    ),
+                  ],
+                );
+              },
+              steps: [
+                Step(
+                  title: const Text("Personal Information"),
+                  isActive: _currentStep >= 0,
+                  content: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        _buildProfileImageSection(),
+                        const SizedBox(height: 20),
+
+                        if (isDesktop)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: AppTextField(
+                                  hintText: "First Name *",
+                                  controller: firstNameCtrl,
+                                  fieldValidator: (v) =>
+                                      v?.isEmpty == true ? 'Required' : null,
                                 ),
                               ),
-                              child: const Text("Back"),
-                            ),
-                          const SizedBox(width: 10),
-                          AppButton(
-                            buttonText: _loading
-                                ? "Saving..."
-                                : (_currentStep == 2
-                                      ? "Submit for Review"
-                                      : "Next Step"),
-                            onTapFunction: _loading
-                                ? null
-                                : details.onStepContinue!,
-                            radius: 8,
-                            fontSize: 14,
-                          ),
-                        ],
-                      );
-                    },
-                    steps: [
-                      Step(
-                        title: const Text("Personal Information"),
-                        isActive: _currentStep >= 0,
-                        content: Form(
-                          key: _formKey,
-                          child: Column(
+                              const SizedBox(width: 15),
+                              Expanded(
+                                child: AppTextField(
+                                  hintText: "Middle Name",
+                                  controller: middleNameCtrl,
+                                ),
+                              ),
+                              const SizedBox(width: 15),
+                              Expanded(
+                                child: AppTextField(
+                                  hintText: "Last Name *",
+                                  controller: lastNameCtrl,
+                                  fieldValidator: (v) =>
+                                      v?.isEmpty == true ? 'Required' : null,
+                                ),
+                              ),
+                            ],
+                          )
+                        else if (isTablet)
+                          Column(
                             children: [
-                              _buildProfileImageSection(),
-                              const SizedBox(height: 20),
-
-                              if (isDesktop)
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: AppTextField(
-                                        hintText: "First Name *",
-                                        controller: firstNameCtrl,
-                                        fieldValidator: (v) =>
-                                            v?.isEmpty == true
-                                            ? 'Required'
-                                            : null,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 15),
-                                    Expanded(
-                                      child: AppTextField(
-                                        hintText: "Middle Name",
-                                        controller: middleNameCtrl,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 15),
-                                    Expanded(
-                                      child: AppTextField(
-                                        hintText: "Last Name *",
-                                        controller: lastNameCtrl,
-                                        fieldValidator: (v) =>
-                                            v?.isEmpty == true
-                                            ? 'Required'
-                                            : null,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              else if (isTablet)
-                                Column(
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: AppTextField(
-                                            hintText: "First Name *",
-                                            controller: firstNameCtrl,
-                                            fieldValidator: (v) =>
-                                                v?.isEmpty == true
-                                                ? 'Required'
-                                                : null,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 15),
-                                        Expanded(
-                                          child: AppTextField(
-                                            hintText: "Middle Name",
-                                            controller: middleNameCtrl,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 15),
-                                    AppTextField(
-                                      hintText: "Last Name *",
-                                      controller: lastNameCtrl,
-                                      fieldValidator: (v) => v?.isEmpty == true
-                                          ? 'Required'
-                                          : null,
-                                    ),
-                                  ],
-                                )
-                              else
-                                Column(
-                                  children: [
-                                    AppTextField(
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: AppTextField(
                                       hintText: "First Name *",
                                       controller: firstNameCtrl,
                                       fieldValidator: (v) => v?.isEmpty == true
                                           ? 'Required'
                                           : null,
                                     ),
-                                    const SizedBox(height: 15),
-                                    AppTextField(
-                                      hintText: "Middle Name",
-                                      controller: middleNameCtrl,
-                                    ),
-                                    const SizedBox(height: 15),
-                                    AppTextField(
-                                      hintText: "Last Name *",
-                                      controller: lastNameCtrl,
-                                      fieldValidator: (v) => v?.isEmpty == true
-                                          ? 'Required'
-                                          : null,
-                                    ),
-                                  ],
-                                ),
-
-                              const SizedBox(height: 15),
-
-                              AppTextField(
-                                hintText: "Email *",
-                                controller: emailCtrl,
-                                keyboardType: TextInputType.emailAddress,
-                                fieldValidator: (v) =>
-                                    v?.isNotEmpty == true && v!.contains('@')
-                                    ? null
-                                    : 'Valid email required',
-                              ),
-
-                              const SizedBox(height: 15),
-
-                              AppTextField(
-                                hintText: "Phone Number",
-                                controller: phoneCtrl,
-                                keyboardType: TextInputType.phone,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      Step(
-                        title: const Text("Professional Details"),
-                        isActive: _currentStep >= 1,
-                        content: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const AppText(
-                              "Certifications",
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            const SizedBox(height: 5),
-                            CustomMultiDropDownWidget<String>(
-                              dropDownKey: _certificationsKey,
-                              showSearchBox: true,
-                              hint: "Select Certifications",
-                              items: certificationOptions,
-                              selectedItems: selectedCertifications,
-                              onChanged: (newList) {
-                                setState(
-                                  () => selectedCertifications = newList,
-                                );
-                              },
-                            ),
-
-                            const SizedBox(height: 15),
-
-                            if (isDesktop || isTablet)
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: AppTextField(
-                                      hintText: "License Number *",
-                                      controller: licenseCtrl,
-                                      fieldValidator: (v) => v?.isEmpty == true
-                                          ? 'Required for CPA'
-                                          : null,
-                                    ),
                                   ),
                                   const SizedBox(width: 15),
                                   Expanded(
                                     child: AppTextField(
-                                      hintText: "Years of Experience *",
-                                      controller: expCtrl,
-                                      keyboardType: TextInputType.number,
-                                      fieldValidator: (v) => v?.isEmpty == true
-                                          ? 'Required'
-                                          : null,
+                                      hintText: "Middle Name",
+                                      controller: middleNameCtrl,
                                     ),
                                   ),
                                 ],
-                              )
-                            else
-                              Column(
-                                children: [
-                                  AppTextField(
-                                    hintText: "License Number *",
-                                    controller: licenseCtrl,
-                                    fieldValidator: (v) => v?.isEmpty == true
-                                        ? 'Required for CPA'
-                                        : null,
-                                  ),
-                                  const SizedBox(height: 15),
-                                  AppTextField(
-                                    hintText: "Years of Experience *",
-                                    controller: expCtrl,
-                                    keyboardType: TextInputType.number,
-                                    fieldValidator: (v) =>
-                                        v?.isEmpty == true ? 'Required' : null,
-                                  ),
-                                ],
                               ),
+                              const SizedBox(height: 15),
+                              AppTextField(
+                                hintText: "Last Name *",
+                                controller: lastNameCtrl,
+                                fieldValidator: (v) =>
+                                    v?.isEmpty == true ? 'Required' : null,
+                              ),
+                            ],
+                          )
+                        else
+                          Column(
+                            children: [
+                              AppTextField(
+                                hintText: "First Name *",
+                                controller: firstNameCtrl,
+                                fieldValidator: (v) =>
+                                    v?.isEmpty == true ? 'Required' : null,
+                              ),
+                              const SizedBox(height: 15),
+                              AppTextField(
+                                hintText: "Middle Name",
+                                controller: middleNameCtrl,
+                              ),
+                              const SizedBox(height: 15),
+                              AppTextField(
+                                hintText: "Last Name *",
+                                controller: lastNameCtrl,
+                                fieldValidator: (v) =>
+                                    v?.isEmpty == true ? 'Required' : null,
+                              ),
+                            ],
+                          ),
 
-                            const SizedBox(height: 15),
+                        const SizedBox(height: 15),
 
-                            const AppText(
-                              "Professional Bio *",
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            const SizedBox(height: 5),
-                            AppTextField(
-                              hintText:
-                                  "Tell us about your experience and expertise...",
-                              controller: bioCtrl,
-                              maxLines: 5,
+                        AppTextField(
+                          hintText: "Email *",
+                          controller: emailCtrl,
+                          keyboardType: TextInputType.emailAddress,
+                          fieldValidator: (v) =>
+                              v?.isNotEmpty == true && v!.contains('@')
+                              ? null
+                              : 'Valid email required',
+                        ),
+
+                        const SizedBox(height: 15),
+
+                        AppTextField(
+                          hintText: "Phone Number",
+                          controller: phoneCtrl,
+                          keyboardType: TextInputType.phone,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                Step(
+                  title: const Text("Professional Details"),
+                  isActive: _currentStep >= 1,
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const AppText(
+                        "Certifications",
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      const SizedBox(height: 5),
+                      CustomMultiDropDownWidget<String>(
+                        dropDownKey: _certificationsKey,
+                        showSearchBox: true,
+                        hint: "Select Certifications",
+                        items: cpaCertificationOptions,
+                        selectedItems: selectedCertifications,
+                        onChanged: (newList) {
+                          setState(() => selectedCertifications = newList);
+                        },
+                      ),
+
+                      const SizedBox(height: 15),
+
+                      AppTextField(
+                        hintText: "License Number *",
+                        controller: licenseCtrl,
+                        fieldValidator: (v) =>
+                            v?.isEmpty == true ? 'Required for CPA' : null,
+                      ),
+                      const SizedBox(height: 15),
+
+                      InkWell(
+                        onTap: () async {
+                          await showDatePicker(
+                            context: context,
+                            initialDate: DateTime(1900),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now(),
+                          ).then((DateTime? pickedDate) async {
+                            if (pickedDate != null) {
+                              final TimeOfDay? pickedTime =
+                                  await showTimePicker(
+                                    // ignore: use_build_context_synchronously
+                                    context: context,
+                                    initialTime: TimeOfDay.fromDateTime(
+                                      DateTime.now(),
+                                    ),
+                                  );
+                              if (pickedTime != null) {
+                                DateTime finalPickedDate = DateTime(
+                                  pickedDate.year,
+                                  pickedDate.month,
+                                  pickedDate.day,
+                                  pickedTime.hour,
+                                  pickedTime.minute,
+                                );
+                                carrerStartDateController.text =
+                                    Jiffy.parseFromDateTime(
+                                      finalPickedDate,
+                                    ).yMMMd;
+                                startDate = finalPickedDate;
+                              }
+                            }
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: AbsorbPointer(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            child: AppTextField(
+                              hintText: "Years of Experience *",
+                              controller: carrerStartDateController,
                               fieldValidator: (v) =>
                                   v?.isEmpty == true ? 'Required' : null,
                             ),
-
-                            const SizedBox(height: 15),
-
-                            const AppText(
-                              "Specialties",
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            const SizedBox(height: 5),
-                            CustomMultiDropDownWidget<String>(
-                              dropDownKey: _specialtiesKey,
-                              showSearchBox: true,
-                              hint: "Select Specialties",
-                              items: specialtyOptions,
-                              selectedItems: selectedSpecialties,
-                              onChanged: (newList) {
-                                setState(() => selectedSpecialties = newList);
-                              },
-                            ),
-
-                            const SizedBox(height: 10),
-
-                            const AppText(
-                              "State Focuses",
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            const SizedBox(height: 5),
-                            CustomMultiDropDownWidget<String>(
-                              dropDownKey: _statesKey,
-                              showSearchBox: true,
-                              hint: "Select States Where Licensed",
-                              items: usStates,
-                              selectedItems: selectedStates,
-                              onChanged: (newList) {
-                                setState(() => selectedStates = newList);
-                              },
-                            ),
-                          ],
+                          ),
                         ),
                       ),
 
-                      Step(
-                        title: const Text("Verification & Agreement"),
-                        isActive: _currentStep >= 2,
-                        content: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildDocumentUploadSection(),
+                      const SizedBox(height: 15),
 
-                            const SizedBox(height: 20),
+                      const AppText(
+                        "Professional Bio *",
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      const SizedBox(height: 5),
+                      AppTextField(
+                        hintText:
+                            "Tell us about your experience and expertise...",
+                        controller: bioCtrl,
+                        maxLines: 5,
+                        fieldValidator: (v) =>
+                            v?.isEmpty == true ? 'Required' : null,
+                      ),
 
-                            const Divider(),
+                      const SizedBox(height: 15),
 
-                            const SizedBox(height: 20),
+                      const AppText(
+                        "Specialties",
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      const SizedBox(height: 5),
+                      CustomMultiDropDownWidget<String>(
+                        dropDownKey: _specialtiesKey,
+                        showSearchBox: true,
+                        hint: "Select Specialties",
+                        items: cpaSpecialtyOptions,
+                        selectedItems: selectedSpecialties,
+                        onChanged: (newList) {
+                          setState(() => selectedSpecialties = newList);
+                        },
+                      ),
 
-                            CheckboxListTile(
-                              title: const Text(
-                                "I certify that all information provided is accurate and complete. I agree to the CPA Network Terms of Service and Privacy Policy.",
-                                style: TextStyle(fontSize: 14),
-                              ),
-                              value: _termsAgreed,
-                              onChanged: (value) {
-                                setState(() {
-                                  _termsAgreed = value ?? false;
-                                });
-                              },
-                              controlAffinity: ListTileControlAffinity.leading,
-                            ),
+                      const SizedBox(height: 10),
 
-                            const SizedBox(height: 30),
+                      const AppText(
+                        "State Focuses",
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      const SizedBox(height: 5),
+                      CustomMultiDropDownWidget<String>(
+                        dropDownKey: _statesKey,
+                        showSearchBox: true,
+                        hint: "Select States Where Licensed",
+                        items: usStates,
+                        selectedItems: selectedStates,
+                        onChanged: (newList) {
+                          setState(() => selectedStates = newList);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
 
-                            Center(
-                              child: SizedBox(
-                                width: isDesktop ? 300 : double.infinity,
-                                child: AppButton(
-                                  buttonText: _loading
-                                      ? "Submitting..."
-                                      : "Submit Profile for Review",
-                                  onTapFunction: _loading
-                                      ? null
-                                      : _submitProfile,
-                                  radius: 8,
-                                  fontSize: 16,
-                                  buttonColor: _termsAgreed
-                                      ? null
-                                      : Colors.grey,
-                                ),
-                              ),
-                            ),
-                          ],
+                Step(
+                  title: const Text("Verification & Agreement"),
+                  isActive: _currentStep >= 2,
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDocumentUploadSection(),
+
+                      const SizedBox(height: 20),
+
+                      const Divider(),
+
+                      const SizedBox(height: 20),
+
+                      CheckboxListTile(
+                        title: const Text(
+                          "I certify that all information provided is accurate and complete. I agree to the CPA Network Terms of Service and Privacy Policy.",
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        value: _termsAgreed,
+                        onChanged: (value) {
+                          setState(() {
+                            _termsAgreed = value ?? false;
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                      ),
+
+                      const SizedBox(height: 30),
+
+                      Center(
+                        child: SizedBox(
+                          width: isDesktop ? 300 : double.infinity,
+                          child: AppButton(
+                            buttonText: "Submit Profile for Review",
+                            onTapFunction: _submitProfile,
+                            radius: 8,
+                            fontSize: 16,
+                            buttonColor: _termsAgreed ? null : Colors.grey,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
+          ],
+        ),
+      ),
     );
   }
 }

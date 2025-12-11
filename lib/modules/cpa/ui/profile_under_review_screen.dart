@@ -1,21 +1,26 @@
-import 'package:flutter/material.dart'; // Add this
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/models/user_data_model.dart';
 import 'package:get/get.dart';
 
-class ProfileUnderReviewScreenCPA extends StatelessWidget {
-  final UserModel? userData;
+import '../../../controllers/auth_controller.dart';
+import '../../../models/user_base_model.dart';
 
-  const ProfileUnderReviewScreenCPA({super.key, this.userData});
+class ProfileUnderReviewScreenCPA extends StatefulWidget {
+  const ProfileUnderReviewScreenCPA({super.key});
+
+  @override
+  State<ProfileUnderReviewScreenCPA> createState() =>
+      _ProfileUnderReviewScreenCPAState();
+}
+
+class _ProfileUnderReviewScreenCPAState
+    extends State<ProfileUnderReviewScreenCPA> {
+  CpaModel? cpa = authCpa;
 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     final isWeb = width > 900;
     final isTablet = width > 600 && width <= 900;
-
-    // Try to get data from Get.arguments if not passed in constructor
-    final data = userData ?? (Get.arguments as UserModel?);
 
     return Scaffold(
       appBar: AppBar(title: const Text("Registration Submitted!")),
@@ -55,38 +60,34 @@ class ProfileUnderReviewScreenCPA extends StatelessWidget {
 
                     const SizedBox(height: 15),
 
-                    if (data != null) ...[
+                    if (cpa != null) ...[
                       // License Number
-                      if (data.licenseNumber != null)
-                        Column(
-                          children: [
-                            _buildStatusRow(
-                              "License Number",
-                              data.licenseNumber!,
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                        ),
+                      Column(
+                        children: [
+                          _buildStatusRow("License Number", cpa!.licenseNumber),
+                          const SizedBox(height: 10),
+                        ],
+                      ),
 
                       // Certifications
-                      if (data.certifications?.isNotEmpty == true)
+                      if (cpa!.certifications.isNotEmpty == true)
                         Column(
                           children: [
                             _buildStatusRow(
                               "Certification",
-                              data.certifications!.join(", "),
+                              cpa!.certifications.join(", "),
                             ),
                             const SizedBox(height: 10),
                           ],
                         ),
 
                       // States
-                      if (data.stateFocuses?.isNotEmpty == true)
+                      if (cpa!.stateFocuses.isNotEmpty == true)
                         Column(
                           children: [
                             _buildStatusRow(
                               "State(s)",
-                              data.stateFocuses!.join(", "),
+                              cpa!.stateFocuses.join(", "),
                             ),
                             const SizedBox(height: 10),
                           ],
@@ -102,7 +103,7 @@ class ProfileUnderReviewScreenCPA extends StatelessWidget {
 
                     _buildStatusRow(
                       "Profile Status",
-                      data?.status?.toUpperCase() ?? "PENDING",
+                      cpa?.status.toUpperCase() ?? "PENDING",
                       color: Colors.amber,
                     ),
                   ],
@@ -120,10 +121,10 @@ class ProfileUnderReviewScreenCPA extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundImage: data?.imgUrl != null
-                          ? NetworkImage(data!.imgUrl!) // Fixed: removed cast
+                      backgroundImage: cpa?.imgUrl != null
+                          ? NetworkImage(cpa!.imgUrl)
                           : null,
-                      child: data?.imgUrl == null
+                      child: cpa?.imgUrl == null
                           ? const Icon(Icons.person)
                           : null,
                     ),
@@ -133,21 +134,21 @@ class ProfileUnderReviewScreenCPA extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (data != null) ...[
+                          if (cpa != null) ...[
                             // Full name
                             AppText(
-                              _getFullName(data),
+                              _getFullName(cpa!.data),
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
                             ),
                             const SizedBox(height: 5),
 
                             // Certifications
-                            if (data.certifications?.isNotEmpty == true)
+                            if (cpa?.certifications.isNotEmpty == true)
                               Column(
                                 children: [
                                   AppText(
-                                    data.certifications!.join(", "),
+                                    cpa!.certifications.join(", "),
                                     fontSize: 12,
                                   ),
                                   const SizedBox(height: 5),
@@ -155,11 +156,11 @@ class ProfileUnderReviewScreenCPA extends StatelessWidget {
                               ),
 
                             // Experience
-                            if (data.yearsOfExperience != null)
+                            if (cpa?.getExperienceInYears != null)
                               Column(
                                 children: [
                                   AppText(
-                                    "Experience: ${data.yearsOfExperience} ${data.yearsOfExperience == 1 ? 'year' : 'years'}",
+                                    "Experience: ${cpa!.getExperienceInYears} Year(s)",
                                     fontSize: 12,
                                   ),
                                   const SizedBox(height: 5),
@@ -167,9 +168,12 @@ class ProfileUnderReviewScreenCPA extends StatelessWidget {
                               ),
 
                             // Bio (truncated)
-                            if (data.professionalBio != null)
+                            if (cpa?.professionalBio != null)
                               AppText(
-                                _truncateText(data.professionalBio!, 80),
+                                _truncateText(
+                                  cpa?.professionalBio ?? '---',
+                                  80,
+                                ),
                                 fontSize: 12,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -237,12 +241,12 @@ class ProfileUnderReviewScreenCPA extends StatelessWidget {
   }
 
   // Helper method to get full name
-  String _getFullName(UserModel user) {
+  String _getFullName(PersonModel user) {
     final parts = [
       user.firstName,
       user.middleName,
       user.lastName,
-    ].where((part) => part != null && part.isNotEmpty).toList();
+    ].where((part) => part.isNotEmpty).toList();
 
     return parts.join(" ");
   }

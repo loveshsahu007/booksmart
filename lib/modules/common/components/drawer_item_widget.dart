@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../widgets/app_text.dart';
+import '../../../widgets/app_text.dart';
 
 class DrawerItemWidget extends StatelessWidget {
   const DrawerItemWidget({

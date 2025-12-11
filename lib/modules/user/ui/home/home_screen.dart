@@ -3,7 +3,7 @@ import 'package:booksmart/modules/user/ui/home/template/web_template.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
-import '../../../components/drawer_item_widget.dart';
+import '../../../common/components/drawer_item_widget.dart';
 import '../ai_strategy_screen.dart';
 import '../cpa/dashboard_screen.dart';
 import '../dashboard/dashboard_screen.dart';

@@ -1,13 +1,20 @@
+import 'package:booksmart/modules/common/providers/user_profile_provider.dart';
+import 'package:get/get.dart';
+
+import '../controllers/auth_controller.dart';
 import '../modules/common/providers/auth_provider.dart';
 import '../routes/routes.dart';
 
 Future<String> getInitialRoute() async {
   if (isUserLoggedIn) {
     if (isEmailVerified) {
-      /// TODO: we need to fetch user doc from the database
-      /// if doc is not found or name etc is empty/null navigate user to the profile setup screen.....
-      /// initilize controller
-      /// & based on role we have to redirect him to the desired dashboard
+      Map<String, dynamic>? userData = await getUserProfile();
+
+      if (userData == null) {
+        return "---/error/---";
+      } else {
+        Get.put(AuthController(userJson: userData), permanent: true);
+      }
       return Routes.home;
     }
     return Routes.verifyEmail;

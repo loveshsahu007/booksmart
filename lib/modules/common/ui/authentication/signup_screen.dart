@@ -1,6 +1,6 @@
-import 'package:booksmart/models/user_model.dart';
 import 'package:get/get.dart';
 import '../../../../constant/exports.dart';
+import '../../../../models/user_base_model.dart';
 import '../../providers/auth_provider.dart';
 import 'login_screen.dart';
 

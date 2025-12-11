@@ -1,5 +1,4 @@
 import 'dart:developer';
-import 'package:booksmart/controllers/user_controller.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/utils/initial_utils.dart';
 import 'package:flutter/foundation.dart';
@@ -21,7 +20,6 @@ void main() async {
   log("isUserLoggedin: $isUserLoggedIn");
 
   String initialRoute = await getInitialRoute();
-  Get.put(UserController());
   runApp(MyApp(initialRoute: initialRoute));
 }
 

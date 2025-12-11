@@ -11,3 +11,5 @@ double getSideBarWidth() {
     return 50;
   }
 }
+
+bool isDevelopmentMode = !const bool.fromEnvironment('dart.vm.product');

@@ -1,24 +1,50 @@
 import 'dart:developer';
 
-import 'package:booksmart/controllers/user_controller.dart';
-import 'package:booksmart/models/user_model.dart';
-import 'package:booksmart/modules/common/providers/supabase_crud.dart';
-import 'package:booksmart/utils/initial_utils.dart';
-import 'package:booksmart/widgets/confirmation_dialog.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../models/user_base_model.dart';
 import '../../../routes/routes.dart';
+import '../../../services/crud_service.dart';
+import '../../../utils/initial_utils.dart';
 import '../../../utils/supabase.dart';
+import '../../../widgets/confirmation_dialog.dart';
 import '../../../widgets/loading.dart';
 import '../../../widgets/snackbar.dart';
 
 bool get isUserLoggedIn => supabase.auth.currentSession != null;
 
+String? get getCurrentLoggedUserId => supabase.auth.currentSession?.user.id;
+
 bool get isEmailVerified =>
     supabase.auth.currentSession?.user.emailConfirmedAt != null;
-final crud = SupabaseCrudService();
+
+Future<bool> createUserRow({
+  required String userId,
+  required String email,
+  required UserRole role,
+}) async {
+  return SupabaseCrudService.insert(
+        table: "users",
+        data: {
+          "auth_id": userId,
+          "email": email,
+          "role": role.name,
+          "first_name": "",
+          "last_name": "",
+          "phone_number": "",
+        },
+      )
+      .then((_) {
+        return true;
+      })
+      .onError((e, x) {
+        log(e.toString());
+        log(e.toString());
+        return false;
+      });
+}
+
 Future<void> signUpWithEmailPassword({
   required String email,
   required String password,
@@ -31,43 +57,12 @@ Future<void> signUpWithEmailPassword({
       password: password,
       data: <String, String>{'role': role.name},
     );
-
-    dismissLoadingWidget();
-
     if (response.user != null) {
-      final userId = response.user!.id;
-
-      // Insert new user row into Supabase table
-      await crud.insert(
-        table: "users",
-        data: {
-          "auth_id": userId,
-          "email": email,
-          "role": role.name,
-          "first_name": "",
-          "last_name": "",
-          "phone_number": "",
-        },
-      );
-
-      // Load user controller and store data immediately
-      final userCtrl = Get.put(UserController());
-      await userCtrl.loadCurrentUser();
-
-      // Redirect based on email verification + role
-      if (isEmailVerified) {
-        if (role == UserRole.user) {
-          Get.offAllNamed(
-            Routes.profileScreen,
-          ); // User Dashboard / profile setup
-        } else {
-          Get.offAllNamed(Routes.profileScreenCPA);
-          // Get.offAllNamed(Routes.dashboardCPA); // CPA Dashboard
-        }
-      } else {
-        Get.offAndToNamed(Routes.verifyEmail);
-      }
+      await createUserRow(userId: response.user!.id, email: email, role: role);
+      dismissLoadingWidget();
+      Get.offAndToNamed(Routes.verifyEmail);
     } else {
+      dismissLoadingWidget();
       somethingWentWrongSnackbar();
     }
   } on AuthApiException catch (e, x) {
@@ -99,25 +94,9 @@ Future<void> signinWithEmailPassword({
       somethingWentWrongSnackbar();
       return;
     }
-
-    // Load user controller and fetch user row
-    // If not already put, register it:
-    final userCtrl = Get.put(UserController());
-    await userCtrl.loadCurrentUser();
-
-    // Get role from metadata that you saved during signup
-    final role = response.user!.userMetadata?['role'] as String?;
-
+    String route = await getInitialRoute();
     dismissLoadingWidget();
-    debugPrint('***********User role : $role');
-    if (role == "user") {
-      // Normal user → go to initial route
-      String initialRoute = await getInitialRoute();
-      Get.offAndToNamed(initialRoute);
-    } else {
-      // CPA → go to CPA dashboard
-      Get.offAllNamed(Routes.dashboardCPA);
-    }
+    Get.offAndToNamed(route);
   } on AuthApiException catch (e, x) {
     dismissLoadingWidget();
     log(e.toString());
@@ -139,22 +118,16 @@ void logOut() async {
       Get.back(); // close the confirmation dialog
       showLoading();
       try {
-        // 1️⃣ Sign out from Supabase
-        await Supabase.instance.client.auth.signOut();
-
-        // 2️⃣ Clear user data in UserController
-        if (Get.isRegistered<UserController>()) {
-          final userCtrl = Get.find<UserController>();
-          userCtrl.user.value = null; // clears all user data
-        }
-
-        // 3️⃣ Navigate to login screen
+        await Future.wait([
+          Supabase.instance.client.auth.signOut(),
+          Get.deleteAll(force: true),
+        ]);
         dismissLoadingWidget();
         Get.offAllNamed(Routes.login);
       } catch (e) {
         dismissLoadingWidget();
         showSnackBar(e.toString(), isError: true);
-        debugPrint('Logout error: $e');
+        log('Logout error: $e');
       }
     },
   );

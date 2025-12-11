@@ -1,4 +1,4 @@
-import 'package:booksmart/controllers/user_controller.dart';
+import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/modules/user/ui/bank/bank_list_screen.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/document_repository_screen.dart';
@@ -7,6 +7,7 @@ import 'package:booksmart/modules/user/ui/sponsored_offers/sponsored_offers_scre
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../../controllers/auth_controller.dart';
 import '../../../../routes/routes.dart';
 import '../../../../widgets/app_text.dart';
 
@@ -22,14 +23,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _proTips = true;
   bool _isDarkMode = Get.isDarkMode;
 
-  late final UserController _userCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _userCtrl = Get.put(UserController());
-    _userCtrl.loadCurrentUser(); // load current user info
-  }
+  UserModel? user = authUser;
 
   @override
   Widget build(BuildContext context) {
@@ -46,17 +40,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           // Profile section
           Obx(() {
-            final user = _userCtrl.user.value;
-            final initials =
-                (user != null && user.firstName != '' && user.lastName != '')
-                ? "${user.firstName![0]}${user.lastName![0]}"
-                : "NA";
+            // here use RX ersion, required by OBX
+            if (authController.rxUser.value == null) {
+              return SizedBox();
+            }
             return Material(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(10),
               child: InkWell(
                 onTap: () {
-                  Get.toNamed(Routes.profileScreen);
+                  Get.toNamed(Routes.userProfile);
                 },
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
@@ -78,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         radius: 26,
                         backgroundColor: colorScheme.primary,
                         child: AppText(
-                          initials,
+                          user!.firstName[0] + user!.lastName[0],
                           color: Colors.white,
                           fontSize: 14,
                         ),
@@ -88,9 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           AppText(
-                            user != null
-                                ? "${user.firstName} ${user.lastName}"
-                                : "Your Name",
+                            "${user?.firstName} ${user?.lastName}",
                             fontSize: 18,
                             color: colorScheme.onSurface,
                           ),

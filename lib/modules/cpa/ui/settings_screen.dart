@@ -1,4 +1,6 @@
-import 'package:booksmart/controllers/user_controller.dart';
+import 'package:booksmart/controllers/auth_controller.dart';
+import 'package:booksmart/models/user_base_model.dart';
+import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/routes/routes.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,13 +16,11 @@ class SettingsScreenCPA extends StatefulWidget {
 
 class _SettingsScreenCPAState extends State<SettingsScreenCPA> {
   bool _isDarkMode = Get.isDarkMode;
-  late final UserController _userCtrl;
+  CpaModel? cpa = authCpa;
 
   @override
   void initState() {
     super.initState();
-    _userCtrl = Get.put(UserController());
-    _userCtrl.loadCurrentUser(); // load current CPA user info
   }
 
   @override
@@ -37,11 +37,9 @@ class _SettingsScreenCPAState extends State<SettingsScreenCPA> {
         padding: const EdgeInsets.all(16),
         children: [
           Obx(() {
-            final user = _userCtrl.user.value;
-            final initials =
-                (user != null && user.firstName != '' && user.lastName != '')
-                ? "${user.firstName![0]}${user.lastName![0]}"
-                : "NA";
+            if (authController.rxUser.value == null) {
+              return SizedBox();
+            }
 
             return Material(
               color: Colors.transparent,
@@ -69,7 +67,7 @@ class _SettingsScreenCPAState extends State<SettingsScreenCPA> {
                         radius: 26,
                         backgroundColor: colorScheme.primary,
                         child: AppText(
-                          initials,
+                          cpa!.firstName[0] + cpa!.lastName[0],
                           color: Colors.white,
                           fontSize: 14,
                         ),
@@ -79,15 +77,13 @@ class _SettingsScreenCPAState extends State<SettingsScreenCPA> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           AppText(
-                            user != null
-                                ? "${user.firstName} ${user.lastName}"
-                                : "CPA Name",
+                            "${cpa?.firstName} ${cpa?.lastName}",
                             fontSize: 18,
                             fontWeight: FontWeight.w600,
                             color: colorScheme.onSurface,
                           ),
                           AppText(
-                            user?.email ?? "cpa@email.com",
+                            cpa?.email ?? "---",
                             color: colorScheme.onSurface.withValues(alpha: 0.7),
                             fontSize: 14,
                           ),
@@ -126,9 +122,7 @@ class _SettingsScreenCPAState extends State<SettingsScreenCPA> {
           const SizedBox(height: 10),
 
           buildTile("Logout", () {
-            final userCtrl = Get.find<UserController>();
-            userCtrl.user.value = null; // clear user data
-            Get.offAllNamed(Routes.login);
+            logOut();
           }, isDestructive: true),
         ],
       ),

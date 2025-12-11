@@ -1,5 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/models/user_data_model.dart';
+import 'package:booksmart/controllers/auth_controller.dart';
+import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/modules/cpa/ui/chat_list_screen.dart';
 import 'package:booksmart/modules/cpa/ui/profile_screen.dart';
 import 'package:booksmart/modules/cpa/ui/profile_under_review_screen.dart';
@@ -13,7 +14,9 @@ import 'package:booksmart/modules/user/ui/bulk_review/bulk_review_screen.dart';
 import 'package:booksmart/modules/user/ui/token/streak_unlocked_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import '../models/user_base_model.dart';
 import '../modules/common/ui/authentication/verify_email_screen.dart';
+import '../modules/common/ui/error_screen.dart';
 import '../modules/cpa/ui/earning_screen.dart';
 import '../modules/cpa/ui/home/home_screen.dart';
 import '../modules/cpa/ui/home/template/web_template.dart';
@@ -42,74 +45,98 @@ class AppPages {
     GetPage(name: Routes.verifyEmail, page: () => const VerifyEmailScreen()),
 
     // internal
-    GetPage(name: Routes.bulkReview, page: () => const BulkReviewScreen()),
-    GetPage(name: Routes.buyTokens, page: () => const BuyTokensScreen()),
+    GetPage(
+      name: Routes.bulkReview,
+      page: () => getRequiredScreen(const BulkReviewScreen(), UserRole.user),
+    ),
+    GetPage(
+      name: Routes.buyTokens,
+      page: () => getRequiredScreen(const BuyTokensScreen(), UserRole.user),
+    ),
     GetPage(
       name: Routes.streakUnlocked,
-      page: () => const StreakUnlockedScreen(),
+      page: () =>
+          getRequiredScreen(const StreakUnlockedScreen(), UserRole.user),
     ),
-    // GetPage(
-    //   name: Routes.organization,
-    //   page: () => const OrganizationListScreen(),
-    // ),
     GetPage(
       name: Routes.rulesManagement,
-      page: () => const RulesManagementScreen(),
+      page: () =>
+          getRequiredScreen(const RulesManagementScreen(), UserRole.user),
     ),
-    GetPage(name: Routes.subscription, page: () => const SubscriptionScreen()),
+    GetPage(
+      name: Routes.subscription,
+      page: () => getRequiredScreen(const SubscriptionScreen(), UserRole.user),
+    ),
 
     // Web Side-bar
-    GetPage(name: Routes.home, page: () => HomeScreen()),
+    GetPage(
+      name: Routes.home,
+      page: () => getRequiredScreen(HomeScreen(), UserRole.user),
+    ),
     GetPage(
       name: Routes.report,
-      page: () => kIsWeb
-          ? WebTemplate(child: FinancialReportPage())
-          : FinancialReportPage(),
+      page: () => getRequiredScreen(
+        kIsWeb
+            ? WebTemplate(child: FinancialReportPage())
+            : FinancialReportPage(),
+        UserRole.user,
+      ),
     ),
     GetPage(
       name: Routes.tax,
-      page: () =>
-          kIsWeb ? WebTemplate(child: TexFillingSceen()) : TexFillingSceen(),
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplate(child: TexFillingSceen()) : TexFillingSceen(),
+        UserRole.user,
+      ),
     ),
     GetPage(
       name: Routes.tokens,
-      page: () =>
-          kIsWeb ? WebTemplate(child: EarnTokensScreen()) : EarnTokensScreen(),
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplate(child: EarnTokensScreen()) : EarnTokensScreen(),
+        UserRole.user,
+      ),
     ),
     GetPage(
       name: Routes.aiChat,
-      page: () =>
-          kIsWeb ? WebTemplate(child: AIChatingScreen()) : AIChatingScreen(),
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplate(child: AIChatingScreen()) : AIChatingScreen(),
+        UserRole.user,
+      ),
     ),
     GetPage(
       name: Routes.chat,
-      page: () =>
-          kIsWeb ? WebTemplate(child: ChatListScreen()) : ChatListScreen(),
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplate(child: ChatListScreen()) : ChatListScreen(),
+        UserRole.user,
+      ),
     ),
     GetPage(
       name: Routes.cpaNetwork,
-      page: () =>
-          kIsWeb ? WebTemplate(child: CpaNetworkScreen()) : CpaNetworkScreen(),
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplate(child: CpaNetworkScreen()) : CpaNetworkScreen(),
+        UserRole.user,
+      ),
     ),
     GetPage(
       name: Routes.settings,
-      page: () =>
-          kIsWeb ? WebTemplate(child: SettingsScreen()) : SettingsScreen(),
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplate(child: SettingsScreen()) : SettingsScreen(),
+        UserRole.user,
+      ),
     ),
     GetPage(
       name: Routes.aiStrategy,
-      page: () => kIsWeb
-          ? WebTemplate(child: AiStrategyScreen())
-          : const AiStrategyScreen(),
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplate(child: AiStrategyScreen()) : AiStrategyScreen(),
+        UserRole.user,
+      ),
     ),
-    // TODO: need to finilize the profile-screen
     GetPage(
-      name: Routes.profileScreen,
-      page: () =>
-          // kIsWeb
-          //     ? WebTemplate(child: UserProfileScreen())
-          //     :
-          const UserProfileScreen(),
+      name: Routes.userProfile,
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplate(child: UserProfileScreen()) : UserProfileScreen(),
+        UserRole.user,
+      ),
     ),
 
     /// ====
@@ -119,47 +146,73 @@ class AppPages {
     /// ======
     /// =====
     /// ====
-    GetPage(name: Routes.dashboardCPA, page: () => HomeScreenCPA()),
+    GetPage(
+      name: Routes.dashboardCPA,
+      page: () => getRequiredScreen(HomeScreenCPA(), UserRole.cpa),
+    ),
     GetPage(
       name: Routes.leadsCPA,
-      page: () => kIsWeb
-          ? WebTemplateCPA(child: LeadsScreenCPA())
-          : const LeadsScreenCPA(),
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplateCPA(child: LeadsScreenCPA()) : LeadsScreenCPA(),
+        UserRole.cpa,
+      ),
     ),
     GetPage(
       name: Routes.billingCPA,
-      page: () => kIsWeb
-          ? WebTemplateCPA(child: EarningScreenCPA())
-          : const EarningScreenCPA(),
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplateCPA(child: EarningScreenCPA()) : EarningScreenCPA(),
+        UserRole.cpa,
+      ),
     ),
     GetPage(
       name: Routes.chatCPA,
-      page: () =>
-          kIsWeb ? WebTemplateCPA(child: ChatListScreen()) : ChatListScreen(),
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplateCPA(child: ChatListScreen()) : ChatListScreen(),
+        UserRole.cpa,
+      ),
     ),
 
     GetPage(
       name: Routes.settingsCPA,
-      page: () => kIsWeb
-          ? WebTemplateCPA(child: SettingsScreenCPA())
-          : const SettingsScreenCPA(),
+      page: () => getRequiredScreen(
+        kIsWeb
+            ? WebTemplateCPA(child: SettingsScreenCPA())
+            : const SettingsScreenCPA(),
+        UserRole.cpa,
+      ),
     ),
 
-    GetPage(name: Routes.profileScreenCPA, page: () => ProfileScreenCPA()),
-GetPage(
-  name: Routes.profileUnderReviewCPA,
-  page: () {
-    // Get the arguments passed from navigation
-    final arguments = Get.arguments;
-    
-    // Check if arguments contain UserModel
-    if (arguments != null && arguments is UserModel) {
-      return ProfileUnderReviewScreenCPA(userData: arguments);
-    } else {
-      // Fallback: return empty screen or handle error
-      return const ProfileUnderReviewScreenCPA();
-    }
-  },
-),
+    GetPage(
+      name: Routes.profileScreenCPA,
+      page: () => getRequiredScreen(ProfileScreenCPA(), UserRole.cpa),
+    ),
+    GetPage(
+      name: Routes.profileUnderReviewCPA,
+      page: () =>
+          getRequiredScreen(ProfileUnderReviewScreenCPA(), UserRole.cpa),
+    ),
   ];
+}
+
+Widget getRequiredScreen(Widget desiredWidget, UserRole role) {
+  if (isUserLoggedIn && Get.isRegistered<AuthController>()) {
+    if (authPerson?.role == role) {
+      return desiredWidget;
+    } else {
+      return const ErrorScreen();
+    }
+  } else {
+    return const ErrorScreen(isLogInType: true);
+  }
+}
+
+String getHomeScreenRoute() {
+  switch (authPerson?.role) {
+    case UserRole.user:
+      return Routes.home;
+    case UserRole.cpa:
+      return Routes.dashboardCPA;
+    default:
+      return Routes.home;
+  }
 }

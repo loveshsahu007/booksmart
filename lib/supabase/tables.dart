@@ -1,3 +1,3 @@
 class SupabaseTable {
-  static String users = 'users';
+  static String users = 'Users';
 }

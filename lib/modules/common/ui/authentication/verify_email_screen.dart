@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/widgets/loading.dart';
 import 'package:booksmart/widgets/snackbar.dart';
@@ -51,13 +52,16 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       final user = supabase.auth.currentUser;
 
       if (user?.emailConfirmedAt != null) {
+        UserRole? role = user!.userMetadata?['role'] as UserRole?;
+        if (role == UserRole.user) {
+          Get.offAllNamed(Routes.userProfile);
+        } else if (role == UserRole.cpa) {
+          Get.offAllNamed(Routes.profileScreenCPA);
+        } else {
+          Get.offAllNamed(Routes.login);
+          somethingWentWrongSnackbar();
+        }
         showSnackBar("Your email has been verified!");
-
-        /// TODO: navigate user to profile-screen
-        /// user:
-        /// cpa:
-
-        Get.offAllNamed(Routes.home); // or CPA route
       } else {
         showSnackBar(
           "Your email is still not verified. Please check your inbox.",
