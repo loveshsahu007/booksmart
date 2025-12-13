@@ -1,58 +1,56 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:camera/camera.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
-Future<void> openReceiptScanner() async {
+Future<Map<String, dynamic>?> openReceiptScanner() async {
   if (kIsWeb) {
-    await customDialog(title: "Attach File", child: ReceiptFilePickerDialog());
+    return await Get.dialog(const ReceiptFilePickerDialog());
   } else {
-    Get.to(() => const ReceiptScanningOutputScreen());
+    return await Get.to(() => const ReceiptScanningOutputScreen());
   }
 }
 
+// ====================
+// Mobile Receipt Scanner
+// ====================
 class ReceiptScanningOutputScreen extends StatefulWidget {
   const ReceiptScanningOutputScreen({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
-  _ReceiptScanningOutputScreenState createState() =>
+  State<ReceiptScanningOutputScreen> createState() =>
       _ReceiptScanningOutputScreenState();
 }
 
 class _ReceiptScanningOutputScreenState
     extends State<ReceiptScanningOutputScreen> {
+  XFile? _selectedFile;
+  Uint8List? _selectedFileBytes; // preview
+
   String merchant = "PHOSPHOR";
   String date = "April 21, 2024";
   double amount = 29.99;
-  XFile? _capturedImage;
-  bool _isLoading = false;
 
+  /// Capture image from camera
   Future<void> _captureImage() async {
     try {
       final cameras = await availableCameras();
       final firstCamera = cameras.first;
 
-      final image = await Navigator.push(
+      final image = await Navigator.push<XFile?>(
         context,
         MaterialPageRoute(
-          builder: (context) => TakePictureScreen(camera: firstCamera),
+          builder: (_) => TakePictureScreen(camera: firstCamera),
         ),
       );
 
       if (image != null) {
+        final bytes = await image.readAsBytes();
         setState(() {
-          _capturedImage = image;
-          _isLoading = true;
-        });
-
-        await Future.delayed(const Duration(seconds: 2));
-
-        setState(() {
-          _isLoading = false;
+          _selectedFile = image;
+          _selectedFileBytes = bytes;
         });
       }
     } catch (e) {
@@ -71,146 +69,76 @@ class _ReceiptScanningOutputScreenState
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text("Receipt Scanner")),
-      body: _isLoading
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: colorScheme.primary),
-                  const SizedBox(height: 16),
-                  AppText(
-                    "Processing receipt...",
-                    color: colorScheme.onSurface,
-                  ),
-                ],
+      appBar: AppBar(title: const Text("Receipt Scanner")),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Container(
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
               ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Container(
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: _capturedImage != null
-                        ? Image.file(
-                            File(_capturedImage!.path),
-                            fit: BoxFit.cover,
-                          )
-                        : Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.receipt_long,
-                                  size: 50,
-                                  color: colorScheme.onSurface.withValues(
-                                    alpha: 0.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                AppText(
-                                  "No receipt captured",
-                                  color: colorScheme.onSurface.withValues(
-                                    alpha: 0.7,
-                                  ),
-                                ),
-                              ],
-                            ),
+              child: _selectedFileBytes != null
+                  ? Image.memory(_selectedFileBytes!, fit: BoxFit.cover)
+                  : Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.receipt_long,
+                            size: 50,
+                            color: colorScheme.onSurface.withOpacity(0.5),
                           ),
-                  ),
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        _row(context, "Merchant:", merchant),
-                        const SizedBox(height: 8),
-                        _row(context, "Date:", date),
-                        const SizedBox(height: 8),
-                        _row(context, "Amount:", "\$$amount", isGreen: true),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
+                          const SizedBox(height: 8),
+                          const AppText("No receipt captured"),
+                        ],
                       ),
                     ),
-                    onPressed: _captureImage,
-                    child: const AppText(
-                      "Retake Photo",
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: colorScheme.onPrimary,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
-                      ),
-                    ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _captureImage,
+                  icon: const Icon(Icons.camera_alt),
+                  label: const AppText("Retake Photo"),
+                ),
+                const SizedBox(width: 16),
+                if (_selectedFileBytes != null)
+                  ElevatedButton.icon(
                     onPressed: () {
+                      setState(() {
+                        _selectedFile = null;
+                        _selectedFileBytes = null;
+                      });
+                    },
+                    icon: const Icon(Icons.delete),
+                    label: const AppText("Remove"),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _selectedFileBytes == null
+                  ? null
+                  : () {
                       Navigator.pop(context, {
                         'merchant': merchant,
                         'date': date,
                         'amount': amount,
-                        'imagePath': _capturedImage?.path,
+                        'imagePath': _selectedFile?.path,
+                        'fileBytes': _selectedFileBytes,
                       });
                     },
-                    child: const AppText(
-                      "Attach to Transaction",
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
+              child: const AppText("Attach to Transaction"),
             ),
-    );
-  }
-
-  Widget _row(
-    BuildContext context,
-    String label,
-    String value, {
-    bool isGreen = false,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        AppText(
-          label,
-          fontWeight: FontWeight.bold,
-          color: colorScheme.onSurface,
-          fontSize: 12,
+          ],
         ),
-        AppText(
-          value,
-          color: isGreen ? Colors.green : colorScheme.onSurface,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ],
+      ),
     );
   }
 }
@@ -218,17 +146,15 @@ class _ReceiptScanningOutputScreenState
 // ====================
 // Camera Screen
 // ====================
-
 class TakePictureScreen extends StatefulWidget {
   final CameraDescription camera;
-
   const TakePictureScreen({super.key, required this.camera});
 
   @override
-  TakePictureScreenState createState() => TakePictureScreenState();
+  State<TakePictureScreen> createState() => _TakePictureScreenState();
 }
 
-class TakePictureScreenState extends State<TakePictureScreen> {
+class _TakePictureScreenState extends State<TakePictureScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
 
@@ -250,10 +176,10 @@ class TakePictureScreenState extends State<TakePictureScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text("Capture Receipt")),
+      appBar: AppBar(title: const Text("Capture Receipt")),
       body: FutureBuilder<void>(
         future: _initializeControllerFuture,
-        builder: (context, snapshot) {
+        builder: (_, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             return CameraPreview(_controller);
           } else {
@@ -264,13 +190,10 @@ class TakePictureScreenState extends State<TakePictureScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: colorScheme.primary,
         onPressed: () async {
-          try {
-            await _initializeControllerFuture;
-            final image = await _controller.takePicture();
-            Navigator.pop(context, image);
-          } catch (_) {}
+          await _initializeControllerFuture;
+          final image = await _controller.takePicture();
+          Navigator.pop(context, image);
         },
         child: Icon(Icons.camera_alt, color: colorScheme.onPrimary),
       ),
@@ -279,9 +202,8 @@ class TakePictureScreenState extends State<TakePictureScreen> {
 }
 
 // ====================
-// File Picker Dialog
+// Web File Picker Dialog
 // ====================
-
 class ReceiptFilePickerDialog extends StatefulWidget {
   const ReceiptFilePickerDialog({super.key});
 
@@ -291,15 +213,19 @@ class ReceiptFilePickerDialog extends StatefulWidget {
 }
 
 class _ReceiptFilePickerDialogState extends State<ReceiptFilePickerDialog> {
-  String merchant = "PHOSPHOR";
-  String date = "April 21, 2024";
-  double amount = 29.99;
-  String? _filePath;
+  XFile? _selectedFile;
+  Uint8List? _selectedFileBytes;
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.image);
-    if (result != null && result.files.single.path != null) {
-      setState(() => _filePath = result.files.single.path);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result != null && result.files.single.bytes != null) {
+      setState(() {
+        _selectedFileBytes = result.files.single.bytes;
+        _selectedFile = XFile(result.files.single.path ?? "");
+      });
     }
   }
 
@@ -308,133 +234,65 @@ class _ReceiptFilePickerDialogState extends State<ReceiptFilePickerDialog> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppText(
-                "Upload Receipt",
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: colorScheme.onSurface,
-              ),
-              const SizedBox(height: 16),
-
-              _filePath == null
-                  ? InkWell(
-                      onTap: _pickFile,
-                      child: Container(
-                        height: 180,
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const AppText(
+              "Upload Receipt",
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+            const SizedBox(height: 16),
+            InkWell(
+              onTap: _pickFile,
+              child: Container(
+                height: 180,
+                color: colorScheme.surfaceContainerHighest,
+                child: _selectedFileBytes == null
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Icon(Icons.upload_file, size: 48),
+                            AppText("Select receipt image"),
+                          ],
                         ),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.upload_file,
-                                size: 48,
-                                color: colorScheme.onSurface.withValues(
-                                  alpha: 0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              AppText(
-                                "Select receipt image",
-                                color: colorScheme.onSurface.withValues(
-                                  alpha: 0.7,
-                                ),
-                                fontSize: 14,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  : ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(File(_filePath!), height: 180),
-                    ),
-
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  children: [
-                    _row(context, "Merchant:", merchant),
-                    _row(context, "Date:", date),
-                    _row(context, "Amount:", "\$$amount", isGreen: true),
-                  ],
-                ),
+                      )
+                    : Image.memory(_selectedFileBytes!, fit: BoxFit.cover),
               ),
-              const SizedBox(height: 20),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: AppText("Cancel", fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_selectedFileBytes != null)
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _selectedFile = null;
+                        _selectedFileBytes = null;
+                      });
+                    },
+                    icon: const Icon(Icons.delete),
+                    label: const AppText("Remove"),
                   ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: colorScheme.onPrimary,
-                    ),
-                    onPressed: _filePath == null
-                        ? null
-                        : () => Navigator.pop(context, {
-                            'merchant': merchant,
-                            'date': date,
-                            'amount': amount,
-                            'imagePath': _filePath,
-                          }),
-                    child: const AppText(
-                      "Attach",
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  onPressed: _selectedFileBytes == null
+                      ? null
+                      : () => Navigator.pop(context, {
+                          'imagePath': _selectedFile?.path,
+                          'fileBytes': _selectedFileBytes,
+                        }),
+                  icon: const Icon(Icons.check),
+                  label: const AppText("Attach"),
+                ),
+              ],
+            ),
+          ],
         ),
-      ),
-    );
-  }
-
-  Widget _row(
-    BuildContext context,
-    String label,
-    String value, {
-    bool isGreen = false,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          AppText(label, fontSize: 14, fontWeight: FontWeight.bold),
-          AppText(
-            value,
-            fontSize: 14,
-            color: isGreen ? Colors.green : colorScheme.onSurface,
-            fontWeight: FontWeight.bold,
-          ),
-        ],
       ),
     );
   }

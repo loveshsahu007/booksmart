@@ -1,6 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:dropdown_search/dropdown_search.dart';
-import 'package:get/get.dart';
 
 class CustomDropDownWidget<T> extends StatefulWidget {
   const CustomDropDownWidget({
@@ -12,6 +11,7 @@ class CustomDropDownWidget<T> extends StatefulWidget {
     this.selectedItem,
     this.itemAsString,
     this.showSearchBox = false,
+    this.onChanged, // Add this
   });
 
   final GlobalKey<DropdownSearchState<T>> dropDownKey;
@@ -21,6 +21,7 @@ class CustomDropDownWidget<T> extends StatefulWidget {
   final List<T> items;
   final String Function(T)? itemAsString;
   final bool showSearchBox;
+  final ValueChanged<T?>? onChanged; // Add this
 
   @override
   State<CustomDropDownWidget<T>> createState() =>
@@ -35,6 +36,7 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
       selectedItem: widget.selectedItem,
       itemAsString: widget.itemAsString,
       items: (filter, infiniteScrollProps) => widget.items,
+      onChanged: widget.onChanged, // Add this
       decoratorProps: DropDownDecoratorProps(
         decoration: InputDecoration(
           labelText: widget.label,
@@ -42,42 +44,7 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
           isDense: true,
         ),
       ),
-      popupProps: PopupProps.menu(
-        fit: FlexFit.loose,
-        showSearchBox: widget.showSearchBox,
-        showSelectedItems: true,
-        searchDelay: Duration(milliseconds: 100),
-        searchFieldProps: TextFieldProps(
-          decoration: InputDecoration(
-            border: OutlineInputBorder(),
-            labelText: "Search here ...",
-          ),
-        ),
-        menuProps: MenuProps(
-          backgroundColor: Get.isDarkMode
-              ? AppColorsDark.surface
-              : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-        itemBuilder: (context, item, isDisabled, isSelected) {
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: () {
-                if (isDisabled) {
-                  return Colors.grey;
-                } else if (isSelected) {
-                  return Get.theme.primaryColor;
-                }
-              }(),
-            ),
-            child: Text(item.toString(), style: TextStyle()),
-          );
-        },
-      ),
-      validator: (value) => value == null ? 'Required' : null,
+      // ... rest of your code
     );
   }
 }

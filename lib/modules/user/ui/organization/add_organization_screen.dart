@@ -1,5 +1,9 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/controllers/auth_controller.dart';
+import 'package:booksmart/controllers/organization_controler.dart';
+import 'package:booksmart/models/organization_model.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
+import 'package:booksmart/widgets/snackbar.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -9,7 +13,7 @@ import '../../../../widgets/custom_drop_down.dart';
 void goToAddOrganizationScreen({bool shouldCloseBefore = false}) {
   if (kIsWeb) {
     if (shouldCloseBefore) {
-      Get.back(); // close previous dialog
+      Get.back();
     }
     customDialog(
       child: const AddOrganizationScreen(),
@@ -35,7 +39,25 @@ class AddOrganizationScreen extends StatefulWidget {
 class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _organizationNameController = TextEditingController();
+  /// Controller
+  final OrganizationController controller = Get.put(OrganizationController());
+
+  /// Text Controllers
+  final nameController = TextEditingController();
+  final websiteController = TextEditingController();
+  final einController = TextEditingController();
+  final streetController = TextEditingController();
+  final cityController = TextEditingController();
+  final zipController = TextEditingController();
+  final phoneController = TextEditingController();
+  final emailController = TextEditingController();
+
+  final ScrollController _scrollController = ScrollController();
+
+  /// Dropdowns
+  final stateDropdownKey = GlobalKey<DropdownSearchState<String>>();
+  final industryDropdownKey = GlobalKey<DropdownSearchState<String>>();
+  final orgDropdownKey = GlobalKey<DropdownSearchState<String>>();
 
   final List<String> _orgTypes = [
     'Sole Proprietorship',
@@ -88,87 +110,79 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
       .map((e) => e['label'] as String)
       .toList();
 
-  final ScrollController _scrollController = ScrollController();
-
-  final stateDropdownKey = GlobalKey<DropdownSearchState<String>>();
-  final industryDropdownKey = GlobalKey<DropdownSearchState<String>>();
-  final orgDropdownKey = GlobalKey<DropdownSearchState<String>>();
-
   @override
   void dispose() {
     _scrollController.dispose();
-    _organizationNameController.dispose();
+    nameController.dispose();
+    websiteController.dispose();
+    einController.dispose();
+    streetController.dispose();
+    cityController.dispose();
+    zipController.dispose();
+    phoneController.dispose();
+    emailController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: kIsWeb ? null : AppBar(),
       body: Scrollbar(
-        thumbVisibility: true,
-        radius: const Radius.circular(10),
-        thickness: 6,
         controller: _scrollController,
-        trackVisibility: true,
+        thumbVisibility: true,
+        thickness: 6,
+        radius: const Radius.circular(10),
         child: SingleChildScrollView(
           controller: _scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.all(16),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 500),
               child: Form(
                 key: _formKey,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    /// 🔹 Title
                     AppText(
                       "Set Up Your Organization Profile",
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       textAlign: TextAlign.center,
                     ),
-
                     0.05.verticalSpace,
 
-                    /// 🔹 Organization Name
                     AppTextField(
-                      controller: _organizationNameController,
-                      hintText: "Organization Name *",
+                      controller: nameController,
                       labelText: "Organization Name *",
-                      keyboardType: TextInputType.name,
-                      maxLines: 1,
-                      fieldValidator: (v) => (v == null || v.isEmpty)
-                          ? "Enter organization name"
-                          : null,
-                    ),
-                    0.02.verticalSpace,
-                    AppTextField(
-                      hintText: "Website (URL)",
-                      labelText: "Website (URL)",
-                      keyboardType: TextInputType.url,
-                      maxLines: 1,
-                    ),
-                    0.02.verticalSpace,
-                    AppTextField(
-                      hintText: "EIN/TIN (9 digits)",
-                      labelText: "EIN/TIN *",
-                      keyboardType: TextInputType.number,
-                      maxLines: 1,
+                      hintText: "Organization Name *",
                       fieldValidator: (v) =>
-                          (v == null || v.isEmpty) ? "Enter EIN/TIN" : null,
+                          v == null || v.isEmpty ? "Required" : null,
                     ),
                     0.02.verticalSpace,
 
-                    /// 🔹 Type of Organization
+                    AppTextField(
+                      controller: websiteController,
+                      labelText: "Website",
+                      hintText: "Website",
+                    ),
+                    0.02.verticalSpace,
+
+                    AppTextField(
+                      controller: einController,
+                      labelText: "EIN/TIN *",
+                      hintText: "EIN/TIN *",
+                      keyboardType: TextInputType.number,
+                      fieldValidator: (v) =>
+                          v == null || v.isEmpty ? "Required" : null,
+                    ),
+                    0.02.verticalSpace,
+
                     _buildFilterDropdown(
-                      dropDownKey: orgDropdownKey,
                       label: "Type of Organization *",
                       items: _orgTypes,
+                      dropDownKey: orgDropdownKey,
                     ),
                     0.02.verticalSpace,
 
@@ -177,86 +191,70 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                       items: _industries,
                       dropDownKey: industryDropdownKey,
                     ),
-
                     0.02.verticalSpace,
 
-                    /// 🔹 State / Territory
                     _buildFilterDropdown(
-                      dropDownKey: stateDropdownKey,
                       label: "State / Territory *",
                       items: _states,
+                      dropDownKey: stateDropdownKey,
                     ),
+                    0.02.verticalSpace,
 
-                    0.02.verticalSpace,
                     AppTextField(
-                      hintText: "Street Address *",
-                      labelText: "Street Address *",
-                      keyboardType: TextInputType.streetAddress,
-                      maxLines: 1,
-                      fieldValidator: (v) => null,
+                      controller: streetController,
+                      labelText: "Street Address",
+                      hintText: "Street Address",
                     ),
                     0.02.verticalSpace,
+
                     AppTextField(
-                      hintText: "City *",
-                      labelText: "City *",
-                      maxLines: 1,
-                      keyboardType: TextInputType.text,
-                      fieldValidator: (v) => null,
+                      controller: cityController,
+                      labelText: "City",
+                      hintText: "City",
                     ),
                     0.02.verticalSpace,
+
                     AppTextField(
-                      hintText: "ZIP Code*",
-                      labelText: "ZIP Code*",
-                      maxLines: 1,
-                      keyboardType: TextInputType.number,
-                      fieldValidator: (v) => null,
+                      controller: zipController,
+                      labelText: "ZIP Code",
+                      hintText: "ZIP Code",
                     ),
                     0.02.verticalSpace,
+
                     AppTextField(
-                      controller: _organizationNameController,
-                      hintText: "Phone Number",
+                      controller: phoneController,
                       labelText: "Phone Number",
-                      keyboardType: TextInputType.phone,
+                      hintText: "Phone Number",
                     ),
                     0.02.verticalSpace,
+
                     AppTextField(
-                      controller: _organizationNameController,
-                      hintText: "Business Email",
+                      controller: emailController,
                       labelText: "Business Email",
-                      keyboardType: TextInputType.phone,
+                      hintText: "Business Email",
                     ),
                     0.06.verticalSpace,
 
-                    /// 🔹 Save & Cancel Buttons
                     Row(
                       children: [
                         Expanded(
                           child: AppButton(
                             buttonText: "Add Organization",
-                            fontSize: 16,
-                            radius: 8,
                             onTapFunction: _saveOrganization,
                           ),
                         ),
                         0.02.horizontalSpace,
                         Expanded(
                           child: OutlinedButton(
+                            onPressed: Get.back,
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: scheme.onSurface,
                               side: BorderSide(color: scheme.outline),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 4),
                             ),
-                            onPressed: () => Get.back(),
                             child: const Text("Cancel"),
                           ),
                         ),
                       ],
                     ),
-
-                    0.05.verticalSpace,
                   ],
                 ),
               ),
@@ -288,14 +286,32 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
   }
 
   void _saveOrganization() {
-    if (_formKey.currentState!.validate()) {
-      // Here you would typically save the organization data
-      Get.back();
-      Get.snackbar(
-        "Success",
-        "Organization saved successfully",
-        snackPosition: SnackPosition.BOTTOM,
-      );
+    if (!_formKey.currentState!.validate()) return;
+
+    final orgType = orgDropdownKey.currentState?.getSelectedItem;
+    final industry = industryDropdownKey.currentState?.getSelectedItem;
+    final state = stateDropdownKey.currentState?.getSelectedItem;
+
+    if (orgType == null || industry == null || state == null) {
+      showSnackBar("Please select all required dropdowns", isError: true);
+      return;
     }
+
+    final model = OrganizationModel(
+      name: nameController.text.trim(),
+      website: websiteController.text.trim(),
+      einTin: einController.text.trim(),
+      orgType: orgType,
+      industry: industry,
+      state: state,
+      street: streetController.text.trim(),
+      city: cityController.text.trim(),
+      zip: zipController.text.trim(),
+      phone: phoneController.text.trim(),
+      email: emailController.text.trim(),
+      ownerId: authPerson!.id.toString(), // ✅ FIXED
+    );
+
+    controller.addOrganization(model);
   }
 }

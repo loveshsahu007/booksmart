@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:booksmart/controllers/transaction_controller.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/utils/initial_utils.dart';
 import 'package:flutter/foundation.dart';
@@ -20,6 +21,8 @@ void main() async {
   log("isUserLoggedin: $isUserLoggedIn");
 
   String initialRoute = await getInitialRoute();
+  // Initialize TransactionController once at app startup
+  Get.put(TransactionController());
   runApp(MyApp(initialRoute: initialRoute));
 }
 
@@ -36,7 +39,7 @@ class MyApp extends StatelessWidget {
       navigatorKey: navigatorKey,
       theme: AppTheme.lightTheme(),
       darkTheme: AppTheme.darkTheme(),
-      themeMode: ThemeMode.dark,
+      themeMode: ThemeMode.light,
       initialRoute: initialRoute,
       getPages: AppPages.routes,
       defaultTransition: kIsWeb ? Transition.noTransition : null,

@@ -1,5 +1,9 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/controllers/transaction_controller.dart';
+import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/modules/user/ui/transaction/category_selection_screen.dart';
+import 'package:booksmart/utils/supabase.dart';
+import 'package:booksmart/widgets/snackbar.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -9,19 +13,20 @@ import '../../../../widgets/custom_drop_down.dart';
 import 'receipt_scanning_output_screen.dart';
 
 void goToAddTransactionScreen({bool shouldCloseBefore = false}) {
+  // Ensure the controller is registered before using it
+  if (!Get.isRegistered<TransactionController>()) {
+    Get.put(TransactionController());
+  }
+
   if (kIsWeb) {
-    if (shouldCloseBefore) {
-      Get.back();
-    }
+    if (shouldCloseBefore) Get.back();
     customDialog(
       child: AddTransactionScreenManual(),
       title: 'Add Transaction',
       barrierDismissible: true,
       actionWidgetList: [
         IconButton(
-          onPressed: () {
-            Get.back();
-          },
+          onPressed: () => Get.back(),
           icon: const Icon(Icons.delete_forever),
         ),
       ],
@@ -46,21 +51,24 @@ class AddTransactionScreenManual extends StatefulWidget {
 class _AddTransactionScreenManualState
     extends State<AddTransactionScreenManual> {
   final _formKey = GlobalKey<FormState>();
-  String type = "Personal";
-  bool deductible = false;
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _categoryController = TextEditingController();
-  final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _dateController = TextEditingController();
+  final TransactionController transactionC = Get.find();
 
   String? _selectedCategory;
   String? _selectedSubcategory;
+  bool deductible = false;
+  XFile? _selectedFile;
+  String _selectedType = "Personal"; // Add this to track the selected type
+  Uint8List? _selectedFileBytes; // bytes for web preview
+
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _dateController = TextEditingController();
+  final typeDropdownKey = GlobalKey<DropdownSearchState<String>>();
 
   @override
   void initState() {
     super.initState();
-
     final now = DateTime.now();
     _dateController.text = "${now.day} ${_getMonthName(now.month)} ${now.year}";
   }
@@ -84,270 +92,180 @@ class _AddTransactionScreenManualState
   }
 
   Future<void> _selectCategory() async {
-    try {
-      await goToCategorySelectionScreen(
-        selectedCategory: _selectedCategory,
-        selectedSubcategory: _selectedSubcategory,
-      ).then((result) {
-        Map<String, String>? resultt = result;
-        setState(() {
-          _selectedCategory = resultt?.keys.first;
-          _selectedSubcategory = resultt?.values.first;
-          if (_selectedCategory != null && _selectedSubcategory != null) {
-            _categoryController.text =
-                '$_selectedCategory: $_selectedSubcategory';
-          }
-        });
+    final result = await goToCategorySelectionScreen(
+      selectedCategory: _selectedCategory,
+      selectedSubcategory: _selectedSubcategory,
+    );
+    if (result != null) {
+      setState(() {
+        _selectedCategory = result.keys.first;
+        _selectedSubcategory = result.values.first;
       });
-    } catch (_) {}
-  }
-
-  void _saveTransaction() {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedCategory == null || _selectedSubcategory == null) {
-        Get.snackbar(
-          'Error',
-          'Please select a category and subcategory',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        return;
-      }
-
-      Get.back();
     }
   }
 
-  final typeDropdownKey = GlobalKey<DropdownSearchState<String>>();
+  Future<void> _attachReceipt() async {
+    final result = await openReceiptScanner();
+    if (result != null) {
+      setState(() {
+        _selectedFile = result['imagePath'] != null
+            ? XFile(result['imagePath'])
+            : null;
+        _selectedFileBytes = result['fileBytes']; // will be non-null on web
+      });
+    }
+  }
+
+  void _saveTransaction() {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedCategory == null || _selectedSubcategory == null) {
+      showSnackBar("Please select category & subcategory", isError: true);
+      return;
+    }
+
+    final model = TransactionModel(
+      title: _titleController.text,
+      amount: double.tryParse(_amountController.text) ?? 0,
+      category: _selectedCategory!,
+      subcategory: _selectedSubcategory!,
+      type: _selectedType,
+      deductible: deductible,
+      notes: _notesController.text,
+      date: _dateController.text,
+      filePath: _selectedFile?.path,
+      ownerId: supabase.auth.currentUser!.id,
+    );
+
+    transactionC.addTransaction(model);
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: kIsWeb
-          ? null
-          : AppBar(
-              title: Text("Add Transaction"),
-              actions: [
-                IconButton(
-                  icon: Icon(
-                    Icons.delete,
-                    color: colorScheme.onPrimaryContainer,
-                  ),
-                  onPressed: () => Get.back(),
-                ),
-              ],
-            ),
+      appBar: kIsWeb ? null : AppBar(title: const Text("Add Transaction")),
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16),
           children: [
             AppText("Title", fontSize: 14, fontWeight: FontWeight.w500),
-            const SizedBox(height: 8),
+            0.01.verticalSpace,
             AppTextField(
-              hintText: "Enter transaction title",
               controller: _titleController,
-              keyboardType: TextInputType.text,
+              hintText: "Transaction title",
               maxLines: 1,
-              fieldValidator: (value) => value == null || value.isEmpty
-                  ? 'Please enter a title'
-                  : null,
+              fieldValidator: (v) => v == null || v.isEmpty ? "Required" : null,
             ),
-            const SizedBox(height: 16),
+            0.01.verticalSpace,
 
-            /// Date
             AppText("Date", fontSize: 14, fontWeight: FontWeight.w500),
-            const SizedBox(height: 8),
+            0.01.verticalSpace,
             AppTextField(
-              hintText: "Enter date",
               controller: _dateController,
-              keyboardType: TextInputType.text,
+              hintText: "Transaction date",
               maxLines: 1,
-              fieldValidator: (value) =>
-                  value == null || value.isEmpty ? 'Please enter a date' : null,
+              fieldValidator: (v) => v == null || v.isEmpty ? "Required" : null,
             ),
-            const SizedBox(height: 16),
+            0.01.verticalSpace,
 
-            /// Amount
             AppText("Amount", fontSize: 14, fontWeight: FontWeight.w500),
-            const SizedBox(height: 8),
+            0.01.verticalSpace,
             AppTextField(
-              hintText: "Enter amount",
               controller: _amountController,
+              hintText: "Enter amount",
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              maxLines: 1,
-              fieldValidator: (value) {
-                if (value == null || value.isEmpty) {
-                  return 'Please enter an amount';
-                }
-                if (double.tryParse(value) == null) {
-                  return 'Please enter a valid number';
-                }
-                return null;
-              },
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-              ],
+              fieldValidator: (v) => v == null || v.isEmpty ? "Required" : null,
             ),
-            const SizedBox(height: 16),
+            0.01.verticalSpace,
 
-            /// Category
             AppText("Category", fontSize: 14, fontWeight: FontWeight.w500),
-            const SizedBox(height: 8),
+            0.01.verticalSpace,
             InkWell(
               onTap: _selectCategory,
               child: Container(
-                width: double.infinity,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
-                  vertical: 10,
+                  vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8.0),
-                  color: Get.theme.colorScheme.surface,
-                  border: Border.all(
-                    color:
-                        Theme.of(context)
-                            .inputDecorationTheme
-                            .enabledBorder
-                            ?.borderSide
-                            .color ??
-                        colorScheme.outline,
-                  ),
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: colorScheme.outline),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _selectedCategory == null
-                            ? "Select Category"
-                            : "$_selectedCategory: $_selectedSubcategory",
-                        style: TextStyle(
-                          color: _selectedCategory == null
-                              ? colorScheme.onSurface.withValues(alpha: 0.5)
-                              : colorScheme.onSurface,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    Icon(Icons.arrow_drop_down, color: colorScheme.onSurface),
-                  ],
+                child: Text(
+                  _selectedCategory == null
+                      ? "Select Category"
+                      : "$_selectedCategory: $_selectedSubcategory",
                 ),
               ),
             ),
-            if (_selectedCategory == null) ...[
-              const SizedBox(height: 4),
-              AppText(
-                "Please select a category",
-                color: colorScheme.error,
-                fontSize: 12,
-              ),
-            ],
-            const SizedBox(height: 16),
+            0.01.verticalSpace,
 
-            /// Type Dropdown
             AppText("Type", fontSize: 14, fontWeight: FontWeight.w500),
-            const SizedBox(height: 8),
+            0.01.verticalSpace,
             CustomDropDownWidget<String>(
               dropDownKey: typeDropdownKey,
-
-              hint: "Select Tax Year",
+              hint: "Select Type",
               items: ["Personal", "Business"],
+              selectedItem: _selectedType,
+              onChanged: (value) {
+                setState(() {
+                  _selectedType = value ?? "Personal";
+                });
+              },
             ),
-            const SizedBox(height: 16),
-            Material(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.0),
-                side: BorderSide(
-                  color:
-                      Theme.of(
-                        context,
-                      ).inputDecorationTheme.enabledBorder?.borderSide.color ??
-                      colorScheme.outline,
-                ),
-              ),
-              child: SwitchListTile.adaptive(
-                title: AppText("Deductible", fontSize: 14),
-                value: deductible,
-                onChanged: (val) => setState(() => deductible = val),
-                activeThumbColor: colorScheme.primary,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                visualDensity: VisualDensity(vertical: -3),
-              ),
+            0.01.verticalSpace,
+
+            SwitchListTile(
+              title: const AppText("Deductible"),
+              value: deductible,
+              onChanged: (val) => setState(() => deductible = val),
             ),
-            const SizedBox(height: 16),
+            0.01.verticalSpace,
+
             AppText("Notes", fontSize: 14, fontWeight: FontWeight.w500),
-            const SizedBox(height: 8),
+            0.01.verticalSpace,
             AppTextField(
-              hintText: "Enter notes (optional)",
               controller: _notesController,
-              keyboardType: TextInputType.multiline,
+              hintText: "Notes (optional)",
               maxLines: 3,
-              fieldValidator: (v) => null,
             ),
-            const SizedBox(height: 20),
+            0.01.verticalSpace,
 
-            /// Scan Receipt Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                icon: const Icon(Icons.camera_alt, color: Colors.black),
-                label: AppText(
-                  "Scan Receipt",
-                  fontSize: 14,
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-                onPressed: () => openReceiptScanner(),
+            // With this:
+            if (_selectedFile != null || (_selectedFileBytes != null && kIsWeb))
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: kIsWeb
+                    ? Image.memory(
+                        _selectedFileBytes!,
+                        height: 200,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.file(
+                        File(_selectedFile!.path),
+                        height: 200,
+                        fit: BoxFit.cover,
+                      ),
               ),
+            ElevatedButton.icon(
+              onPressed: _attachReceipt,
+              icon: const Icon(Icons.camera_alt, color: primaryColor),
+              label: const AppText("Attach Receipt", color: primaryColor),
             ),
-            const SizedBox(height: 12),
+            0.01.verticalSpace,
 
-            /// Save Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.secondary,
-                  foregroundColor: colorScheme.onSecondary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                onPressed: _saveTransaction,
-                child: AppText(
-                  "Save Transaction",
-                  fontSize: 14,
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+            ElevatedButton(
+              onPressed: _saveTransaction,
+              child: const AppText("Save Transaction", color: primaryColor),
             ),
           ],
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _amountController.dispose();
-    _categoryController.dispose();
-    _notesController.dispose();
-    _dateController.dispose();
-    super.dispose();
   }
 }

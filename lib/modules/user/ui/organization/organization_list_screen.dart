@@ -1,8 +1,9 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/controllers/organization_controler.dart';
+import 'package:booksmart/widgets/confirmation_dialog.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-
 import 'add_organization_screen.dart';
 
 void goToOrganizationListScreen({bool shouldCloseBefore = false}) {
@@ -24,44 +25,64 @@ void goToOrganizationListScreen({bool shouldCloseBefore = false}) {
   }
 }
 
-class OrganizationListScreen extends StatefulWidget {
+class OrganizationListScreen extends StatelessWidget {
   const OrganizationListScreen({super.key});
 
   @override
-  State<OrganizationListScreen> createState() => _OrganizationListScreenState();
-}
-
-class _OrganizationListScreenState extends State<OrganizationListScreen> {
-  @override
   Widget build(BuildContext context) {
+    final OrganizationController controller = Get.put(OrganizationController());
+
     return Scaffold(
       appBar: kIsWeb ? null : AppBar(title: const Text('Organizations')),
-      body: SingleChildScrollView(
-        child: Container(
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (controller.organizations.isEmpty) {
+          return const Center(child: Text("No organizations found"));
+        }
+
+        return SingleChildScrollView(
           padding: EdgeInsets.symmetric(horizontal: context.screenWidth * 0.02),
           child: Column(
-            children: const [
-              ListTile(
-                leading: Icon(Icons.business),
-                title: Text('Organization 1'),
-                subtitle: Text('3322-24-43'),
-              ),
-              SizedBox(height: 10),
-              ListTile(
-                leading: Icon(Icons.business),
-                title: Text('Organization 2'),
-                subtitle: Text('212-324-444'),
-              ),
-              SizedBox(height: 10),
-              ListTile(
-                leading: Icon(Icons.business),
-                title: Text('Organization 3'),
-                subtitle: Text('123-234-4234'),
-              ),
-            ],
+            children: controller.organizations.map((org) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: ListTile(
+                  leading: const Icon(Icons.business),
+                  title: Text(org.name),
+                  subtitle: Text(org.einTin),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () {},
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          ///======
+                          showConfirmationDialog(
+                            title: "Delete Organization",
+                            description:
+                                "Are you sure you want to delete '${org.name}'?",
+                            onYes: () async {
+                              controller.deleteOrganization(org.id!);
+                              Get.back();
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
           ),
-        ),
-      ),
+        );
+      }),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           goToAddOrganizationScreen(shouldCloseBefore: true);
