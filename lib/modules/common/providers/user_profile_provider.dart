@@ -14,7 +14,7 @@ Future<Map<String, dynamic>?> getUserProfile({String? userAuthId}) async {
   }
 
   return SupabaseCrudService.read(
-        table: SupabaseTable.users,
+        table: SupabaseTable.user,
         filters: {"auth_id": id},
         single: true,
       )
@@ -40,7 +40,7 @@ Future<bool> updateUserProfile({
   showLoading();
 
   return SupabaseCrudService.update(
-        table: SupabaseTable.users,
+        table: SupabaseTable.user,
         filters: {"auth_id": id},
         data: data,
       )

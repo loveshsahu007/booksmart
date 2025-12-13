@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../controllers/auth_controller.dart';
+import '../../../../helpers/name_initial_helper.dart';
 import '../../../../routes/routes.dart';
 import '../../../../widgets/app_text.dart';
 
@@ -71,7 +72,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         radius: 26,
                         backgroundColor: colorScheme.primary,
                         child: AppText(
-                          user!.firstName[0] + user!.lastName[0],
+                          getNameInitials(user!.firstName, user!.lastName),
                           color: Colors.white,
                           fontSize: 14,
                         ),

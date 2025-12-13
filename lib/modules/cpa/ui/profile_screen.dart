@@ -275,7 +275,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
 
     try {
       await _saveToSupabase();
-      Get.toNamed(Routes.profileUnderReviewCPA);
+      Get.toNamed(Routes.cpaProfileUnderReview);
     } catch (e) {
       debugPrint('Profile submission failed: $e');
     }

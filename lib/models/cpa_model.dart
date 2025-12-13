@@ -12,6 +12,9 @@ class CpaModel extends Core {
   final bool termsAgreed;
   final String status;
 
+  bool get isProfileCompleted =>
+      data.firstName.isNotEmpty && data.lastName.isNotEmpty;
+
   int get getExperienceInYears {
     int difference = DateTime.now().year - (careerStartDate.year);
 

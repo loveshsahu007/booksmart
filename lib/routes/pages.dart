@@ -183,11 +183,11 @@ class AppPages {
     ),
 
     GetPage(
-      name: Routes.profileScreenCPA,
+      name: Routes.cpaProfile,
       page: () => getRequiredScreen(ProfileScreenCPA(), UserRole.cpa),
     ),
     GetPage(
-      name: Routes.profileUnderReviewCPA,
+      name: Routes.cpaProfileUnderReview,
       page: () =>
           getRequiredScreen(ProfileUnderReviewScreenCPA(), UserRole.cpa),
     ),

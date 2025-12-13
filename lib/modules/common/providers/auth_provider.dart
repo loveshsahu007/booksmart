@@ -1,5 +1,6 @@
 import 'dart:developer';
 
+import 'package:booksmart/supabase/tables.dart';
 import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -25,7 +26,7 @@ Future<bool> createUserRow({
   required UserRole role,
 }) async {
   return SupabaseCrudService.insert(
-        table: "users",
+        table: SupabaseTable.user,
         data: {
           "auth_id": userId,
           "email": email,
@@ -59,8 +60,9 @@ Future<void> signUpWithEmailPassword({
     );
     if (response.user != null) {
       await createUserRow(userId: response.user!.id, email: email, role: role);
+      String route = await getInitialRoute();
       dismissLoadingWidget();
-      Get.offAndToNamed(Routes.verifyEmail);
+      Get.offAndToNamed(route);
     } else {
       dismissLoadingWidget();
       somethingWentWrongSnackbar();

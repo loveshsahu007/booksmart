@@ -41,6 +41,6 @@ abstract class Routes {
   static const String billingCPA = '/cpa/earnings';
   static const String chatCPA = '/cpa/chat';
   static const String settingsCPA = '/cpa/settings';
-  static const String profileScreenCPA = '/cpa/profile';
-  static const String profileUnderReviewCPA = '/cpa/profile-under-review';
+  static const String cpaProfile = '/cpa/profile';
+  static const String cpaProfileUnderReview = '/cpa/profile-under-review';
 }

@@ -46,7 +46,7 @@ class _SettingsScreenCPAState extends State<SettingsScreenCPA> {
               borderRadius: BorderRadius.circular(10),
               child: InkWell(
                 onTap: () {
-                  Get.toNamed(Routes.profileScreenCPA);
+                  Get.toNamed(Routes.cpaProfile);
                 },
                 child: Container(
                   padding: const EdgeInsets.all(16),
