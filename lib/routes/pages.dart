@@ -1,5 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/controllers/auth_controller.dart';
+import 'package:booksmart/controllers/organization_controller.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/modules/cpa/ui/chat_list_screen.dart';
 import 'package:booksmart/modules/cpa/ui/profile_screen.dart';
@@ -12,6 +13,7 @@ import 'package:booksmart/modules/user/ui/cpa/dashboard_screen.dart';
 import 'package:booksmart/modules/user/ui/home/template/web_template.dart';
 import 'package:booksmart/modules/user/ui/bulk_review/bulk_review_screen.dart';
 import 'package:booksmart/modules/user/ui/token/streak_unlocked_screen.dart';
+import 'package:booksmart/utils/initial_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../models/user_base_model.dart';
@@ -25,6 +27,7 @@ import '../modules/user/ui/ai_strategy_screen.dart';
 import '../modules/common/ui/authentication/forgot.dart';
 import '../modules/user/ui/financial_statement/financial_statement.dart';
 import '../modules/user/ui/home/home_screen.dart';
+import '../modules/user/ui/organization/organization_list_screen.dart';
 import '../modules/user/ui/profile_screen.dart';
 import '../modules/user/ui/rules_management/rules_management_screen.dart';
 import '../modules/user/ui/settings/settings_screen.dart';
@@ -138,6 +141,15 @@ class AppPages {
         UserRole.user,
       ),
     ),
+    GetPage(
+      name: Routes.userOrganizations,
+      page: () => getRequiredScreen(
+        kIsWeb
+            ? WebTemplate(child: OrganizationListScreen())
+            : OrganizationListScreen(),
+        UserRole.user,
+      ),
+    ),
 
     /// ====
     /// =====
@@ -147,25 +159,25 @@ class AppPages {
     /// =====
     /// ====
     GetPage(
-      name: Routes.dashboardCPA,
+      name: Routes.cpaDashboard,
       page: () => getRequiredScreen(HomeScreenCPA(), UserRole.cpa),
     ),
     GetPage(
-      name: Routes.leadsCPA,
+      name: Routes.cpaLeads,
       page: () => getRequiredScreen(
         kIsWeb ? WebTemplateCPA(child: LeadsScreenCPA()) : LeadsScreenCPA(),
         UserRole.cpa,
       ),
     ),
     GetPage(
-      name: Routes.billingCPA,
+      name: Routes.cpaBilling,
       page: () => getRequiredScreen(
         kIsWeb ? WebTemplateCPA(child: EarningScreenCPA()) : EarningScreenCPA(),
         UserRole.cpa,
       ),
     ),
     GetPage(
-      name: Routes.chatCPA,
+      name: Routes.cpaChat,
       page: () => getRequiredScreen(
         kIsWeb ? WebTemplateCPA(child: ChatListScreen()) : ChatListScreen(),
         UserRole.cpa,
@@ -173,7 +185,7 @@ class AppPages {
     ),
 
     GetPage(
-      name: Routes.settingsCPA,
+      name: Routes.cpaSettings,
       page: () => getRequiredScreen(
         kIsWeb
             ? WebTemplateCPA(child: SettingsScreenCPA())
@@ -197,6 +209,13 @@ class AppPages {
 Widget getRequiredScreen(Widget desiredWidget, UserRole role) {
   if (isUserLoggedIn && Get.isRegistered<AuthController>()) {
     if (authPerson?.role == role) {
+      if (role == UserRole.user) {
+        if (isAnyOrganizationAvailable && isUserProfileCompleted(authUser!)) {
+          return desiredWidget;
+        } else {
+          return const ErrorScreen();
+        }
+      }
       return desiredWidget;
     } else {
       return const ErrorScreen();
@@ -211,7 +230,7 @@ String getHomeScreenRoute() {
     case UserRole.user:
       return Routes.home;
     case UserRole.cpa:
-      return Routes.dashboardCPA;
+      return Routes.cpaDashboard;
     default:
       return Routes.home;
   }

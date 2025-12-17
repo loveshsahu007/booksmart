@@ -52,13 +52,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       final user = supabase.auth.currentUser;
 
       if (user?.emailConfirmedAt != null) {
-        UserRole? role = () {
-          try {
-            return UserRole.values.byName(user!.userMetadata?['role']);
-          } catch (e) {
-            return null;
-          }
-        }();
+        UserRole? role = getUserRoleFromSession;
         if (role == UserRole.user) {
           Get.offAllNamed(Routes.userProfile);
         } else if (role == UserRole.cpa) {

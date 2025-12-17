@@ -8,7 +8,10 @@ enum UserRole { user, cpa, admin }
 abstract class Core {
   final PersonModel data;
 
+  /// int based, auto increment ID by supabase
   int get id => data.id;
+
+  /// uuid, created when user sign-up
   String get authId => data.authId;
   String get email => data.email;
   UserRole get role => data.role;
@@ -24,7 +27,10 @@ abstract class Core {
 }
 
 class PersonModel {
+  /// int based, auto increment ID by supabase
   final int id;
+
+  /// uuid, created when user sign-up
   final String authId;
   final String email;
   final UserRole role;

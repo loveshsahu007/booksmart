@@ -1,11 +1,11 @@
-import 'package:booksmart/controllers/organization_controler.dart';
+import 'package:booksmart/controllers/organization_controller.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-void showSwitchOrganizationDialog() {
-  final OrganizationController controller = Get.put(OrganizationController());
+import '../../../../models/organization_model.dart';
 
+void showSwitchOrganizationDialog() {
   Get.generalDialog(
     pageBuilder: (context, animation, secondaryAnimation) {
       return Align(
@@ -21,45 +21,47 @@ void showSwitchOrganizationDialog() {
           constraints: const BoxConstraints(maxWidth: 350),
           child: Material(
             color: Colors.transparent,
-            child: Obx(() {
-              if (controller.isLoading.value) {
-                return const Padding(
-                  padding: EdgeInsets.all(50),
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
+            child: GetBuilder<OrganizationController>(
+              builder: (controller) {
+                if (controller.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-              if (controller.organizations.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(child: Text("No organizations available")),
-                );
-              }
+                if (controller.organizations.isEmpty) {
+                  return const Center(child: Text("No organizations found"));
+                }
 
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(15),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: controller.organizations.map((org) {
-                    return Column(
-                      children: [
-                        ListTile(
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.all(15),
+                  child: Column(
+                    spacing: 10,
+                    children: controller.organizations.map((
+                      OrganizationModel org,
+                    ) {
+                      bool isCurrent = getCurrentOrganization == org;
+                      return Material(
+                        color: isCurrent
+                            ? Get.theme.colorScheme.primary
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(10),
+                        child: ListTile(
                           leading: const Icon(Icons.business),
                           title: Text(org.name),
-                          subtitle: Text(org.industry),
+                          subtitle: Text(org.einTin),
                           onTap: () {
                             Get.back();
                             showSnackBar('Switched to ${org.name}');
-                            // TODO: Save selected organization in app state if needed
+                            organizationControllerInstance.switchOrganization(
+                              org,
+                            );
                           },
                         ),
-                        const Divider(thickness: 0.1),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              );
-            }),
+                      );
+                    }).toList(),
+                  ),
+                );
+              },
+            ),
           ),
         ),
       );

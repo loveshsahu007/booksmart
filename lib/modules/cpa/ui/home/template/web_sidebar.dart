@@ -53,26 +53,26 @@ class WebSideBarCPA extends StatelessWidget {
                       SideBarIcon(
                         icon: Icons.dashboard_customize_outlined,
                         infoMessage: 'Dashboard',
-                        routeName: Routes.dashboardCPA,
+                        routeName: Routes.cpaDashboard,
                         isShowName: isShowName,
                       ),
                       SideBarIcon(
                         icon: Icons.healing_outlined,
                         infoMessage: 'Leads',
-                        routeName: Routes.leadsCPA,
+                        routeName: Routes.cpaLeads,
                         isShowName: isShowName,
                       ),
                       SideBarIcon(
                         icon: Icons.file_copy_outlined,
                         infoMessage: 'Billing',
-                        routeName: Routes.billingCPA,
+                        routeName: Routes.cpaBilling,
                         isShowName: isShowName,
                       ),
 
                       SideBarIcon(
                         icon: Icons.chat_bubble_outline,
                         infoMessage: 'Chat',
-                        routeName: Routes.chatCPA,
+                        routeName: Routes.cpaChat,
                         isShowName: isShowName,
                       ),
                     ],
@@ -83,7 +83,7 @@ class WebSideBarCPA extends StatelessWidget {
               SideBarIcon(
                 icon: Icons.settings_outlined,
                 infoMessage: 'Settings',
-                routeName: Routes.settingsCPA,
+                routeName: Routes.cpaSettings,
                 isShowName: isShowName,
               ),
             ],

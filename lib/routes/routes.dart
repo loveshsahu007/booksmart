@@ -24,6 +24,7 @@ abstract class Routes {
   static const String tokenWallet = '/user/token-wallet';
   static const String rulesManagement = '/user/rules-management';
   static const String subscription = '/user/subscription';
+  static const String userOrganizations = '/user/organizations';
 
   static const String aiStrategy = '/user/ai-strategy';
   static const String userProfile = '/user/profile';
@@ -36,11 +37,11 @@ abstract class Routes {
   /// =====
   /// ====
 
-  static const String dashboardCPA = '/cpa/dashboard';
-  static const String leadsCPA = '/cpa/leads';
-  static const String billingCPA = '/cpa/earnings';
-  static const String chatCPA = '/cpa/chat';
-  static const String settingsCPA = '/cpa/settings';
+  static const String cpaDashboard = '/cpa/dashboard';
+  static const String cpaLeads = '/cpa/leads';
+  static const String cpaBilling = '/cpa/earnings';
+  static const String cpaChat = '/cpa/chat';
+  static const String cpaSettings = '/cpa/settings';
   static const String cpaProfile = '/cpa/profile';
   static const String cpaProfileUnderReview = '/cpa/profile-under-review';
 }

@@ -6,6 +6,7 @@ import 'package:booksmart/modules/user/ui/transaction/add_transaction_manual.dar
 import 'package:booksmart/widgets/date_range_picker.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:get/get.dart';
+import '../../../../controllers/organization_controller.dart';
 import '../../../../widgets/custom_drop_down.dart';
 import '../../../../widgets/custom_dialog.dart';
 
@@ -17,8 +18,6 @@ class TransactionListScreen extends StatefulWidget {
 }
 
 class _TransactionListScreenState extends State<TransactionListScreen> {
-  final TransactionController transactionC = Get.find();
-
   String searchQuery = "";
   DateTime? startDate;
   DateTime? endDate;
@@ -225,6 +224,23 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
       startDate != null ||
       searchQuery.isNotEmpty;
 
+  late TransactionController transactionC;
+
+  @override
+  void initState() {
+    if (Get.isRegistered<TransactionController>()) {
+      transactionC = Get.find<TransactionController>(
+        tag: getCurrentOrganization!.id.toString(),
+      );
+    } else {
+      transactionC = Get.put(
+        TransactionController(),
+        tag: getCurrentOrganization!.id.toString(),
+      );
+    }
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -267,62 +283,69 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                 onChanged: (value) => setState(() => searchQuery = value),
               ),
               const SizedBox(height: 12),
-
               Expanded(
-                child: Obx(() {
-                  final allTransactions = transactionC.transactions;
-                  if (allTransactions.isEmpty) {
-                    return Center(child: AppText('No transactions found'));
-                  }
+                child: GetBuilder<TransactionController>(
+                  tag: getCurrentOrganization!.id.toString(),
+                  builder: (controller) {
+                    if (controller.isLoading.value) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                  return ListView.separated(
-                    itemCount: allTransactions.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final t = allTransactions[index];
-                      final amountColor = t.amount < 0
-                          ? Colors.red
-                          : Colors.green;
+                    if (controller.transactions.isEmpty) {
+                      return const Center(child: Text("No transactions found"));
+                    }
 
-                      return InkWell(
-                        onTap: () => goToAddTransactionScreen(),
-                        child: Card(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    final allTransactions = controller.transactions;
+
+                    return ListView.separated(
+                      itemCount: allTransactions.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final t = allTransactions[index];
+                        final amountColor = t.amount < 0
+                            ? Colors.red
+                            : Colors.green;
+
+                        return InkWell(
+                          onTap: () => goToAddTransactionScreen(),
+                          child: Card(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              title: AppText(
+                                t.title,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  AppText(
+                                    "${t.date} • ${t.category}",
+                                    fontSize: 12,
+                                  ),
+                                  AppText(
+                                    "${t.type} • ${t.deductible ? "Deductible" : ""}",
+                                    fontSize: 11,
+                                  ),
+                                ],
+                              ),
+                              trailing: AppText(
+                                "\$${t.amount.toStringAsFixed(2)}",
+                                color: amountColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                          child: ListTile(
-                            title: AppText(
-                              t.title,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                AppText(
-                                  "${t.date} • ${t.category}",
-                                  fontSize: 12,
-                                ),
-                                AppText(
-                                  "${t.type} • ${t.deductible ? "Deductible" : ""}",
-                                  fontSize: 11,
-                                ),
-                              ],
-                            ),
-                            trailing: AppText(
-                              "\$${t.amount.toStringAsFixed(2)}",
-                              color: amountColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                }),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
               // Bottom buttons
               const SizedBox(height: 16),

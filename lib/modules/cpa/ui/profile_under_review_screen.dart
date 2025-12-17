@@ -210,7 +210,7 @@ class _ProfileUnderReviewScreenCPAState
             AppButton(
               buttonText: "Dashboard (Temp)",
               onTapFunction: () {
-                Get.offAllNamed(Routes.dashboardCPA);
+                Get.offAllNamed(Routes.cpaDashboard);
               },
               radius: 8,
               fontSize: 14,

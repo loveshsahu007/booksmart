@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:booksmart/controllers/organization_controller.dart';
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';
@@ -6,6 +7,10 @@ import 'package:booksmart/widgets/snackbar.dart';
 import 'package:get/get.dart';
 import '../utils/supabase.dart';
 
+TransactionController transactionControllerInstance =
+    Get.find<TransactionController>(tag: getCurrentOrganization!.id.toString());
+
+/// TAG: currentOrganizationID
 class TransactionController extends GetxController {
   final String table = SupabaseTable.transaction;
 
@@ -18,9 +23,6 @@ class TransactionController extends GetxController {
     getAllTransactions();
   }
 
-  // ===============================
-  // GET ALL TRANSACTIONS
-  // ===============================
   Future<void> getAllTransactions() async {
     try {
       final user = supabase.auth.currentUser;
@@ -30,7 +32,10 @@ class TransactionController extends GetxController {
 
       final res = await SupabaseCrudService.read(
         table: table,
-        filters: {'owner_id': user.id},
+        filters: {
+          'owner_id': user.id,
+          'organization_id': getCurrentOrganization!.id,
+        },
       );
 
       transactions.value = (res as List)
@@ -46,20 +51,14 @@ class TransactionController extends GetxController {
     }
   }
 
-  // ===============================
-  // ADD TRANSACTION
-  // ===============================
-  Future<void> addTransaction(TransactionModel model) async {
+  Future<void> addTransaction(Map<String, dynamic> json) async {
     try {
       final user = supabase.auth.currentUser;
       if (user == null) return;
 
-      final data = model.toJson();
-      data['owner_id'] = user.id;
+      log("📤 ADD TRANSACTION PAYLOAD: $json");
 
-      log("📤 ADD TRANSACTION PAYLOAD: $data");
-
-      await SupabaseCrudService.create(table: table, data: data);
+      await SupabaseCrudService.create(table: table, data: json);
       Get.back();
       showSnackBar("Transaction added successfully");
       await getAllTransactions();
@@ -71,9 +70,6 @@ class TransactionController extends GetxController {
     }
   }
 
-  // ===============================
-  // UPDATE TRANSACTION
-  // ===============================
   Future<void> updateTransaction({
     required String id,
     required Map<String, dynamic> data,
@@ -97,9 +93,6 @@ class TransactionController extends GetxController {
     }
   }
 
-  // ===============================
-  // DELETE TRANSACTION
-  // ===============================
   Future<void> deleteTransaction(String id) async {
     try {
       await SupabaseCrudService.delete(table: table, filters: {'id': id});

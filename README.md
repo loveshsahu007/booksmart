@@ -1,16 +1,15 @@
-# booksmart
+# BookSmart
 
-A new Flutter project.
 
-## Getting Started
+## DataModels
+- all should have default/auto-generated id from supabase
+- use id for foreign key
+- use enum for type/roles where possible, avoid string comparison
+- in User role; models should depend on organizationId, i.e. transaction, bank etc
 
-This project is a starting point for a Flutter application.
 
-A few resources to get you started if this is your first Flutter project:
+## Controllers
+- in User role; controllers should depend on organizationId, i.e. transaction, bank etc
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Pending
+- on web, when user have no organization, then it will navigate user to a route, that is temporary. we have to fix it later on, for better navigation

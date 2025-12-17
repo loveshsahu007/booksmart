@@ -1,62 +1,72 @@
 import 'dart:developer';
 import 'package:booksmart/models/organization_model.dart';
+import 'package:booksmart/modules/user/providers/organization_provider.dart';
 import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:get/get.dart';
 
-import '../utils/supabase.dart'; // supabase instance
+import '../utils/supabase.dart';
+
+OrganizationModel? get getCurrentOrganization {
+  try {
+    return Get.find<OrganizationController>().currentOrganization;
+  } catch (_) {
+    return null;
+  }
+}
+
+bool get isAnyOrganizationAvailable {
+  return getCurrentOrganization != null;
+}
+
+OrganizationController get organizationControllerInstance =>
+    Get.find<OrganizationController>();
 
 class OrganizationController extends GetxController {
   final String table = SupabaseTable.organization;
 
+  Rx<OrganizationModel?> rxCurrentOrganization = Rx<OrganizationModel?>(null);
+  OrganizationModel? get currentOrganization => rxCurrentOrganization.value;
+
   RxBool isLoading = false.obs;
   RxList<OrganizationModel> organizations = <OrganizationModel>[].obs;
 
-  @override
-  void onInit() {
-    super.onInit();
-    getAllOrganizations();
+  OrganizationController(List<OrganizationModel> organizationList) {
+    initlizeOrganizations(organizationList);
   }
 
-  // ===============================
-  // GET ALL ORGANIZATIONS
-  // ===============================
-  Future<void> getAllOrganizations() async {
-    try {
-      final user = supabase.auth.currentUser;
+  void initlizeOrganizations(
+    List<OrganizationModel> list, {
+    bool shouldUpdate = true,
+  }) {
+    organizations.value = list;
 
-      if (user == null) {
-        log("❌ getAllOrganizations: user not logged in");
-        return;
-      }
-
-      isLoading.value = true;
-
-      final res = await SupabaseCrudService.read(
-        table: table,
-        filters: {
-          'owner_id': user.id, // ✅ UUID
-        },
-      );
-
-      organizations.value = (res as List)
-          .map((e) => OrganizationModel.fromJson(e))
-          .toList();
-    } catch (e, s) {
-      log("❌ getAllOrganizations ERROR");
-      log(e.toString());
-      log(s.toString());
-      somethingWentWrongSnackbar();
-    } finally {
-      isLoading.value = false;
+    if (currentOrganization == null ||
+        !organizations.any((org) => org.id == currentOrganization?.id)) {
+      rxCurrentOrganization.value = organizations.first;
     }
+    if (shouldUpdate) {
+      update();
+    }
+  }
+
+  Future<void> refreshOrganizations() async {
+    isLoading.value = true;
+    initlizeOrganizations(await getOrganizations());
+    update();
+    isLoading.value = false;
+  }
+
+  void switchOrganization(OrganizationModel org) {
+    rxCurrentOrganization.value = org;
+    update();
   }
 
   // ===============================
   // ADD ORGANIZATION
   // ===============================
-  Future<void> addOrganization(OrganizationModel model) async {
+  Future<void> addOrganization(Map<String, dynamic> json) async {
     try {
       final user = supabase.auth.currentUser;
 
@@ -65,19 +75,14 @@ class OrganizationController extends GetxController {
         return;
       }
 
-      final data = model.toJson();
-
-      /// 🔥 Force correct UUID owner
-      data['owner_id'] = user.id;
-
       log("📤 ADD ORGANIZATION PAYLOAD");
-      log(data.toString());
+      log(json.toString());
 
-      await SupabaseCrudService.create(table: table, data: data);
+      await SupabaseCrudService.create(table: table, data: json);
       Get.back();
       showSnackBar("Organization added successfully");
 
-      await getAllOrganizations();
+      await refreshOrganizations();
     } catch (e, s) {
       log("❌ addOrganization ERROR");
       log(e.toString());
@@ -105,7 +110,7 @@ class OrganizationController extends GetxController {
       );
 
       showSnackBar("Organization updated successfully");
-      await getAllOrganizations();
+      await refreshOrganizations();
     } catch (e, s) {
       log("❌ updateOrganization ERROR");
       log(e.toString());
@@ -123,7 +128,8 @@ class OrganizationController extends GetxController {
       await SupabaseCrudService.delete(table: table, filters: {'id': id});
 
       showSnackBar("Organization deleted");
-      await getAllOrganizations();
+      organizations.removeWhere((org) => org.id == id);
+      update();
     } catch (e, s) {
       log("❌ deleteOrganization ERROR");
       log(e.toString());

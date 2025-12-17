@@ -11,14 +11,9 @@ Future<dynamic> showConfirmationDialog({
       return Align(
         alignment: Alignment.center,
         child: Card(
+          margin: const EdgeInsets.all(30),
           child: Container(
             constraints: const BoxConstraints(maxWidth: 320),
-            // decoration: BoxDecoration(
-            //   color: Colors.black,
-            //   borderRadius: BorderRadius.circular(10),
-            //   boxShadow: const [BoxShadow(color: Colors.grey, blurRadius: 10.0)],
-            // ),
-            margin: const EdgeInsets.all(30),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             child: Column(
               mainAxisSize: MainAxisSize.min,

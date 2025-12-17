@@ -1,20 +1,19 @@
-import 'package:uuid/uuid.dart';
-
 class TransactionModel {
-  String id;
-  String title;
-  double amount;
-  String category;
-  String subcategory;
-  String type; // Personal / Business
-  bool deductible;
-  String notes;
-  String date;
-  String? filePath; // Optional attachment
-  String ownerId;
+  final String id;
+  final String title;
+  final double amount;
+  final String category;
+  final String subcategory;
+  final String type; // Personal / Business
+  final bool deductible;
+  final String notes;
+  final String date;
+  final String? filePath; // Optional attachment
+  final String ownerId;
+  final String organizationId;
 
   TransactionModel({
-    String? id,
+    required this.id,
     required this.title,
     required this.amount,
     required this.category,
@@ -25,7 +24,8 @@ class TransactionModel {
     required this.date,
     this.filePath,
     required this.ownerId,
-  }) : id = id ?? const Uuid().v4();
+    required this.organizationId,
+  });
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -39,11 +39,12 @@ class TransactionModel {
     'date': date,
     'file_path': filePath,
     'owner_id': ownerId,
+    'organization_id': organizationId,
   };
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) =>
       TransactionModel(
-        id: json['id'] as String?,
+        id: json['id'],
         title: json['title'] as String,
         amount: (json['amount'] as num).toDouble(),
         category: json['category'] as String,
@@ -54,5 +55,6 @@ class TransactionModel {
         date: json['date'] as String,
         filePath: json['file_path'] as String?,
         ownerId: json['owner_id'] as String,
+        organizationId: json['organization_id'] as String,
       );
 }

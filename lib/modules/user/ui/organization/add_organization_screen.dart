@@ -1,6 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/controllers/auth_controller.dart';
-import 'package:booksmart/controllers/organization_controler.dart';
+import 'package:booksmart/controllers/organization_controller.dart';
 import 'package:booksmart/models/organization_model.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:booksmart/widgets/snackbar.dart';
@@ -40,7 +40,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
   final _formKey = GlobalKey<FormState>();
 
   /// Controller
-  final OrganizationController controller = Get.put(OrganizationController());
+  final OrganizationController controller = Get.find<OrganizationController>();
 
   /// Text Controllers
   final nameController = TextEditingController();
@@ -298,6 +298,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
     }
 
     final model = OrganizationModel(
+      id: '',
       name: nameController.text.trim(),
       website: websiteController.text.trim(),
       einTin: einController.text.trim(),
@@ -309,9 +310,12 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
       zip: zipController.text.trim(),
       phone: phoneController.text.trim(),
       email: emailController.text.trim(),
-      ownerId: authPerson!.id.toString(), // ✅ FIXED
+      ownerId: authPerson!.id.toString(),
     );
 
-    controller.addOrganization(model);
+    Map<String, dynamic> json = model.toJson();
+    json.remove("id");
+
+    controller.addOrganization(json);
   }
 }

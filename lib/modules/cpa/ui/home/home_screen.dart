@@ -76,7 +76,7 @@ class _HomeScreenCPAState extends State<HomeScreenCPA> {
                   : Text(title),
               actions: [
                 IconButton(
-                  onPressed: () => Get.toNamed(Routes.settingsCPA),
+                  onPressed: () => Get.toNamed(Routes.cpaSettings),
                   icon: Icon(Icons.settings, color: colorScheme.onSurface),
                 ),
               ],

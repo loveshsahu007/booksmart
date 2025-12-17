@@ -1,10 +1,11 @@
 class BankModel {
-  final String id; // Supabase UUID
+  final String id;
   final String name;
   final String accountHolder;
   final String accountNumber;
   final String iban;
-  final String ownerId; // Supabase auth user id
+  final String ownerId;
+  final String organizationId;
 
   BankModel({
     required this.id,
@@ -13,6 +14,7 @@ class BankModel {
     required this.accountNumber,
     required this.iban,
     required this.ownerId,
+    required this.organizationId,
   });
 
   factory BankModel.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class BankModel {
       accountNumber: json['account_number'] as String,
       iban: json['iban'] as String,
       ownerId: json['owner_id'] as String,
+      organizationId: json['organization_id'] as String,
     );
   }
 
@@ -34,6 +37,7 @@ class BankModel {
       'account_number': accountNumber,
       'iban': iban,
       'owner_id': ownerId,
+      'organization_id': organizationId,
     };
   }
 }

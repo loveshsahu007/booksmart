@@ -5,7 +5,6 @@ import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:get/get.dart';
-import 'package:uuid/uuid.dart';
 
 import '../utils/supabase.dart';
 
@@ -50,19 +49,13 @@ class BankController extends GetxController {
   // ===============================
   // ADD BANK
   // ===============================
-  Future<void> addBank(BankModel model) async {
+  Future<void> addBank(Map<String, dynamic> data) async {
     try {
       final user = supabase.auth.currentUser;
       if (user == null) {
         showSnackBar("User not logged in", isError: true);
         return;
       }
-
-      final data = model.toJson();
-
-      // Generate UUID for the bank id if not present
-      data['id'] = const Uuid().v4();
-      data['owner_id'] = user.id;
 
       log("📤 ADD BANK PAYLOAD");
       log(data.toString());

@@ -1,8 +1,9 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/controllers/auth_controller.dart';
+import 'package:booksmart/controllers/organization_controller.dart';
 import 'package:booksmart/controllers/transaction_controller.dart';
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/modules/user/ui/transaction/category_selection_screen.dart';
-import 'package:booksmart/utils/supabase.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
@@ -12,7 +13,10 @@ import '../../../../widgets/custom_dialog.dart';
 import '../../../../widgets/custom_drop_down.dart';
 import 'receipt_scanning_output_screen.dart';
 
-void goToAddTransactionScreen({bool shouldCloseBefore = false}) {
+void goToAddTransactionScreen({
+  TransactionModel? transaction,
+  bool shouldCloseBefore = false,
+}) {
   // Ensure the controller is registered before using it
   if (!Get.isRegistered<TransactionController>()) {
     Get.put(TransactionController());
@@ -41,7 +45,8 @@ void goToAddTransactionScreen({bool shouldCloseBefore = false}) {
 }
 
 class AddTransactionScreenManual extends StatefulWidget {
-  const AddTransactionScreenManual({super.key});
+  const AddTransactionScreenManual({super.key, this.transaction});
+  final TransactionModel? transaction;
 
   @override
   State<AddTransactionScreenManual> createState() =>
@@ -71,6 +76,20 @@ class _AddTransactionScreenManualState
     super.initState();
     final now = DateTime.now();
     _dateController.text = "${now.day} ${_getMonthName(now.month)} ${now.year}";
+
+    _titleController.text = widget.transaction?.title ?? '';
+    _amountController.text = widget.transaction?.amount.toString() ?? '';
+    _notesController.text = widget.transaction?.notes ?? '';
+    _selectedType = widget.transaction?.type ?? 'Personal';
+    deductible = widget.transaction?.deductible ?? false;
+    _selectedCategory = widget.transaction?.category;
+    _selectedSubcategory = widget.transaction?.subcategory;
+    // _selectedFile = widget.transaction?.filePath != null
+    //     ? XFile(widget.transaction!.filePath!)
+    //     : null;
+    // _selectedFileBytes = widget.transaction?.filePath != null
+    //     ? widget.transaction!.filePath!.codeUnits
+    //     : null;
   }
 
   String _getMonthName(int month) {
@@ -122,8 +141,8 @@ class _AddTransactionScreenManualState
       showSnackBar("Please select category & subcategory", isError: true);
       return;
     }
-
     final model = TransactionModel(
+      id: widget.transaction?.id ?? '',
       title: _titleController.text,
       amount: double.tryParse(_amountController.text) ?? 0,
       category: _selectedCategory!,
@@ -133,10 +152,17 @@ class _AddTransactionScreenManualState
       notes: _notesController.text,
       date: _dateController.text,
       filePath: _selectedFile?.path,
-      ownerId: supabase.auth.currentUser!.id,
+      ownerId: authPerson!.id.toString(),
+      organizationId: getCurrentOrganization!.id,
     );
 
-    transactionC.addTransaction(model);
+    if (widget.transaction == null) {
+      Map<String, dynamic> json = model.toJson();
+      json.remove("id");
+      transactionC.addTransaction(json);
+    } else {
+      // handle update transaction
+    }
   }
 
   @override

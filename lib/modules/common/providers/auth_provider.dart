@@ -20,6 +20,16 @@ String? get getCurrentLoggedUserId => supabase.auth.currentSession?.user.id;
 bool get isEmailVerified =>
     supabase.auth.currentSession?.user.emailConfirmedAt != null;
 
+UserRole? get getUserRoleFromSession {
+  try {
+    return UserRole.values.byName(
+      supabase.auth.currentUser!.userMetadata?['role'],
+    );
+  } catch (e) {
+    return null;
+  }
+}
+
 Future<bool> createUserRow({
   required String userId,
   required String email,
