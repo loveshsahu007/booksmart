@@ -9,7 +9,7 @@ import 'package:get/get.dart';
 import '../../../../controllers/organization_controller.dart';
 
 class AddBankDialog extends StatefulWidget {
-  final BankModel? bankToEdit; // Add this parameter for edit mode
+  final BankModel? bankToEdit;
 
   const AddBankDialog({super.key, this.bankToEdit});
 
@@ -25,18 +25,15 @@ class _AddBankDialogState extends State<AddBankDialog> {
       TextEditingController();
   final TextEditingController _ibanController = TextEditingController();
 
-  final BankController controller =
-      Get.find<BankController>(); // Use Get.find instead of Get.put
+  final BankController controller = Get.find<BankController>();
   bool _isEditMode = false;
 
   @override
   void initState() {
     super.initState();
 
-    // Check if we're in edit mode
     _isEditMode = widget.bankToEdit != null;
 
-    // If editing, prefill the form with existing data
     if (_isEditMode) {
       _bankNameController.text = widget.bankToEdit!.name;
       _accountHolderController.text = widget.bankToEdit!.accountHolder;
@@ -45,7 +42,7 @@ class _AddBankDialogState extends State<AddBankDialog> {
     }
   }
 
-  void _saveBank() {
+  void _saveBank() async {
     if (_bankNameController.text.isEmpty ||
         _accountHolderController.text.isEmpty ||
         _accountNumberController.text.isEmpty ||
@@ -54,33 +51,22 @@ class _AddBankDialogState extends State<AddBankDialog> {
       return;
     }
 
-    if (_isEditMode) {
-      // Update existing bank
-      controller.updateBank(
-        id: widget.bankToEdit!.id,
-        data: {
-          'name': _bankNameController.text,
-          'account_holder': _accountHolderController.text,
-          'account_number': _accountNumberController.text,
-          'iban': _ibanController.text,
-        },
+    final bank = BankModel(
+      name: _bankNameController.text,
+      accountHolder: _accountHolderController.text,
+      accountNumber: _accountNumberController.text,
+      iban: _ibanController.text,
+      ownerId: authPerson!.authId,
+      organizationId: getCurrentOrganization!.id!,
+    );
+
+    if (_isEditMode && widget.bankToEdit?.id != null) {
+      await controller.updateBank(
+        id: widget.bankToEdit!.id!,
+        data: bank.toJson(),
       );
     } else {
-      // Add new bank
-      final newBank = BankModel(
-        id: '',
-        name: _bankNameController.text,
-        accountHolder: _accountHolderController.text,
-        accountNumber: _accountNumberController.text,
-        iban: _ibanController.text,
-        ownerId: authPerson!.id.toString(),
-        organizationId: getCurrentOrganization!.id,
-      );
-
-      Map<String, dynamic> json = newBank.toJson();
-      json.remove("id");
-
-      controller.addBank(json);
+      await controller.addBank(bank);
     }
   }
 

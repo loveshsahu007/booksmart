@@ -1,5 +1,5 @@
 class OrganizationModel {
-  final String id;
+  final String? id;
   final String name;
   final String? website;
   final String einTin;
@@ -14,7 +14,7 @@ class OrganizationModel {
   final String ownerId;
 
   OrganizationModel({
-    required this.id,
+    this.id,
     required this.name,
     this.website,
     required this.einTin,

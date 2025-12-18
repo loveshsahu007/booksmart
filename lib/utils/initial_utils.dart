@@ -11,46 +11,67 @@ import '../modules/user/providers/organization_provider.dart';
 import '../routes/routes.dart';
 
 Future<String> getInitialRoute() async {
-  if (isUserLoggedIn) {
-    if (isEmailVerified) {
-      UserRole? role = getUserRoleFromSession;
-      List<Future<dynamic>> futureList = <Future>[
-        getUserProfile(),
-        if (role == UserRole.user) getOrganizations(),
-      ];
-      return Future.wait(futureList).then((value) {
-        Map<String, dynamic>? userData = value[0];
-        List<OrganizationModel>? organizationList = role == UserRole.user
-            ? value[1]
-            : null;
-        if (userData == null) {
-          return "---/error/---";
-        } else {
-          Get.put(AuthController(userJson: userData), permanent: true);
-          if (authPerson?.role == UserRole.user) {
-            Get.put(
-              OrganizationController(organizationList ?? []),
-              permanent: true,
-            );
-            if (!isUserProfileCompleted(authUser!)) {
-              return Routes.userProfile;
-            }
-            if (organizationList == null) {
-              return Routes.userOrganizations;
-            }
-          } else if (authPerson?.role == UserRole.cpa) {
-            if (!isCPAProfileCompleted(authCpa!)) {
-              return Routes.cpaProfile;
-            }
-          }
-          return getHomeScreenRoute();
-        }
-      });
-    }
-    return Routes.verifyEmail;
-  } else {
+  if (!isUserLoggedIn) {
     return Routes.login;
   }
+
+  if (!isEmailVerified) {
+    return Routes.verifyEmail;
+  }
+
+  final UserRole? role = getUserRoleFromSession;
+
+  final futures = <Future<dynamic>>[
+    getUserProfile(),
+    if (role == UserRole.user) getOrganizations(),
+  ];
+
+  final results = await Future.wait(futures);
+
+  final Map<String, dynamic>? userData = results[0];
+  final List<OrganizationModel>? organizations = role == UserRole.user
+      ? results[1] as List<OrganizationModel>?
+      : null;
+
+  if (userData == null) {
+    return Routes.login;
+  }
+
+  /// -----------------------------
+  /// AUTH CONTROLLER
+  /// -----------------------------
+  Get.put(AuthController(userJson: userData), permanent: true);
+
+  /// -----------------------------
+  /// USER FLOW
+  /// -----------------------------
+  if (authPerson?.role == UserRole.user) {
+    final orgController = Get.put(OrganizationController(), permanent: true);
+
+    if (organizations != null) {
+      orgController.organizations.assignAll(organizations);
+      orgController.update();
+    }
+
+    if (!isUserProfileCompleted(authUser!)) {
+      return Routes.userProfile;
+    }
+
+    if (organizations == null || organizations.isEmpty) {
+      return Routes.userOrganizations;
+    }
+  }
+
+  /// -----------------------------
+  /// CPA FLOW
+  /// -----------------------------
+  if (authPerson?.role == UserRole.cpa) {
+    if (!isCPAProfileCompleted(authCpa!)) {
+      return Routes.cpaProfile;
+    }
+  }
+
+  return getHomeScreenRoute();
 }
 
 bool isUserProfileCompleted(UserModel user) {

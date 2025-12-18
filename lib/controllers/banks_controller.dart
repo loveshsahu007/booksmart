@@ -1,12 +1,13 @@
 import 'dart:developer';
 
+import 'package:booksmart/controllers/auth_controller.dart';
+import 'package:booksmart/controllers/organization_controller.dart';
 import 'package:booksmart/models/bank_model.dart';
 import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';
+import 'package:booksmart/widgets/loading.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:get/get.dart';
-
-import '../utils/supabase.dart';
 
 class BankController extends GetxController {
   final String table = SupabaseTable.bank;
@@ -25,14 +26,14 @@ class BankController extends GetxController {
   // ===============================
   Future<void> getAllBanks() async {
     try {
-      final user = supabase.auth.currentUser;
-      if (user == null) return;
-
       isLoading.value = true;
 
       final res = await SupabaseCrudService.read(
         table: table,
-        filters: {'owner_id': user.id},
+        filters: {
+          'owner_id': authPerson!.authId,
+          'organization_id': getCurrentOrganization!.id,
+        },
       );
 
       banks.value = (res as List).map((e) => BankModel.fromJson(e)).toList();
@@ -49,18 +50,11 @@ class BankController extends GetxController {
   // ===============================
   // ADD BANK
   // ===============================
-  Future<void> addBank(Map<String, dynamic> data) async {
+  Future<void> addBank(BankModel model) async {
+    showLoading();
     try {
-      final user = supabase.auth.currentUser;
-      if (user == null) {
-        showSnackBar("User not logged in", isError: true);
-        return;
-      }
-
-      log("📤 ADD BANK PAYLOAD");
-      log(data.toString());
-
-      await SupabaseCrudService.create(table: table, data: data);
+      await SupabaseCrudService.create(table: table, data: model.toJson());
+      dismissLoadingWidget();
       Get.back();
       showSnackBar("Bank added successfully");
       await getAllBanks();
@@ -79,15 +73,14 @@ class BankController extends GetxController {
     required String id,
     required Map<String, dynamic> data,
   }) async {
+    showLoading();
     try {
-      log("📤 UPDATE BANK DATA");
-      log(data.toString());
-
       await SupabaseCrudService.update(
         table: table,
         data: data,
         filters: {'id': id},
       );
+      dismissLoadingWidget();
       Get.back();
       showSnackBar("Bank updated successfully");
       await getAllBanks();

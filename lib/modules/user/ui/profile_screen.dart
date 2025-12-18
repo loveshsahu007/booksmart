@@ -23,7 +23,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   final _scrollController = ScrollController();
 
   final _firstNameCtrl = TextEditingController();
+  final _middleNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
+
+  final TextEditingController middleNameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
 
   final _imagePicker = ImagePicker();
@@ -46,7 +49,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   void dispose() {
     _scrollController.dispose();
     _firstNameCtrl.dispose();
+    _middleNameCtrl.dispose();
     _lastNameCtrl.dispose();
+
     _phoneCtrl.dispose();
     super.dispose();
   }
@@ -111,6 +116,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         'phone_number': _phoneCtrl.text.trim().isEmpty
             ? null
             : _phoneCtrl.text.trim(),
+        'middle_name': _middleNameCtrl.text.trim(),
         if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty)
           'img_url': _profileImageUrl,
         'updated_at': DateTime.now().toIso8601String(),
@@ -227,6 +233,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           return null;
                         },
                       ),
+                      0.02.verticalSpace,
+                      AppTextField(
+                        controller: _middleNameCtrl,
+                        hintText: "Middle Name *",
+                        keyboardType: TextInputType.name,
+                        maxLines: 1,
+                        fieldValidator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return "Enter middle name";
+                          }
+                          return null;
+                        },
+                      ),
+                      0.02.verticalSpace,
                       0.02.verticalSpace,
                       AppTextField(
                         controller: _lastNameCtrl,

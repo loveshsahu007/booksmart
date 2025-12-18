@@ -153,7 +153,7 @@ class _AddTransactionScreenManualState
       date: _dateController.text,
       filePath: _selectedFile?.path,
       ownerId: authPerson!.id.toString(),
-      organizationId: getCurrentOrganization!.id,
+      organizationId: getCurrentOrganization!.id!,
     );
 
     if (widget.transaction == null) {

@@ -1,5 +1,5 @@
 class BankModel {
-  final String id;
+  final String? id;
   final String name;
   final String accountHolder;
   final String accountNumber;
@@ -8,7 +8,7 @@ class BankModel {
   final String organizationId;
 
   BankModel({
-    required this.id,
+    this.id,
     required this.name,
     required this.accountHolder,
     required this.accountNumber,
@@ -19,19 +19,18 @@ class BankModel {
 
   factory BankModel.fromJson(Map<String, dynamic> json) {
     return BankModel(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      accountHolder: json['account_holder'] as String,
-      accountNumber: json['account_number'] as String,
-      iban: json['iban'] as String,
-      ownerId: json['owner_id'] as String,
-      organizationId: json['organization_id'] as String,
+      id: json['id'],
+      name: json['name'],
+      accountHolder: json['account_holder'],
+      accountNumber: json['account_number'],
+      iban: json['iban'],
+      ownerId: json['owner_id'],
+      organizationId: json['organization_id'],
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
       'name': name,
       'account_holder': accountHolder,
       'account_number': accountNumber,

@@ -285,37 +285,36 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
     );
   }
 
-  void _saveOrganization() {
-    if (!_formKey.currentState!.validate()) return;
+void _saveOrganization() {
+  if (!_formKey.currentState!.validate()) return;
 
-    final orgType = orgDropdownKey.currentState?.getSelectedItem;
-    final industry = industryDropdownKey.currentState?.getSelectedItem;
-    final state = stateDropdownKey.currentState?.getSelectedItem;
+  final orgType = orgDropdownKey.currentState?.getSelectedItem;
+  final industry = industryDropdownKey.currentState?.getSelectedItem;
+  final state = stateDropdownKey.currentState?.getSelectedItem;
 
-    if (orgType == null || industry == null || state == null) {
-      showSnackBar("Please select all required dropdowns", isError: true);
-      return;
-    }
-
-    final model = OrganizationModel(
-      id: '',
-      name: nameController.text.trim(),
-      website: websiteController.text.trim(),
-      einTin: einController.text.trim(),
-      orgType: orgType,
-      industry: industry,
-      state: state,
-      street: streetController.text.trim(),
-      city: cityController.text.trim(),
-      zip: zipController.text.trim(),
-      phone: phoneController.text.trim(),
-      email: emailController.text.trim(),
-      ownerId: authPerson!.id.toString(),
-    );
-
-    Map<String, dynamic> json = model.toJson();
-    json.remove("id");
-
-    controller.addOrganization(json);
+  if (orgType == null || industry == null || state == null) {
+    showSnackBar("Please select all required dropdowns", isError: true);
+    return;
   }
+
+  final model = OrganizationModel(
+    name: nameController.text.trim(),
+    website: websiteController.text.trim(),
+    einTin: einController.text.trim(),
+    orgType: orgType,
+    industry: industry,
+    state: state,
+    street: streetController.text.trim(),
+    city: cityController.text.trim(),
+    zip: zipController.text.trim(),
+    phone: phoneController.text.trim(),
+    email: emailController.text.trim(),
+    ownerId: authPerson!.id.toString(),
+  );
+
+  controller.addOrganization(model);
+}
+
+
+
 }
