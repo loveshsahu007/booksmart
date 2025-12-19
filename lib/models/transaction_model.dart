@@ -1,5 +1,5 @@
 class TransactionModel {
-  final String id;
+  final int id;
   final String title;
   final double amount;
   final String category;
@@ -9,8 +9,8 @@ class TransactionModel {
   final String notes;
   final String date;
   final String? filePath; // Optional attachment
-  final String ownerId;
-  final String organizationId;
+  final int ownerId;
+  final int organizationId;
 
   TransactionModel({
     required this.id,
@@ -54,7 +54,7 @@ class TransactionModel {
         notes: json['notes'] as String? ?? '',
         date: json['date'] as String,
         filePath: json['file_path'] as String?,
-        ownerId: json['owner_id'] as String,
-        organizationId: json['organization_id'] as String,
+        ownerId: json['owner_id'] as int,
+        organizationId: json['organization_id'] as int,
       );
 }

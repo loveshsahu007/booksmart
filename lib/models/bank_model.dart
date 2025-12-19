@@ -1,14 +1,14 @@
 class BankModel {
-  final String? id;
+  final int id;
   final String name;
   final String accountHolder;
   final String accountNumber;
   final String iban;
-  final String ownerId;
-  final String organizationId;
+  final int ownerId;
+  final int organizationId;
 
   BankModel({
-    this.id,
+    required this.id,
     required this.name,
     required this.accountHolder,
     required this.accountNumber,
@@ -31,6 +31,7 @@ class BankModel {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'name': name,
       'account_holder': accountHolder,
       'account_number': accountNumber,

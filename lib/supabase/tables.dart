@@ -1,6 +1,6 @@
 class SupabaseTable {
-  static String user = 'User';
-  static String organization = 'Organizations';
-  static String bank = 'Banks';
-  static String transaction = 'Transactions';
+  static String user = 'users';
+  static String organization = 'organizations';
+  static String bank = 'banks';
+  static String transaction = 'transactions';
 }

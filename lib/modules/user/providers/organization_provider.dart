@@ -1,11 +1,11 @@
+import 'package:booksmart/controllers/auth_controller.dart';
 import 'package:booksmart/models/organization_model.dart';
-import 'package:booksmart/modules/common/providers/auth_provider.dart';
 
 import '../../../services/crud_service.dart';
 import '../../../supabase/tables.dart';
 
-Future<List<OrganizationModel>> getOrganizations({String? userId}) async {
-  final String? id = userId ?? getCurrentLoggedUserId;
+Future<List<OrganizationModel>> getOrganizations({int? userId}) async {
+  final int? id = userId ?? authPerson?.id;
   if (id == null) {
     return [];
   }

@@ -52,19 +52,17 @@ class SupabaseCrudService {
     try {
       var query = supabase.from(table).select();
 
-      if (filters != null) {
-        filters.forEach((key, value) {
-          query = query.eq(key, value);
-        });
-      }
+      filters?.forEach((key, value) {
+        query = query.eq(key, value);
+      });
 
-      if (single) {
-        return await query.maybeSingle();
-      } else {
-        return await query;
-      }
-    } catch (e) {
-      throw Exception("Read failed: $e");
+      final result = single ? await query.maybeSingle() : await query;
+      log("$table - ${filters?.toString() ?? ""}\n$result");
+      return result;
+    } catch (e, st) {
+      log(e.toString());
+      log(st.toString());
+      return null;
     }
   }
 

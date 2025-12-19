@@ -1,6 +1,5 @@
 import 'dart:developer';
 
-import 'package:booksmart/controllers/auth_controller.dart';
 import 'package:booksmart/controllers/organization_controller.dart';
 import 'package:booksmart/models/bank_model.dart';
 import 'package:booksmart/services/crud_service.dart';
@@ -30,10 +29,7 @@ class BankController extends GetxController {
 
       final res = await SupabaseCrudService.read(
         table: table,
-        filters: {
-          'owner_id': authPerson!.authId,
-          'organization_id': getCurrentOrganization!.id,
-        },
+        filters: {'organization_id': getCurrentOrganization!.id},
       );
 
       banks.value = (res as List).map((e) => BankModel.fromJson(e)).toList();
@@ -53,7 +49,9 @@ class BankController extends GetxController {
   Future<void> addBank(BankModel model) async {
     showLoading();
     try {
-      await SupabaseCrudService.create(table: table, data: model.toJson());
+      Map<String, dynamic> result = model.toJson();
+      result.remove("id");
+      await SupabaseCrudService.create(table: table, data: result);
       dismissLoadingWidget();
       Get.back();
       showSnackBar("Bank added successfully");
@@ -70,7 +68,7 @@ class BankController extends GetxController {
   // UPDATE BANK
   // ===============================
   Future<void> updateBank({
-    required String id,
+    required int id,
     required Map<String, dynamic> data,
   }) async {
     showLoading();
@@ -95,7 +93,7 @@ class BankController extends GetxController {
   // ===============================
   // DELETE BANK
   // ===============================
-  Future<void> deleteBank(String id) async {
+  Future<void> deleteBank(int id) async {
     try {
       await SupabaseCrudService.delete(table: table, filters: {'id': id});
 

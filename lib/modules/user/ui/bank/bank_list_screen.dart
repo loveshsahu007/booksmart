@@ -140,7 +140,7 @@ class _BanksListScreenState extends State<BanksListScreen> {
                                     confirmTextColor: Colors.white,
                                     onConfirm: () async {
                                       Get.back();
-                                      await controller.deleteBank(bank.id!);
+                                      await controller.deleteBank(bank.id);
                                     },
                                     onCancel: () => Get.back(),
                                   );

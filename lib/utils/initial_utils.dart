@@ -19,52 +19,29 @@ Future<String> getInitialRoute() async {
     return Routes.verifyEmail;
   }
 
-  final UserRole? role = getUserRoleFromSession;
-
-  final futures = <Future<dynamic>>[
-    getUserProfile(),
-    if (role == UserRole.user) getOrganizations(),
-  ];
-
-  final results = await Future.wait(futures);
-
-  final Map<String, dynamic>? userData = results[0];
-  final List<OrganizationModel>? organizations = role == UserRole.user
-      ? results[1] as List<OrganizationModel>?
-      : null;
+  final Map<String, dynamic>? userData = await getUserProfile();
 
   if (userData == null) {
     return Routes.login;
   }
 
-  /// -----------------------------
-  /// AUTH CONTROLLER
-  /// -----------------------------
   Get.put(AuthController(userJson: userData), permanent: true);
 
-  /// -----------------------------
-  /// USER FLOW
-  /// -----------------------------
   if (authPerson?.role == UserRole.user) {
-    final orgController = Get.put(OrganizationController(), permanent: true);
-
-    if (organizations != null) {
-      orgController.organizations.assignAll(organizations);
-      orgController.update();
-    }
+    final List<OrganizationModel> organizations = await getOrganizations(
+      userId: authPerson?.id,
+    );
+    Get.put(OrganizationController(organizations), permanent: true);
 
     if (!isUserProfileCompleted(authUser!)) {
       return Routes.userProfile;
     }
 
-    if (organizations == null || organizations.isEmpty) {
+    if (organizations.isEmpty) {
       return Routes.userOrganizations;
     }
   }
 
-  /// -----------------------------
-  /// CPA FLOW
-  /// -----------------------------
   if (authPerson?.role == UserRole.cpa) {
     if (!isCPAProfileCompleted(authCpa!)) {
       return Routes.cpaProfile;

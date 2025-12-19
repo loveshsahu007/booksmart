@@ -13,6 +13,8 @@ Future<Map<String, dynamic>?> getUserProfile({String? userAuthId}) async {
     return null;
   }
 
+  log("Fetching user profile for ID: $id");
+
   return SupabaseCrudService.read(
         table: SupabaseTable.user,
         filters: {"auth_id": id},

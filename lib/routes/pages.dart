@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/controllers/auth_controller.dart';
 import 'package:booksmart/controllers/organization_controller.dart';
@@ -207,12 +209,21 @@ class AppPages {
 }
 
 Widget getRequiredScreen(Widget desiredWidget, UserRole role) {
+  log("=== ${Get.currentRoute} === ");
   if (isUserLoggedIn && Get.isRegistered<AuthController>()) {
     if (authPerson?.role == role) {
       if (role == UserRole.user) {
-        if (isAnyOrganizationAvailable && isUserProfileCompleted(authUser!)) {
+        bool isUserProfileOk = isUserProfileCompleted(authUser!);
+        bool isOrganizationsOk = isAnyOrganizationAvailable;
+        if (isUserProfileOk && isOrganizationsOk) {
           return desiredWidget;
         } else {
+          if (!isUserProfileOk && Get.currentRoute == Routes.userProfile) {
+            return desiredWidget;
+          } else if (!isOrganizationsOk &&
+              Get.currentRoute == Routes.userOrganizations) {
+            return desiredWidget;
+          }
           return const ErrorScreen();
         }
       }

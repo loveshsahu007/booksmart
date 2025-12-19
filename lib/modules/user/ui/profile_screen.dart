@@ -236,17 +236,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       0.02.verticalSpace,
                       AppTextField(
                         controller: _middleNameCtrl,
-                        hintText: "Middle Name *",
+                        hintText: "Middle Name",
                         keyboardType: TextInputType.name,
                         maxLines: 1,
-                        fieldValidator: (v) {
-                          if (v == null || v.trim().isEmpty) {
-                            return "Enter middle name";
-                          }
-                          return null;
-                        },
                       ),
-                      0.02.verticalSpace,
                       0.02.verticalSpace,
                       AppTextField(
                         controller: _lastNameCtrl,

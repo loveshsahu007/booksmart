@@ -1,5 +1,5 @@
 class OrganizationModel {
-  final String? id;
+  final int id;
   final String name;
   final String? website;
   final String einTin;
@@ -11,10 +11,12 @@ class OrganizationModel {
   final String zip;
   final String? phone;
   final String? email;
-  final String ownerId;
+
+  /// User.id
+  final int ownerId;
 
   OrganizationModel({
-    this.id,
+    required this.id,
     required this.name,
     this.website,
     required this.einTin,
@@ -49,6 +51,7 @@ class OrganizationModel {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'name': name,
       'website': website,
       'ein_tin': einTin,

@@ -71,7 +71,7 @@ class OrganizationListScreen extends StatelessWidget {
                             description:
                                 "Are you sure you want to delete '${org.name}'?",
                             onYes: () async {
-                              await controller.deleteOrganization(org.id!);
+                              await controller.deleteOrganization(org.id);
                               Get.back();
                             },
                           );

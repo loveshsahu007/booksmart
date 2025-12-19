@@ -52,17 +52,18 @@ class _AddBankDialogState extends State<AddBankDialog> {
     }
 
     final bank = BankModel(
+      id: widget.bankToEdit?.id ?? 0,
       name: _bankNameController.text,
       accountHolder: _accountHolderController.text,
       accountNumber: _accountNumberController.text,
       iban: _ibanController.text,
-      ownerId: authPerson!.authId,
-      organizationId: getCurrentOrganization!.id!,
+      ownerId: authPerson!.id,
+      organizationId: getCurrentOrganization!.id,
     );
 
     if (_isEditMode && widget.bankToEdit?.id != null) {
       await controller.updateBank(
-        id: widget.bankToEdit!.id!,
+        id: widget.bankToEdit!.id,
         data: bank.toJson(),
       );
     } else {

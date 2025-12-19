@@ -13,3 +13,6 @@
 
 ## Pending
 - on web, when user have no organization, then it will navigate user to a route, that is temporary. we have to fix it later on, for better navigation
+
+## Supabase Tables
+- id type should be int8 and from setting icon set it to IDENTITY

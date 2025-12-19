@@ -142,7 +142,7 @@ class _AddTransactionScreenManualState
       return;
     }
     final model = TransactionModel(
-      id: widget.transaction?.id ?? '',
+      id: widget.transaction?.id ?? 0,
       title: _titleController.text,
       amount: double.tryParse(_amountController.text) ?? 0,
       category: _selectedCategory!,
@@ -152,16 +152,14 @@ class _AddTransactionScreenManualState
       notes: _notesController.text,
       date: _dateController.text,
       filePath: _selectedFile?.path,
-      ownerId: authPerson!.id.toString(),
-      organizationId: getCurrentOrganization!.id!,
+      ownerId: authPerson!.id,
+      organizationId: getCurrentOrganization!.id,
     );
 
     if (widget.transaction == null) {
-      Map<String, dynamic> json = model.toJson();
-      json.remove("id");
-      transactionC.addTransaction(json);
+      transactionC.addTransaction(model);
     } else {
-      // handle update transaction
+      //TODO: handle update transaction
     }
   }
 
