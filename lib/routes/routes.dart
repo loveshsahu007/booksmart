@@ -5,7 +5,7 @@ abstract class Routes {
   static const String verifyEmail = '/verify-email';
 
   /// The bottom-bar screen for mobile and side-bar for web
-  static const String home = '/user/home';
+  static const String userHome = '/user/';
 
   // web-side-bar routes
   static const String tax = '/user/tax';
@@ -37,7 +37,7 @@ abstract class Routes {
   /// =====
   /// ====
 
-  static const String cpaDashboard = '/cpa/dashboard';
+  static const String cpaHome = '/cpa/';
   static const String cpaLeads = '/cpa/leads';
   static const String cpaBilling = '/cpa/earnings';
   static const String cpaChat = '/cpa/chat';

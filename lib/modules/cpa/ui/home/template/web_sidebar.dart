@@ -53,7 +53,7 @@ class WebSideBarCPA extends StatelessWidget {
                       SideBarIcon(
                         icon: Icons.dashboard_customize_outlined,
                         infoMessage: 'Dashboard',
-                        routeName: Routes.cpaDashboard,
+                        routeName: Routes.cpaHome,
                         isShowName: isShowName,
                       ),
                       SideBarIcon(

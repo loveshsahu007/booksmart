@@ -34,8 +34,9 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
   final TextEditingController certCtrl = TextEditingController();
   final TextEditingController licenseCtrl = TextEditingController();
 
-  late final TextEditingController carrerStartDateController;
-  late DateTime? startDate;
+  final TextEditingController carrerStartDateController =
+      TextEditingController();
+  DateTime? startDate;
 
   final TextEditingController bioCtrl = TextEditingController();
 
@@ -95,9 +96,9 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
 
       // CPA fields
       licenseCtrl.text = cpa!.licenseNumber;
-      carrerStartDateController.text = Jiffy.parseFromDateTime(
-        cpa!.careerStartDate,
-      ).yMMMd;
+      carrerStartDateController.text = cpa!.careerStartDate == null
+          ? ""
+          : Jiffy.parseFromDateTime(cpa!.careerStartDate!).yMMMd;
       startDate = cpa!.careerStartDate;
       bioCtrl.text = cpa!.professionalBio;
 
@@ -232,7 +233,10 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
         if (_licenseCopyUrl != null && _licenseCopyUrl!.isNotEmpty)
           'license_copy_url': _licenseCopyUrl,
         'terms_agreed': _termsAgreed,
-        'status': 'pending', // Set to pending for admin review
+        //TODO: change status to verification_status in db as well, and in profile_screen json
+        'status': CpaVerificationStatus
+            .pending
+            .name, // Set to pending for admin review
         'updated_at': DateTime.now().toIso8601String(),
       };
 
@@ -241,6 +245,9 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
 
       await updateUserProfile(data: payload).then((value) {
         dismissLoadingWidget();
+        if (authCpa!.verificationStatus != CpaVerificationStatus.approved) {
+          Get.toNamed(Routes.cpaProfileUnderReview);
+        }
         showSnackBar('Profile saved successfully');
       });
     } catch (e) {
@@ -272,13 +279,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
       );
       return;
     }
-
-    try {
-      await _saveToSupabase();
-      Get.toNamed(Routes.cpaProfileUnderReview);
-    } catch (e) {
-      debugPrint('Profile submission failed: $e');
-    }
+    await _saveToSupabase();
   }
 
   Widget _buildProfileImageSection() {
@@ -612,33 +613,21 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                         onTap: () async {
                           await showDatePicker(
                             context: context,
-                            initialDate: DateTime(1900),
-                            firstDate: DateTime.now(),
+                            initialDate: DateTime.now(),
+                            firstDate: DateTime(1900),
                             lastDate: DateTime.now(),
                           ).then((DateTime? pickedDate) async {
                             if (pickedDate != null) {
-                              final TimeOfDay? pickedTime =
-                                  await showTimePicker(
-                                    // ignore: use_build_context_synchronously
-                                    context: context,
-                                    initialTime: TimeOfDay.fromDateTime(
-                                      DateTime.now(),
-                                    ),
-                                  );
-                              if (pickedTime != null) {
-                                DateTime finalPickedDate = DateTime(
-                                  pickedDate.year,
-                                  pickedDate.month,
-                                  pickedDate.day,
-                                  pickedTime.hour,
-                                  pickedTime.minute,
-                                );
-                                carrerStartDateController.text =
-                                    Jiffy.parseFromDateTime(
-                                      finalPickedDate,
-                                    ).yMMMd;
-                                startDate = finalPickedDate;
-                              }
+                              DateTime finalPickedDate = DateTime(
+                                pickedDate.year,
+                                pickedDate.month,
+                                pickedDate.day,
+                              );
+                              carrerStartDateController.text =
+                                  Jiffy.parseFromDateTime(
+                                    finalPickedDate,
+                                  ).yMMMd;
+                              startDate = finalPickedDate;
                             }
                           });
                         },
@@ -665,6 +654,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                       ),
                       const SizedBox(height: 5),
                       AppTextField(
+                        labelText: "Professional Bio",
                         hintText:
                             "Tell us about your experience and expertise...",
                         controller: bioCtrl,
@@ -744,18 +734,18 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
 
                       const SizedBox(height: 30),
 
-                      Center(
-                        child: SizedBox(
-                          width: isDesktop ? 300 : double.infinity,
-                          child: AppButton(
-                            buttonText: "Submit Profile for Review",
-                            onTapFunction: _submitProfile,
-                            radius: 8,
-                            fontSize: 16,
-                            buttonColor: _termsAgreed ? null : Colors.grey,
-                          ),
-                        ),
-                      ),
+                      // Center(
+                      //   child: SizedBox(
+                      //     width: isDesktop ? 300 : double.infinity,
+                      //     child: AppButton(
+                      //       buttonText: "Submit Profile for Review",
+                      //       onTapFunction: _submitProfile,
+                      //       radius: 8,
+                      //       fontSize: 16,
+                      //       buttonColor: _termsAgreed ? null : Colors.grey,
+                      //     ),
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),

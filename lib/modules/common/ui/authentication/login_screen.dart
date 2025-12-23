@@ -1,4 +1,5 @@
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
+import 'package:booksmart/routes/pages.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sign_in_button/sign_in_button.dart';
 import 'package:get/get.dart';
@@ -20,6 +21,16 @@ class _LoginScreenState extends State<LoginScreen> {
     text: isDevelopmentMode ? "Sp17bcs052@" : null,
   );
   bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (isUserLoggedIn) {
+        Get.offAndToNamed(getHomeScreenRoute());
+      }
+    });
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,7 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           text: "Sign in with Google",
                           textStyle: TextStyle(color: Colors.black),
                           onPressed: () {
-                            Get.offAllNamed(Routes.home);
+                            Get.offAllNamed(Routes.userHome);
                           },
                         ),
                         SizedBox(height: 10),
@@ -191,7 +202,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               : EdgeInsets.zero,
                           text: "Sign in with Apple",
                           onPressed: () {
-                            Get.offAllNamed(Routes.home);
+                            Get.offAllNamed(Routes.userHome);
                           },
                         ),
                         0.01.verticalSpace,

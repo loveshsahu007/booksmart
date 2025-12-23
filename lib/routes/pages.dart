@@ -75,7 +75,7 @@ class AppPages {
 
     // Web Side-bar
     GetPage(
-      name: Routes.home,
+      name: Routes.userHome,
       page: () => getRequiredScreen(HomeScreen(), UserRole.user),
     ),
     GetPage(
@@ -161,7 +161,7 @@ class AppPages {
     /// =====
     /// ====
     GetPage(
-      name: Routes.cpaDashboard,
+      name: Routes.cpaHome,
       page: () => getRequiredScreen(HomeScreenCPA(), UserRole.cpa),
     ),
     GetPage(
@@ -215,6 +215,7 @@ Widget getRequiredScreen(Widget desiredWidget, UserRole role) {
       if (role == UserRole.user) {
         bool isUserProfileOk = isUserProfileCompleted(authUser!);
         bool isOrganizationsOk = isAnyOrganizationAvailable;
+
         if (isUserProfileOk && isOrganizationsOk) {
           return desiredWidget;
         } else {
@@ -223,26 +224,50 @@ Widget getRequiredScreen(Widget desiredWidget, UserRole role) {
           } else if (!isOrganizationsOk &&
               Get.currentRoute == Routes.userOrganizations) {
             return desiredWidget;
+          } else if (!isUserProfileOk) {
+            return const ErrorScreen(routeError: RouteError.userProfile);
+          } else if (!isOrganizationsOk) {
+            return const ErrorScreen(routeError: RouteError.userOrganization);
           }
-          return const ErrorScreen();
+        }
+      } else if (role == UserRole.cpa) {
+        bool isCPAProfileOk = isCPAProfileCompleted(authCpa!);
+        bool isVerified =
+            authCpa?.verificationStatus == CpaVerificationStatus.approved;
+        if (isCPAProfileOk && isVerified) {
+          return desiredWidget;
+        } else {
+          // can access profile in any case
+          if (Get.currentRoute == Routes.cpaProfile) {
+            return desiredWidget;
+          } else if (!isVerified &&
+              Get.currentRoute == Routes.cpaProfileUnderReview) {
+            return desiredWidget;
+          } else if (!isCPAProfileOk) {
+            return const ErrorScreen(routeError: RouteError.cpaProfile);
+          } else if (!isVerified) {
+            return const ErrorScreen(
+              routeError: RouteError.cpaProfileUnderReview,
+            );
+          }
         }
       }
       return desiredWidget;
     } else {
-      return const ErrorScreen();
+      return const ErrorScreen(routeError: RouteError.permissionDenied);
     }
   } else {
-    return const ErrorScreen(isLogInType: true);
+    return const ErrorScreen(routeError: RouteError.login);
   }
 }
 
 String getHomeScreenRoute() {
   switch (authPerson?.role) {
     case UserRole.user:
-      return Routes.home;
+      return Routes.userHome;
     case UserRole.cpa:
-      return Routes.cpaDashboard;
+      return Routes.cpaHome;
     default:
-      return Routes.home;
+      return Routes.userHome;
   }
 }

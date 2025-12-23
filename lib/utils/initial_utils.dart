@@ -26,7 +26,7 @@ Future<String> getInitialRoute() async {
   }
 
   Get.put(AuthController(userJson: userData), permanent: true);
-  print("=======++=========${authPerson?.role} ");
+
   if (authPerson?.role == UserRole.user) {
     final List<OrganizationModel> organizations = await getOrganizations(
       userId: authPerson?.id,
@@ -40,11 +40,12 @@ Future<String> getInitialRoute() async {
     if (organizations.isEmpty) {
       return Routes.userOrganizations;
     }
-  }
-
-  if (authPerson?.role == UserRole.cpa) {
+  } else if (authPerson?.role == UserRole.cpa) {
     if (!isCPAProfileCompleted(authCpa!)) {
       return Routes.cpaProfile;
+    }
+    if (authCpa?.verificationStatus != CpaVerificationStatus.approved) {
+      return Routes.cpaProfileUnderReview;
     }
   }
 

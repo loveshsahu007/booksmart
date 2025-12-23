@@ -103,7 +103,8 @@ class _ProfileUnderReviewScreenCPAState
 
                     _buildStatusRow(
                       "Profile Status",
-                      cpa?.status.toUpperCase() ?? "PENDING",
+                      cpa?.verificationStatus.name.toUpperCase() ??
+                          CpaVerificationStatus.pending.name.toUpperCase(),
                       color: Colors.amber,
                     ),
                   ],
@@ -198,7 +199,7 @@ class _ProfileUnderReviewScreenCPAState
             AppButton(
               buttonText: "Edit Profile",
               onTapFunction: () {
-                Get.back();
+                Get.toNamed(Routes.cpaProfile);
               },
               buttonColor: const Color.fromARGB(255, 19, 44, 82),
               fontSize: 14,
@@ -208,9 +209,9 @@ class _ProfileUnderReviewScreenCPAState
             const SizedBox(height: 20),
 
             AppButton(
-              buttonText: "Dashboard (Temp)",
+              buttonText: "Dashboard",
               onTapFunction: () {
-                Get.offAllNamed(Routes.cpaDashboard);
+                Get.offAllNamed(Routes.cpaHome);
               },
               radius: 8,
               fontSize: 14,

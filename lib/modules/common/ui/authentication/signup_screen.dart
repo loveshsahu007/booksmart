@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import '../../../../constant/exports.dart';
 import '../../../../models/user_base_model.dart';
+import '../../../../routes/pages.dart';
 import '../../providers/auth_provider.dart';
 import 'login_screen.dart';
 
@@ -30,6 +31,16 @@ class _SignupScreenState extends State<SignupScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (isUserLoggedIn) {
+        Get.offAndToNamed(getHomeScreenRoute());
+      }
+    });
+    super.initState();
   }
 
   @override

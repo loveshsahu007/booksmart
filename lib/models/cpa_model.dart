@@ -1,22 +1,27 @@
 part of './user_base_model.dart';
 
+enum CpaVerificationStatus { pending, approved, rejected }
+
 class CpaModel extends Core {
   final List<String> certifications;
   final String licenseNumber;
-  final DateTime careerStartDate;
+  final DateTime? careerStartDate;
   final String professionalBio;
   final List<String> specialties;
   final List<String> stateFocuses;
   final String certificationProofUrl;
   final String licenseCopyUrl;
   final bool termsAgreed;
-  final String status;
 
-  bool get isProfileCompleted =>
-      data.firstName.isNotEmpty && data.lastName.isNotEmpty;
+  final CpaVerificationStatus verificationStatus;
+  final int? verifiedBy;
+  final DateTime? verifiedAt;
 
   int get getExperienceInYears {
-    int difference = DateTime.now().year - (careerStartDate.year);
+    if (careerStartDate == null) {
+      return 0;
+    }
+    int difference = DateTime.now().year - (careerStartDate!.year);
 
     if (difference == 0) {
       return 1;
@@ -36,7 +41,9 @@ class CpaModel extends Core {
     required this.certificationProofUrl,
     required this.licenseCopyUrl,
     required this.termsAgreed,
-    required this.status,
+    required this.verificationStatus,
+    required this.verifiedBy,
+    required this.verifiedAt,
   });
 
   factory CpaModel.fromJson(Map<String, dynamic> json) {
@@ -48,7 +55,7 @@ class CpaModel extends Core {
           .toList(),
       licenseNumber:
           handleResponseFromJson<String>(json, "license_number") ?? "",
-      careerStartDate: DateTime.parse(
+      careerStartDate: DateTime.tryParse(
         handleResponseFromJson<String>(json, "career_start_date") ?? "",
       ),
       professionalBio:
@@ -64,7 +71,18 @@ class CpaModel extends Core {
       licenseCopyUrl:
           handleResponseFromJson<String>(json, "license_copy_url") ?? "",
       termsAgreed: handleResponseFromJson<bool>(json, "terms_agreed") ?? false,
-      status: handleResponseFromJson<String>(json, "status") ?? "pending",
+      verificationStatus: () {
+        // TODO: change status to verification_status in db as well, and in profile_screen json
+        String status =
+            handleResponseFromJson<String>(json, "status") ??
+            CpaVerificationStatus.pending.name;
+
+        return CpaVerificationStatus.values.byName(status);
+      }(),
+      verifiedBy: handleResponseFromJson<int?>(json, "verified_by"),
+      verifiedAt: DateTime.tryParse(
+        handleResponseFromJson<String?>(json, "verified_at") ?? "",
+      ),
     );
   }
 
@@ -72,14 +90,17 @@ class CpaModel extends Core {
     return super.data.toJson()..addAll({
       "certifications": certifications,
       "license_number": licenseNumber,
-      "career_start_date": careerStartDate.toIso8601String(),
+      "career_start_date": careerStartDate?.toIso8601String(),
       "professional_bio": professionalBio,
       "specialties": specialties,
       "state_focuses": stateFocuses,
       "certification_proof_url": certificationProofUrl,
       "license_copy_url": licenseCopyUrl,
       "terms_agreed": termsAgreed,
-      "status": status,
+      // TODO: change status to verification_status in db as well, and in profile_screen json
+      "status": verificationStatus,
+      "verified_by": verifiedBy,
+      "verified_at": verifiedAt?.toIso8601String(),
     });
   }
 }

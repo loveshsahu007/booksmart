@@ -47,9 +47,10 @@ Future<bool> updateUserProfile({
         data: data,
       )
       .then((value) {
-        authController.refereshUser();
-        dismissLoadingWidget();
-        return true;
+        return authController.refereshUser().then((value) {
+          dismissLoadingWidget();
+          return true;
+        });
       })
       .onError((e, x) {
         dismissLoadingWidget();

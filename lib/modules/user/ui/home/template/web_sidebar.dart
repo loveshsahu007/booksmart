@@ -62,7 +62,7 @@ class WebSideBar extends StatelessWidget {
                       SideBarIcon(
                         icon: Icons.dashboard_customize_outlined,
                         infoMessage: 'Dashboard',
-                        routeName: Routes.home,
+                        routeName: Routes.userHome,
                         isShowName: isShowName,
                       ),
                       SideBarIcon(
