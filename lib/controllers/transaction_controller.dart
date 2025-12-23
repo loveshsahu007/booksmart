@@ -58,21 +58,24 @@ class TransactionController extends GetxController {
       log(s.toString());
       somethingWentWrongSnackbar();
     }
+    update();
   }
 
   Future<void> updateTransaction({
-    required String id,
-    required Map<String, dynamic> data,
+    required int id,
+    required TransactionModel data,
   }) async {
     try {
       log("📤 UPDATE TRANSACTION DATA: $data");
-
+      Map<String, dynamic> json = data.toJson();
+      json.remove('id'); // remove id before sending to Supabase
       await SupabaseCrudService.update(
         table: table,
-        data: data,
+        data: json,
         filters: {'id': id},
       );
       getAllTransactions();
+      Get.back();
       showSnackBar("Transaction updated successfully");
     } catch (e, s) {
       log("❌ updateTransaction ERROR");
@@ -80,6 +83,7 @@ class TransactionController extends GetxController {
       log(s.toString());
       somethingWentWrongSnackbar();
     }
+    update();
   }
 
   Future<void> deleteTransaction(int id) async {

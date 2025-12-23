@@ -74,7 +74,7 @@ class CpaModel extends Core {
       verificationStatus: () {
         // TODO: change status to verification_status in db as well, and in profile_screen json
         String status =
-            handleResponseFromJson<String>(json, "status") ??
+            handleResponseFromJson<String>(json, "verification_status") ??
             CpaVerificationStatus.pending.name;
 
         return CpaVerificationStatus.values.byName(status);
@@ -97,8 +97,7 @@ class CpaModel extends Core {
       "certification_proof_url": certificationProofUrl,
       "license_copy_url": licenseCopyUrl,
       "terms_agreed": termsAgreed,
-      // TODO: change status to verification_status in db as well, and in profile_screen json
-      "status": verificationStatus,
+      "verification_status": verificationStatus,
       "verified_by": verifiedBy,
       "verified_at": verifiedAt?.toIso8601String(),
     });

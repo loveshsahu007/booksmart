@@ -14,7 +14,7 @@ import '../../../../widgets/custom_drop_down.dart';
 import 'receipt_scanning_output_screen.dart';
 
 void goToAddTransactionScreen({
-  TransactionModel? transaction,
+  TransactionModel? tr,
   bool shouldCloseBefore = false,
 }) {
   // Ensure the controller is registered before using it
@@ -25,8 +25,8 @@ void goToAddTransactionScreen({
   if (kIsWeb) {
     if (shouldCloseBefore) Get.back();
     customDialog(
-      child: AddTransactionScreenManual(),
-      title: 'Add Transaction',
+      child: AddTransactionScreenManual(transaction: tr),
+      title: tr != null ? 'Update Transaction' : 'Add Transaction',
       barrierDismissible: true,
       actionWidgetList: [
         IconButton(
@@ -37,16 +37,16 @@ void goToAddTransactionScreen({
     );
   } else {
     if (shouldCloseBefore) {
-      Get.off(() => const AddTransactionScreenManual());
+      Get.off(() => AddTransactionScreenManual(transaction: tr));
     } else {
-      Get.to(() => const AddTransactionScreenManual());
+      Get.to(() => AddTransactionScreenManual(transaction: tr));
     }
   }
 }
 
 class AddTransactionScreenManual extends StatefulWidget {
-  const AddTransactionScreenManual({super.key, this.transaction});
   final TransactionModel? transaction;
+  const AddTransactionScreenManual({super.key, this.transaction});
 
   @override
   State<AddTransactionScreenManual> createState() =>
@@ -74,7 +74,14 @@ class _AddTransactionScreenManualState
   @override
   void initState() {
     super.initState();
+    if (widget.transaction != null) {
+      updateData();
+    }
+  }
+
+  updateData() {
     final now = DateTime.now();
+
     _dateController.text = "${now.day} ${_getMonthName(now.month)} ${now.year}";
 
     _titleController.text = widget.transaction?.title ?? '';
@@ -84,12 +91,6 @@ class _AddTransactionScreenManualState
     deductible = widget.transaction?.deductible ?? false;
     _selectedCategory = widget.transaction?.category;
     _selectedSubcategory = widget.transaction?.subcategory;
-    // _selectedFile = widget.transaction?.filePath != null
-    //     ? XFile(widget.transaction!.filePath!)
-    //     : null;
-    // _selectedFileBytes = widget.transaction?.filePath != null
-    //     ? widget.transaction!.filePath!.codeUnits
-    //     : null;
   }
 
   String _getMonthName(int month) {
@@ -159,7 +160,10 @@ class _AddTransactionScreenManualState
     if (widget.transaction == null) {
       transactionC.addTransaction(model);
     } else {
-      //TODO: handle update transaction
+      transactionC.updateTransaction(
+        data: model,
+        id: widget.transaction?.id ?? 0,
+      );
     }
   }
 

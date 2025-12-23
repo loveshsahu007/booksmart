@@ -1,9 +1,9 @@
 class CategoryModel {
-  final int? id;
+  final int id;
   final String name;
   final int addedBy;
 
-  CategoryModel({this.id, required this.name, required this.addedBy});
+  CategoryModel({required this.id, required this.name, required this.addedBy});
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
     return CategoryModel(
@@ -14,18 +14,18 @@ class CategoryModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {if (id != null) 'id': id, 'name': name, 'added_by': addedBy};
+    return {'id': id, 'name': name, 'added_by': addedBy};
   }
 }
 
 class SubCategoryModel {
-  final int? id;
+  final int id;
   final int categoryId;
   final String name;
   final int addedBy;
 
   SubCategoryModel({
-    this.id,
+    required this.id,
     required this.categoryId,
     required this.name,
     required this.addedBy,
@@ -40,7 +40,7 @@ class SubCategoryModel {
   }
   Map<String, dynamic> toJson() {
     return {
-      if (id != null) 'id': id,
+      'id': id,
       'category_id': categoryId,
       'name': name,
       'added_by': addedBy,

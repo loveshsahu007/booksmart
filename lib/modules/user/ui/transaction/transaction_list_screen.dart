@@ -307,7 +307,9 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                             : Colors.green;
 
                         return InkWell(
-                          onTap: () => goToAddTransactionScreen(),
+                          onTap: () {
+                            goToAddTransactionScreen(tr: t);
+                          },
                           child: Card(
                             color: Theme.of(
                               context,

@@ -1,4 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/controllers/category_controler.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -41,39 +42,21 @@ class CategorySelectionScreen extends StatefulWidget {
 }
 
 class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
-  String? _selectedSubcategory;
+  final CategoryAdminController controller = Get.put(CategoryAdminController());
 
   final TextEditingController _searchController = TextEditingController();
-  List<Map<String, dynamic>> _filteredCategories = [];
+
+  String? _selectedSubcategory;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _selectedSubcategory = widget.selectedSubcategory;
-    _filteredCategories = CategoryData.categories;
-  }
-
-  void _filterCategories(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _filteredCategories = CategoryData.categories;
-      } else {
-        _filteredCategories = CategoryData.categories.where((category) {
-          final categoryName = category['name'] as String;
-          final subcategories = category['subcategories'] as List<String>;
-
-          return categoryName.toLowerCase().contains(query.toLowerCase()) ||
-              subcategories.any(
-                (subcat) => subcat.toLowerCase().contains(query.toLowerCase()),
-              );
-        }).toList();
-      }
-    });
   }
 
   void _selectSubcategory(String category, String subcategory) {
-    final result = <String, String>{category: subcategory};
-    Get.back(result: result);
+    Get.back(result: {category: subcategory});
   }
 
   @override
@@ -97,25 +80,41 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                 filled: true,
                 fillColor: colorScheme.surfaceContainerHighest,
               ),
-              onChanged: _filterCategories,
+              onChanged: (value) {
+                setState(() => _searchQuery = value.toLowerCase());
+              },
             ),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           Expanded(
-            child: ListView.builder(
-              itemCount: _filteredCategories.length,
-              padding: const EdgeInsets.only(left: 15, right: 15, bottom: 50),
-              itemBuilder: (context, index) {
-                final category = _filteredCategories[index];
-                final categoryName = category['name'] as String;
-                final subcategories = category['subcategories'] as List<String>;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _buildCategorySection(
-                    categoryName,
-                    subcategories,
-                    colorScheme,
+            child: GetBuilder<CategoryAdminController>(
+              builder: (_) {
+                final categories = controller.categories
+                    .where((c) => c.name.toLowerCase().contains(_searchQuery))
+                    .toList();
+
+                if (categories.isEmpty) {
+                  return const Center(child: AppText('No categories found'));
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.only(
+                    left: 15,
+                    right: 15,
+                    bottom: 50,
                   ),
+                  itemCount: categories.length,
+                  itemBuilder: (_, index) {
+                    final category = categories[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildCategoryTile(
+                        categoryId: category.id,
+                        categoryName: category.name,
+                        colorScheme: colorScheme,
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -125,11 +124,11 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     );
   }
 
-  Widget _buildCategorySection(
-    String categoryName,
-    List<String> subcategories,
-    ColorScheme colorScheme,
-  ) {
+  Widget _buildCategoryTile({
+    required int categoryId,
+    required String categoryName,
+    required ColorScheme colorScheme,
+  }) {
     return Card(
       margin: EdgeInsets.zero,
       child: ExpansionTile(
@@ -139,33 +138,54 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
           size: 20,
         ),
         title: AppText(categoryName, fontSize: 14),
-        tilePadding: EdgeInsets.symmetric(horizontal: 5, vertical: 0),
-        initiallyExpanded: true,
+        initiallyExpanded: false,
         dense: true,
-        shape: RoundedRectangleBorder(),
-        collapsedShape: RoundedRectangleBorder(),
-        collapsedBackgroundColor: Colors.transparent,
-        children: subcategories.map((subcategory) {
-          final isSelected = _selectedSubcategory == subcategory;
-          return Padding(
-            padding: EdgeInsetsGeometry.all(2),
-            child: ListTile(
-              leading: const SizedBox(width: 40),
-              shape: RoundedRectangleBorder(),
-              title: AppText(
-                subcategory,
-                fontSize: 14,
-                color: isSelected ? colorScheme.primary : Colors.grey,
-              ),
-              trailing: isSelected
-                  ? Icon(Icons.check, color: colorScheme.primary)
-                  : null,
-              dense: true,
-              contentPadding: EdgeInsets.symmetric(vertical: 0),
-              onTap: () => _selectSubcategory(categoryName, subcategory),
-            ),
-          );
-        }).toList(),
+        tilePadding: const EdgeInsets.symmetric(horizontal: 5),
+        onExpansionChanged: (expanded) {
+          if (expanded) {
+            controller.fetchSubCategories(categoryId);
+          }
+        },
+        children: [
+          GetBuilder<CategoryAdminController>(
+            builder: (_) {
+              final subs = controller.subCategories
+                  .where((e) => e.categoryId == categoryId)
+                  .toList();
+
+              if (subs.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: AppText(
+                    'No sub-categories',
+                    fontSize: 13,
+                    color: Colors.grey,
+                  ),
+                );
+              }
+
+              return Column(
+                children: subs.map((sub) {
+                  final isSelected = _selectedSubcategory == sub.name;
+
+                  return ListTile(
+                    leading: const SizedBox(width: 40),
+                    title: AppText(
+                      sub.name,
+                      fontSize: 14,
+                      color: isSelected ? colorScheme.primary : Colors.grey,
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check, color: colorScheme.primary)
+                        : null,
+                    dense: true,
+                    onTap: () => _selectSubcategory(categoryName, sub.name),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

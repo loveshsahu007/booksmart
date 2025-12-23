@@ -1,26 +1,58 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/category_controler.dart';
-import 'package:booksmart/modules/admin/category_dialogs.dart';
+import 'package:booksmart/controllers/admin_user_controller.dart';
+import 'package:booksmart/modules/admin/user_list.dart';
 import 'package:get/get.dart';
 
-class TempAdmin extends StatelessWidget {
-  TempAdmin({super.key});
+import '../../controllers/category_controler.dart';
+import 'category_dialogs.dart';
 
-  final controller = Get.put(CategoryAdminController());
+class AdminDashboard extends StatelessWidget {
+  AdminDashboard({super.key});
+
+  final CategoryAdminController categoryController = Get.put(
+    CategoryAdminController(),
+  );
+
+  final AdminUsersController usersController = Get.put(AdminUsersController());
 
   @override
   Widget build(BuildContext context) {
+    final bool isDesktop = context.screenWidth > 900;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Category Admin'),
+        title: const Text('Admin Panel'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => showSaveCategoryDialog(controller: controller),
+            onPressed: () =>
+                showSaveCategoryDialog(controller: categoryController),
           ),
         ],
       ),
-      body: Obx(() {
+      body: isDesktop
+          ? Row(
+              children: [
+                Expanded(child: const AdminUsersList()),
+
+                const VerticalDivider(width: 1),
+                Expanded(child: _buildCategories()),
+              ],
+            )
+          : Column(
+              children: [
+                Expanded(child: const AdminUsersList()),
+
+                const Divider(height: 1),
+                Expanded(child: _buildCategories()),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildCategories() {
+    return GetBuilder<CategoryAdminController>(
+      builder: (controller) {
         if (controller.categories.isEmpty) {
           return const Center(child: AppText('No categories found'));
         }
@@ -30,11 +62,12 @@ class TempAdmin extends StatelessWidget {
           itemCount: controller.categories.length,
           itemBuilder: (_, index) {
             final cat = controller.categories[index];
+
             return Card(
               child: ListTile(
                 title: AppText(cat.name, fontWeight: FontWeight.w600),
                 onTap: () =>
-                    showSubCategoryListDialog(controller, cat.id!, cat.name),
+                    showSubCategoryListDialog(controller, cat.id, cat.name),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -49,7 +82,7 @@ class TempAdmin extends StatelessWidget {
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () => showConfirmDeleteDialog(
                         title: 'Delete Category?',
-                        onConfirm: () => controller.deleteCategory(cat.id!),
+                        onConfirm: () => controller.deleteCategory(cat.id),
                       ),
                     ),
                   ],
@@ -58,7 +91,7 @@ class TempAdmin extends StatelessWidget {
             );
           },
         );
-      }),
+      },
     );
   }
 }

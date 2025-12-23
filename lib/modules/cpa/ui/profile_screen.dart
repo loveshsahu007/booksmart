@@ -23,7 +23,22 @@ class ProfileScreenCPA extends StatefulWidget {
 
 class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
   int _currentStep = 0;
-  final _formKey = GlobalKey<FormState>();
+  final _personalFormKey = GlobalKey<FormState>();
+  final _professionalFormKey = GlobalKey<FormState>();
+  final _verificationFormKey = GlobalKey<FormState>();
+
+  bool _validateStep(int step) {
+    switch (step) {
+      case 0:
+        return _personalFormKey.currentState?.validate() ?? false;
+      case 1:
+        return _professionalFormKey.currentState?.validate() ?? false;
+      case 2:
+        return _verificationFormKey.currentState?.validate() ?? false;
+      default:
+        return false;
+    }
+  }
 
   // Text controllers
   final TextEditingController firstNameCtrl = TextEditingController();
@@ -234,7 +249,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
           'license_copy_url': _licenseCopyUrl,
         'terms_agreed': _termsAgreed,
         //TODO: change status to verification_status in db as well, and in profile_screen json
-        'status': CpaVerificationStatus
+        'verification_status': CpaVerificationStatus
             .pending
             .name, // Set to pending for admin review
         'updated_at': DateTime.now().toIso8601String(),
@@ -258,6 +273,10 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
   }
 
   void _nextStep() {
+    final isValid = _validateStep(_currentStep);
+
+    if (!isValid) return;
+
     if (_currentStep < 2) {
       setState(() => _currentStep++);
     } else {
@@ -270,15 +289,24 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
   }
 
   void _submitProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Validate all steps
+    for (int step = 0; step < 3; step++) {
+      final valid = _validateStep(step);
+      if (!valid) {
+        setState(() => _currentStep = step);
+        return;
+      }
+    }
 
     if (!_termsAgreed) {
+      setState(() => _currentStep = 2);
       showSnackBar(
         'Please agree to the terms and conditions',
         title: 'Agreement Required',
       );
       return;
     }
+
     await _saveToSupabase();
   }
 
@@ -461,7 +489,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                   title: const Text("Personal Information"),
                   isActive: _currentStep >= 0,
                   content: Form(
-                    key: _formKey,
+                    key: _personalFormKey,
                     child: Column(
                       children: [
                         _buildProfileImageSection(),
@@ -579,174 +607,180 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                 Step(
                   title: const Text("Professional Details"),
                   isActive: _currentStep >= 1,
-                  content: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const AppText(
-                        "Certifications",
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      const SizedBox(height: 5),
-                      CustomMultiDropDownWidget<String>(
-                        dropDownKey: _certificationsKey,
-                        showSearchBox: true,
-                        hint: "Select Certifications",
-                        items: cpaCertificationOptions,
-                        selectedItems: selectedCertifications,
-                        onChanged: (newList) {
-                          setState(() => selectedCertifications = newList);
-                        },
-                      ),
+                  content: Form(
+                    key: _professionalFormKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const AppText(
+                          "Certifications",
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        const SizedBox(height: 5),
+                        CustomMultiDropDownWidget<String>(
+                          dropDownKey: _certificationsKey,
+                          showSearchBox: true,
+                          hint: "Select Certifications",
+                          items: cpaCertificationOptions,
+                          selectedItems: selectedCertifications,
+                          onChanged: (newList) {
+                            setState(() => selectedCertifications = newList);
+                          },
+                        ),
 
-                      const SizedBox(height: 15),
+                        const SizedBox(height: 15),
 
-                      AppTextField(
-                        hintText: "License Number *",
-                        controller: licenseCtrl,
-                        fieldValidator: (v) =>
-                            v?.isEmpty == true ? 'Required for CPA' : null,
-                      ),
-                      const SizedBox(height: 15),
+                        AppTextField(
+                          hintText: "License Number *",
+                          controller: licenseCtrl,
+                          fieldValidator: (v) =>
+                              v?.isEmpty == true ? 'Required for CPA' : null,
+                        ),
+                        const SizedBox(height: 15),
 
-                      InkWell(
-                        onTap: () async {
-                          await showDatePicker(
-                            context: context,
-                            initialDate: DateTime.now(),
-                            firstDate: DateTime(1900),
-                            lastDate: DateTime.now(),
-                          ).then((DateTime? pickedDate) async {
-                            if (pickedDate != null) {
-                              DateTime finalPickedDate = DateTime(
-                                pickedDate.year,
-                                pickedDate.month,
-                                pickedDate.day,
-                              );
-                              carrerStartDateController.text =
-                                  Jiffy.parseFromDateTime(
-                                    finalPickedDate,
-                                  ).yMMMd;
-                              startDate = finalPickedDate;
-                            }
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(20),
-                        child: AbsorbPointer(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 5),
-                            child: AppTextField(
-                              hintText: "Years of Experience *",
-                              controller: carrerStartDateController,
-                              fieldValidator: (v) =>
-                                  v?.isEmpty == true ? 'Required' : null,
+                        InkWell(
+                          onTap: () async {
+                            await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(1900),
+                              lastDate: DateTime.now(),
+                            ).then((DateTime? pickedDate) async {
+                              if (pickedDate != null) {
+                                DateTime finalPickedDate = DateTime(
+                                  pickedDate.year,
+                                  pickedDate.month,
+                                  pickedDate.day,
+                                );
+                                carrerStartDateController.text =
+                                    Jiffy.parseFromDateTime(
+                                      finalPickedDate,
+                                    ).yMMMd;
+                                startDate = finalPickedDate;
+                              }
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: AbsorbPointer(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 5),
+                              child: AppTextField(
+                                hintText: "Years of Experience *",
+                                controller: carrerStartDateController,
+                                fieldValidator: (v) =>
+                                    v?.isEmpty == true ? 'Required' : null,
+                              ),
                             ),
                           ),
                         ),
-                      ),
 
-                      const SizedBox(height: 15),
+                        const SizedBox(height: 15),
 
-                      const AppText(
-                        "Professional Bio *",
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      const SizedBox(height: 5),
-                      AppTextField(
-                        labelText: "Professional Bio",
-                        hintText:
-                            "Tell us about your experience and expertise...",
-                        controller: bioCtrl,
-                        maxLines: 5,
-                        fieldValidator: (v) =>
-                            v?.isEmpty == true ? 'Required' : null,
-                      ),
+                        const AppText(
+                          "Professional Bio *",
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        const SizedBox(height: 5),
+                        AppTextField(
+                          labelText: "Professional Bio",
+                          hintText:
+                              "Tell us about your experience and expertise...",
+                          controller: bioCtrl,
+                          maxLines: 5,
+                          fieldValidator: (v) =>
+                              v?.isEmpty == true ? 'Required' : null,
+                        ),
 
-                      const SizedBox(height: 15),
+                        const SizedBox(height: 15),
 
-                      const AppText(
-                        "Specialties",
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      const SizedBox(height: 5),
-                      CustomMultiDropDownWidget<String>(
-                        dropDownKey: _specialtiesKey,
-                        showSearchBox: true,
-                        hint: "Select Specialties",
-                        items: cpaSpecialtyOptions,
-                        selectedItems: selectedSpecialties,
-                        onChanged: (newList) {
-                          setState(() => selectedSpecialties = newList);
-                        },
-                      ),
+                        const AppText(
+                          "Specialties",
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        const SizedBox(height: 5),
+                        CustomMultiDropDownWidget<String>(
+                          dropDownKey: _specialtiesKey,
+                          showSearchBox: true,
+                          hint: "Select Specialties",
+                          items: cpaSpecialtyOptions,
+                          selectedItems: selectedSpecialties,
+                          onChanged: (newList) {
+                            setState(() => selectedSpecialties = newList);
+                          },
+                        ),
 
-                      const SizedBox(height: 10),
+                        const SizedBox(height: 10),
 
-                      const AppText(
-                        "State Focuses",
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      const SizedBox(height: 5),
-                      CustomMultiDropDownWidget<String>(
-                        dropDownKey: _statesKey,
-                        showSearchBox: true,
-                        hint: "Select States Where Licensed",
-                        items: usStates,
-                        selectedItems: selectedStates,
-                        onChanged: (newList) {
-                          setState(() => selectedStates = newList);
-                        },
-                      ),
-                    ],
+                        const AppText(
+                          "State Focuses",
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        const SizedBox(height: 5),
+                        CustomMultiDropDownWidget<String>(
+                          dropDownKey: _statesKey,
+                          showSearchBox: true,
+                          hint: "Select States Where Licensed",
+                          items: usStates,
+                          selectedItems: selectedStates,
+                          onChanged: (newList) {
+                            setState(() => selectedStates = newList);
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
                 Step(
                   title: const Text("Verification & Agreement"),
                   isActive: _currentStep >= 2,
-                  content: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildDocumentUploadSection(),
-
-                      const SizedBox(height: 20),
-
-                      const Divider(),
-
-                      const SizedBox(height: 20),
-
-                      CheckboxListTile(
-                        title: const Text(
-                          "I certify that all information provided is accurate and complete. I agree to the CPA Network Terms of Service and Privacy Policy.",
-                          style: TextStyle(fontSize: 14),
+               content: Form(
+  key: _verificationFormKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildDocumentUploadSection(),
+                    
+                        const SizedBox(height: 20),
+                    
+                        const Divider(),
+                    
+                        const SizedBox(height: 20),
+                    
+                        CheckboxListTile(
+                          title: const Text(
+                            "I certify that all information provided is accurate and complete. I agree to the CPA Network Terms of Service and Privacy Policy.",
+                            style: TextStyle(fontSize: 14),
+                          ),
+                          value: _termsAgreed,
+                          onChanged: (value) {
+                            setState(() {
+                              _termsAgreed = value ?? false;
+                            });
+                          },
+                          controlAffinity: ListTileControlAffinity.leading,
                         ),
-                        value: _termsAgreed,
-                        onChanged: (value) {
-                          setState(() {
-                            _termsAgreed = value ?? false;
-                          });
-                        },
-                        controlAffinity: ListTileControlAffinity.leading,
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      // Center(
-                      //   child: SizedBox(
-                      //     width: isDesktop ? 300 : double.infinity,
-                      //     child: AppButton(
-                      //       buttonText: "Submit Profile for Review",
-                      //       onTapFunction: _submitProfile,
-                      //       radius: 8,
-                      //       fontSize: 16,
-                      //       buttonColor: _termsAgreed ? null : Colors.grey,
-                      //     ),
-                      //   ),
-                      // ),
-                    ],
+                    
+                        const SizedBox(height: 30),
+                    
+                        // Center(
+                        //   child: SizedBox(
+                        //     width: isDesktop ? 300 : double.infinity,
+                        //     child: AppButton(
+                        //       buttonText: "Submit Profile for Review",
+                        //       onTapFunction: _submitProfile,
+                        //       radius: 8,
+                        //       fontSize: 16,
+                        //       buttonColor: _termsAgreed ? null : Colors.grey,
+                        //     ),
+                        //   ),
+                        // ),
+                      ],
+                    ),
                   ),
                 ),
               ],

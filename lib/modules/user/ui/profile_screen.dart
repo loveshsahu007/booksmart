@@ -162,22 +162,23 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextButton(
-              onPressed: _pickImage,
-              child: const Text('Change Profile Picture'),
-            ),
-            if (avatarImage != null)
-              TextButton(
-                onPressed: () {
-                  // remove selection & remote URL (if user wants to remove pic)
-                  setState(() {
-                    _profileImage = null;
-                    _profileImageBytes = null;
-                    _profileImageUrl = null;
-                  });
-                },
-                child: const Text('Remove'),
-              ),
+            IconButton(onPressed: _pickImage, icon: Icon(Icons.camera_alt)),
+            // TextButton(
+            //   onPressed: _pickImage,
+            //   child: const Text('Change Profile Picture'),
+            // ),
+            // if (avatarImage != null)
+            //   TextButton(
+            //     onPressed: () {
+            //       // remove selection & remote URL (if user wants to remove pic)
+            //       setState(() {
+            //         _profileImage = null;
+            //         _profileImageBytes = null;
+            //         _profileImageUrl = null;
+            //       });
+            //     },
+            //     child: const Text('Remove'),
+            //   ),
           ],
         ),
       ],

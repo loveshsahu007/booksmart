@@ -12,8 +12,8 @@ void showSaveCategoryDialog({
 
   customDialog(
     title: category == null ? 'Add Category' : 'Edit Category',
-    child: Container(
-      padding: EdgeInsets.all(8),
+    child: Padding(
+      padding: const EdgeInsets.all(8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -26,11 +26,10 @@ void showSaveCategoryDialog({
           AppButton(
             buttonText: category == null ? 'Add' : 'Update',
             onTapFunction: () {
-              if (textController.text.trim().isEmpty) return;
-              controller.saveCategory(
-                id: category?.id,
-                name: textController.text.trim(),
-              );
+              final name = textController.text.trim();
+              if (name.isEmpty) return;
+
+              controller.saveCategory(id: category?.id, name: name);
               Get.back();
             },
           ),
@@ -49,47 +48,69 @@ void showSubCategoryListDialog(
 
   customDialog(
     title: categoryName,
-    child: Obx(() {
-      return Container(
-        padding: EdgeInsets.all(8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ...controller.subCategories.map((sub) {
-              return ListTile(
-                title: AppText(sub.name),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => showSaveSubCategoryDialog(
-                        controller: controller,
-                        categoryId: categoryId,
-                        subCategory: sub,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () =>
-                          controller.deleteSubCategory(sub.id!, categoryId),
-                    ),
-                  ],
+    child: GetBuilder<CategoryAdminController>(
+      builder: (_) {
+        if (controller.subCategories.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const AppText('No sub-categories found'),
+                0.06.verticalSpace,
+                AppButton(
+                  buttonText: 'Add Sub-Category',
+                  onTapFunction: () => showSaveSubCategoryDialog(
+                    controller: controller,
+                    categoryId: categoryId,
+                  ),
                 ),
-              );
-            }),
-            0.06.verticalSpace,
-            AppButton(
-              buttonText: 'Add Sub-Category',
-              onTapFunction: () => showSaveSubCategoryDialog(
-                controller: controller,
-                categoryId: categoryId,
-              ),
+              ],
             ),
-          ],
-        ),
-      );
-    }),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ...controller.subCategories.map(
+                (sub) => ListTile(
+                  title: AppText(sub.name),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => showSaveSubCategoryDialog(
+                          controller: controller,
+                          categoryId: categoryId,
+                          subCategory: sub,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () =>
+                            controller.deleteSubCategory(sub.id, categoryId),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              0.06.verticalSpace,
+              AppButton(
+                buttonText: 'Add Sub-Category',
+                onTapFunction: () => showSaveSubCategoryDialog(
+                  controller: controller,
+                  categoryId: categoryId,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    ),
   );
 }
 
@@ -102,8 +123,8 @@ void showSaveSubCategoryDialog({
 
   customDialog(
     title: subCategory == null ? 'Add Sub-Category' : 'Edit Sub-Category',
-    child: Container(
-      padding: EdgeInsets.all(8),
+    child: Padding(
+      padding: const EdgeInsets.all(8),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -116,11 +137,13 @@ void showSaveSubCategoryDialog({
           AppButton(
             buttonText: subCategory == null ? 'Add' : 'Update',
             onTapFunction: () {
-              if (textController.text.trim().isEmpty) return;
+              final name = textController.text.trim();
+              if (name.isEmpty) return;
+
               controller.saveSubCategory(
                 id: subCategory?.id,
                 categoryId: categoryId,
-                name: textController.text.trim(),
+                name: name,
               );
               Get.back();
             },

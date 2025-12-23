@@ -25,6 +25,7 @@ class CategoryAdminController extends GetxController {
     } catch (e) {
       somethingWentWrongSnackbar();
     }
+    update();
   }
 
   Future<void> saveCategory({int? id, required String name}) async {
@@ -47,6 +48,7 @@ class CategoryAdminController extends GetxController {
     } catch (e) {
       somethingWentWrongSnackbar();
     }
+    update();
   }
 
   Future<void> deleteCategory(int id) async {
@@ -57,6 +59,7 @@ class CategoryAdminController extends GetxController {
     } catch (e) {
       somethingWentWrongSnackbar();
     }
+    update();
   }
 
   // ================= SUB CATEGORY =================
@@ -73,6 +76,7 @@ class CategoryAdminController extends GetxController {
     } catch (e) {
       somethingWentWrongSnackbar();
     }
+    update();
   }
 
   Future<void> saveSubCategory({
@@ -103,6 +107,7 @@ class CategoryAdminController extends GetxController {
     } catch (e) {
       somethingWentWrongSnackbar();
     }
+    update();
   }
 
   Future<void> deleteSubCategory(int id, int categoryId) async {
@@ -116,5 +121,6 @@ class CategoryAdminController extends GetxController {
     } catch (e) {
       somethingWentWrongSnackbar();
     }
+    update();
   }
 }
