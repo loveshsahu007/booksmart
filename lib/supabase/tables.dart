@@ -5,4 +5,5 @@ class SupabaseTable {
   static String transaction = 'transactions';
   static String category = 'category';
   static String subCategory = 'sub_category';
+  static String categoryRules = 'category_rules';
 }

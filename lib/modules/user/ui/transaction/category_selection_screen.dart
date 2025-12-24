@@ -143,7 +143,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
         tilePadding: const EdgeInsets.symmetric(horizontal: 5),
         onExpansionChanged: (expanded) {
           if (expanded) {
-            controller.fetchSubCategories(categoryId);
+            controller.getSubCategoriesByCategory(categoryId);
           }
         },
         children: [

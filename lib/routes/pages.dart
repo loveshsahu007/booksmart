@@ -24,7 +24,7 @@ import '../modules/admin/ui/categories_screen.dart';
 import '../modules/admin/ui/cpa_list_screen.dart';
 import '../modules/admin/ui/home/home_screen.dart';
 import '../modules/admin/ui/home/template/web_template.dart';
-import '../modules/admin/ui/user_list_screen.dart';
+import '../modules/admin/ui/widgets/user_list_screen.dart';
 import '../modules/common/ui/authentication/verify_email_screen.dart';
 import '../modules/common/ui/error_screen.dart';
 import '../modules/cpa/ui/earning_screen.dart';

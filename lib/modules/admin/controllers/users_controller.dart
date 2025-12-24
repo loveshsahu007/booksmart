@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:booksmart/services/crud_service.dart';
+import 'package:booksmart/supabase/tables.dart';
 import 'package:get/get.dart';
 import '../../../models/user_base_model.dart';
 
@@ -8,7 +9,7 @@ class AdminUsersController extends GetxController {
   final List<PersonModel> users = [];
   bool isLoading = false;
 
-  static const String table = 'users'; // or profiles/persons table
+  String table = SupabaseTable.user; // or profiles/persons table
 
   @override
   void onInit() {

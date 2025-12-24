@@ -1,80 +1,88 @@
 import 'package:booksmart/services/crud_service.dart';
+import 'package:booksmart/supabase/tables.dart';
 import 'package:get/get.dart';
 import '../../../models/category.dart';
 import '../../../widgets/snackbar.dart';
 import '../../common/controllers/auth_controller.dart';
 
 class CategoryAdminController extends GetxController {
-  final categories = <CategoryModel>[].obs;
-  final subCategories = <SubCategoryModel>[].obs;
+  final categories = <CategoryModel>[];
+  final subCategories = <SubCategoryModel>[];
 
   @override
   void onInit() {
-    fetchCategories();
+    fetchAll();
     super.onInit();
   }
 
-  Future<void> fetchCategories() async {
+  // ================= FETCH ALL =================
+
+  Future<void> fetchAll() async {
     try {
-      final res = await SupabaseCrudService.read(table: 'category');
-      categories.value = (res as List)
-          .map((e) => CategoryModel.fromJson(e))
-          .toList();
+      final categoryRes = await SupabaseCrudService.read(
+        table: SupabaseTable.category,
+      );
+
+      final subCategoryRes = await SupabaseCrudService.read(
+        table: SupabaseTable.subCategory,
+      );
+
+      categories
+        ..clear()
+        ..addAll((categoryRes as List).map((e) => CategoryModel.fromJson(e)));
+
+      subCategories
+        ..clear()
+        ..addAll(
+          (subCategoryRes as List).map((e) => SubCategoryModel.fromJson(e)),
+        );
     } catch (e) {
       somethingWentWrongSnackbar();
     }
     update();
   }
+
+  // ================= CATEGORY =================
 
   Future<void> saveCategory({int? id, required String name}) async {
     try {
       if (id == null) {
         await SupabaseCrudService.insert(
-          table: 'category',
-          data: {'name': name, 'added_by': authUser?.id},
+          table: SupabaseTable.category,
+          data: {'name': name, 'added_by': authAdmin?.id},
         );
         showSnackBar('Category added');
       } else {
         await SupabaseCrudService.update(
-          table: 'category',
+          table: SupabaseTable.category,
           data: {'name': name},
           filters: {'id': id},
         );
         showSnackBar('Category updated');
       }
-      fetchCategories();
+      fetchAll();
     } catch (e) {
       somethingWentWrongSnackbar();
     }
-    update();
   }
 
   Future<void> deleteCategory(int id) async {
     try {
-      await SupabaseCrudService.delete(table: 'category', filters: {'id': id});
+      await SupabaseCrudService.delete(
+        table: SupabaseTable.category,
+        filters: {'id': id},
+      );
       showSnackBar('Category deleted');
-      fetchCategories();
+      fetchAll();
     } catch (e) {
       somethingWentWrongSnackbar();
     }
-    update();
   }
 
   // ================= SUB CATEGORY =================
 
-  Future<void> fetchSubCategories(int categoryId) async {
-    try {
-      final res = await SupabaseCrudService.read(
-        table: 'sub_category',
-        filters: {'category_id': categoryId},
-      );
-      subCategories.value = (res as List)
-          .map((e) => SubCategoryModel.fromJson(e))
-          .toList();
-    } catch (e) {
-      somethingWentWrongSnackbar();
-    }
-    update();
+  List<SubCategoryModel> getSubCategoriesByCategory(int categoryId) {
+    return subCategories.where((e) => e.categoryId == categoryId).toList();
   }
 
   Future<void> saveSubCategory({
@@ -85,40 +93,55 @@ class CategoryAdminController extends GetxController {
     try {
       if (id == null) {
         await SupabaseCrudService.insert(
-          table: 'sub_category',
+          table: SupabaseTable.subCategory,
           data: {
             'category_id': categoryId,
             'name': name,
-            'added_by': authUser?.id,
+            'added_by': authAdmin?.id,
           },
         );
         showSnackBar('Sub-category added');
       } else {
         await SupabaseCrudService.update(
-          table: 'sub_category',
+          table: SupabaseTable.subCategory,
           data: {'name': name},
           filters: {'id': id},
         );
         showSnackBar('Sub-category updated');
       }
-      fetchSubCategories(categoryId);
+      fetchAll();
     } catch (e) {
       somethingWentWrongSnackbar();
     }
-    update();
   }
 
-  Future<void> deleteSubCategory(int id, int categoryId) async {
+  Future<void> deleteSubCategory(int id) async {
     try {
       await SupabaseCrudService.delete(
-        table: 'sub_category',
+        table: SupabaseTable.subCategory,
         filters: {'id': id},
       );
       showSnackBar('Sub-category deleted');
-      fetchSubCategories(categoryId);
+      fetchAll();
     } catch (e) {
       somethingWentWrongSnackbar();
     }
-    update();
+  }
+
+  String getCategoryName(int id) {
+    try {
+      return categories.firstWhere((c) => c.id == id).name;
+    } catch (_) {
+      return '-';
+    }
+  }
+
+  String getSubCategoryName(int? id) {
+    if (id == null) return '-';
+    try {
+      return subCategories.firstWhere((s) => s.id == id).name;
+    } catch (_) {
+      return '-';
+    }
   }
 }

@@ -43,14 +43,14 @@ void showSubCategoryListDialog(
   CategoryAdminController controller,
   int categoryId,
   String categoryName,
-) async {
-  await controller.fetchSubCategories(categoryId);
-
+) {
   customDialog(
     title: categoryName,
     child: GetBuilder<CategoryAdminController>(
       builder: (_) {
-        if (controller.subCategories.isEmpty) {
+        final subCategories = controller.getSubCategoriesByCategory(categoryId);
+
+        if (subCategories.isEmpty) {
           return Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -75,7 +75,7 @@ void showSubCategoryListDialog(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ...controller.subCategories.map(
+              ...subCategories.map(
                 (sub) => ListTile(
                   title: AppText(sub.name),
                   trailing: Row(
@@ -91,8 +91,7 @@ void showSubCategoryListDialog(
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () =>
-                            controller.deleteSubCategory(sub.id, categoryId),
+                        onPressed: () => controller.deleteSubCategory(sub.id),
                       ),
                     ],
                   ),
