@@ -1,8 +1,8 @@
 import 'package:booksmart/services/crud_service.dart';
 import 'package:get/get.dart';
-import '../models/category.dart';
-import '../widgets/snackbar.dart';
-import '../controllers/auth_controller.dart';
+import '../../../models/category.dart';
+import '../../../widgets/snackbar.dart';
+import '../../common/controllers/auth_controller.dart';
 
 class CategoryAdminController extends GetxController {
   final categories = <CategoryModel>[].obs;

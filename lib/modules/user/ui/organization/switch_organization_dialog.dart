@@ -1,4 +1,4 @@
-import 'package:booksmart/controllers/organization_controller.dart';
+import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';

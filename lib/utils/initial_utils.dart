@@ -3,8 +3,8 @@ import 'package:booksmart/modules/common/providers/user_profile_provider.dart';
 import 'package:booksmart/routes/pages.dart';
 import 'package:get/get.dart';
 
-import '../controllers/auth_controller.dart';
-import '../controllers/organization_controller.dart';
+import '../modules/common/controllers/auth_controller.dart';
+import '../modules/user/controllers/organization_controller.dart';
 import '../models/organization_model.dart';
 import '../modules/common/providers/auth_provider.dart';
 import '../modules/user/providers/organization_provider.dart';

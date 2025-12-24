@@ -7,7 +7,7 @@ import 'package:booksmart/modules/user/ui/sponsored_offers/sponsored_offers_scre
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../../controllers/auth_controller.dart';
+import '../../../common/controllers/auth_controller.dart';
 import '../../../../helpers/name_initial_helper.dart';
 import '../../../../routes/routes.dart';
 import '../../../../widgets/app_text.dart';

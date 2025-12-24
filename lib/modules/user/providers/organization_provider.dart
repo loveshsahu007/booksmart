@@ -1,4 +1,4 @@
-import 'package:booksmart/controllers/auth_controller.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/models/organization_model.dart';
 
 import '../../../services/crud_service.dart';

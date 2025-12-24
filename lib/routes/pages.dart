@@ -1,8 +1,8 @@
 import 'dart:developer';
 
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/auth_controller.dart';
-import 'package:booksmart/controllers/organization_controller.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
+import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/modules/cpa/ui/chat_list_screen.dart';
 import 'package:booksmart/modules/cpa/ui/profile_screen.dart';

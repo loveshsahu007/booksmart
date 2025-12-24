@@ -1,5 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/organization_controller.dart';
+import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'package:booksmart/widgets/confirmation_dialog.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';

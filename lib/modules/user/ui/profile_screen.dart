@@ -1,7 +1,7 @@
 import 'dart:developer';
 
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/auth_controller.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/modules/common/providers/user_profile_provider.dart';
 import 'package:booksmart/services/storage_service.dart';
 import 'package:booksmart/supabase/buckets.dart';

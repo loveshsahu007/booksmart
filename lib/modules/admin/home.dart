@@ -1,9 +1,9 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/admin_user_controller.dart';
+import 'package:booksmart/modules/admin/controllers/users_controller.dart';
 import 'package:booksmart/modules/admin/user_list.dart';
 import 'package:get/get.dart';
 
-import '../../controllers/category_controler.dart';
+import 'controllers/category_controler.dart';
 import 'category_dialogs.dart';
 
 class AdminDashboard extends StatelessWidget {

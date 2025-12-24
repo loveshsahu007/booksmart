@@ -1,7 +1,7 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/auth_controller.dart';
-import 'package:booksmart/controllers/organization_controller.dart';
-import 'package:booksmart/controllers/transaction_controller.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
+import 'package:booksmart/modules/user/controllers/organization_controller.dart';
+import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/modules/user/ui/transaction/category_selection_screen.dart';
 import 'package:booksmart/widgets/snackbar.dart';

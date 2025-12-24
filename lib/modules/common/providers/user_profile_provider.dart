@@ -1,6 +1,6 @@
 import 'dart:developer';
 
-import 'package:booksmart/controllers/auth_controller.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/widgets/loading.dart';
 

@@ -1,12 +1,12 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/auth_controller.dart';
-import 'package:booksmart/controllers/banks_controller.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
+import 'package:booksmart/modules/user/controllers/bank_controller.dart';
 import 'package:booksmart/models/bank_model.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
-import '../../../../controllers/organization_controller.dart';
+import '../../controllers/organization_controller.dart';
 
 class AddBankDialog extends StatefulWidget {
   final BankModel? bankToEdit;

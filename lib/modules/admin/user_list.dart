@@ -1,5 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/admin_user_controller.dart';
+import 'package:booksmart/modules/admin/controllers/users_controller.dart';
 import 'package:get/get.dart';
 
 import '../../models/user_base_model.dart';

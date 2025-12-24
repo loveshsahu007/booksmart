@@ -1,12 +1,12 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/transaction_controller.dart';
+import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/modules/user/ui/bulk_review/bulk_review_screen.dart';
 import 'package:booksmart/modules/user/ui/transaction/add_transaction_manual.dart';
 import 'package:booksmart/widgets/date_range_picker.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:get/get.dart';
-import '../../../../controllers/organization_controller.dart';
+import '../../controllers/organization_controller.dart';
 import '../../../../widgets/custom_drop_down.dart';
 import '../../../../widgets/custom_dialog.dart';
 

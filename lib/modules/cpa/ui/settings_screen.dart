@@ -1,4 +1,4 @@
-import 'package:booksmart/controllers/auth_controller.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/routes/routes.dart';

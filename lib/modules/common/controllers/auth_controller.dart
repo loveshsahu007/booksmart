@@ -1,7 +1,7 @@
 import 'package:get/get.dart';
 
-import '../models/user_base_model.dart';
-import '../modules/common/providers/user_profile_provider.dart';
+import '../../../models/user_base_model.dart';
+import '../providers/user_profile_provider.dart';
 
 PersonModel? get authPerson {
   try {

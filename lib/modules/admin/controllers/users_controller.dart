@@ -2,7 +2,7 @@ import 'dart:developer';
 
 import 'package:booksmart/services/crud_service.dart';
 import 'package:get/get.dart';
-import '../models/user_base_model.dart';
+import '../../../models/user_base_model.dart';
 
 class AdminUsersController extends GetxController {
   final List<PersonModel> users = [];

@@ -11,7 +11,7 @@ import 'package:path/path.dart' as path;
 import 'package:jiffy/jiffy.dart';
 
 import '../../../constant/data.dart';
-import '../../../controllers/auth_controller.dart';
+import '../../common/controllers/auth_controller.dart';
 import '../../../models/user_base_model.dart';
 
 class ProfileScreenCPA extends StatefulWidget {
@@ -738,19 +738,19 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                 Step(
                   title: const Text("Verification & Agreement"),
                   isActive: _currentStep >= 2,
-               content: Form(
-  key: _verificationFormKey,
+                  content: Form(
+                    key: _verificationFormKey,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildDocumentUploadSection(),
-                    
+
                         const SizedBox(height: 20),
-                    
+
                         const Divider(),
-                    
+
                         const SizedBox(height: 20),
-                    
+
                         CheckboxListTile(
                           title: const Text(
                             "I certify that all information provided is accurate and complete. I agree to the CPA Network Terms of Service and Privacy Policy.",
@@ -764,9 +764,9 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                           },
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
-                    
+
                         const SizedBox(height: 30),
-                    
+
                         // Center(
                         //   child: SizedBox(
                         //     width: isDesktop ? 300 : double.infinity,

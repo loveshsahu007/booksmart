@@ -1,5 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/controllers/banks_controller.dart';
+import 'package:booksmart/modules/user/controllers/bank_controller.dart';
 import 'package:booksmart/models/bank_model.dart';
 import 'package:booksmart/modules/user/ui/bank/add_bank_screen.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';

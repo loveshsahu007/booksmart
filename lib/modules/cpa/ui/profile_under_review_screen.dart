@@ -1,7 +1,7 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:get/get.dart';
 
-import '../../../controllers/auth_controller.dart';
+import '../../common/controllers/auth_controller.dart';
 import '../../../models/user_base_model.dart';
 
 class ProfileUnderReviewScreenCPA extends StatefulWidget {

@@ -1,5 +1,5 @@
 import 'dart:developer';
-import 'package:booksmart/controllers/organization_controller.dart';
+import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';
