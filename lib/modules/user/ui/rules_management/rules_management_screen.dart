@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:booksmart/widgets/app_text.dart';
 import 'package:booksmart/widgets/app_text_field.dart';
@@ -113,7 +114,7 @@ class _RulesManagementScreenState extends State<RulesManagementScreen> {
     final isMobile = MediaQuery.of(context).size.width < 600;
 
     return Scaffold(
-      appBar: AppBar(title: Text("Rules Management")),
+      appBar: kIsWeb ? null : AppBar(title: Text("Rules Management")),
       backgroundColor: Get.theme.colorScheme.surface,
       body: Padding(
         padding: const EdgeInsets.all(16),

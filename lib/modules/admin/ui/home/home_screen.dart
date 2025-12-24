@@ -1,18 +1,14 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/modules/user/ui/home/template/web_template.dart';
+import 'package:booksmart/modules/admin/ui/categories_screen.dart';
+import 'package:booksmart/modules/admin/ui/cpa_list_screen.dart';
+import 'package:booksmart/modules/admin/ui/dashboard_screen.dart';
+import 'package:booksmart/modules/admin/ui/user_list_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
-import '../../../common/components/drawer_item_widget.dart';
-import '../ai_strategy_screen.dart';
-import '../cpa/dashboard_screen.dart';
-import '../dashboard/dashboard_screen.dart';
-import '../financial_statement/financial_statement.dart';
-import '../organization/switch_organization_dialog.dart';
-import '../tax_filling/tax_filling.dart';
-import '../token/earn_tokens_screen.dart';
+import 'template/web_template.dart';
 
-class BottomNavController extends GetxController {
+class BottomNavControllerAdmin extends GetxController {
   var currentIndex = 0.obs;
 
   void changePage(int index) {
@@ -21,47 +17,31 @@ class BottomNavController extends GetxController {
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class HomeScreenAdmin extends StatefulWidget {
+  const HomeScreenAdmin({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreenAdmin> createState() => _HomeScreenAdminState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  BottomNavController controller = Get.put(BottomNavController());
+class _HomeScreenAdminState extends State<HomeScreenAdmin> {
+  BottomNavControllerAdmin controller = Get.put(BottomNavControllerAdmin());
 
   final List<Map<String, dynamic>> _navItems = const [
-    {'icon': Icons.home, 'label': 'Home'},
-    {'icon': Icons.lightbulb, 'label': 'AI Tax Strategies'},
-    {'icon': Icons.assessment, 'label': 'Reports'},
-    {'icon': Icons.receipt, 'label': 'Tax Filing'},
-    {'icon': Icons.person_pin_circle, 'label': 'CPA Network'},
-    {'icon': Icons.account_balance_wallet, 'label': 'Wallet'},
+    {'icon': Icons.home, 'label': 'Dashboard'},
+    {'icon': Icons.assessment, 'label': 'Users'},
+    {'icon': Icons.business_outlined, 'label': 'CPAs'},
+    {'icon': Icons.category_outlined, 'label': 'Categories'},
   ];
 
   final List<Widget> _pages = [
-    DashboardScreen(),
-    AiStrategyScreen(),
-    FinancialReportPage(),
-    TexFillingSceen(),
-    CpaNetworkScreen(),
-    EarnTokensScreen(),
+    AdminDashboardScreen(),
+    UserListScreen(),
+    CpaListScreenAdmin(),
+    AdminCategoriesScreen(),
   ];
 
-  List<String?> pageTitles = [
-    null,
-    "AI Tax Strategies",
-    "Financial Reports",
-    "Tax Filing",
-    "CPA Network",
-    "Wallet",
-  ];
-  FinincialTabController finincialTabController = Get.put(
-    FinincialTabController(),
-  );
-
-  TaxTabController taxTabController = Get.put(TaxTabController());
+  List<String?> pageTitles = [null, "Users", "CPAs", "Categories"];
 
   @override
   Widget build(BuildContext context) {
@@ -74,13 +54,14 @@ class _HomeScreenState extends State<HomeScreen> {
         : AppColorsLight.surface;
 
     if (kIsWeb) {
-      return WebTemplate(child: DashboardScreen());
+      return WebTemplateAdmin(child: AdminDashboardScreen());
     } else {
-      return GetBuilder<BottomNavController>(
+      return GetBuilder<BottomNavControllerAdmin>(
         builder: (controller) {
           String? title = pageTitles[controller.currentIndex.value];
           return Scaffold(
             extendBody: false,
+            backgroundColor: colorScheme.surface,
             appBar: AppBar(
               leadingWidth: 45,
               centerTitle: false,
@@ -93,10 +74,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     )
                   : Text(title),
-
               actions: [
                 IconButton(
-                  onPressed: () => Get.toNamed(Routes.settings),
+                  onPressed: () => Get.toNamed(Routes.cpaSettings),
                   icon: Icon(Icons.settings, color: colorScheme.onSurface),
                 ),
               ],
@@ -121,47 +101,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Text("Organization 1"),
                             ],
                           ),
                         ],
                       ),
                     ),
                     Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          children: [
-                            DrawerItemWidget(
-                              title: "Switch Organization",
-                              onTap: () {
-                                showSwitchOrganizationDialog();
-                              },
-                              trallingIcon: Icons.swap_horiz_outlined,
-                            ),
-
-                            DrawerItemWidget(
-                              title: "AI Chat",
-                              onTap: () {
-                                Get.toNamed(Routes.aiChat);
-                              },
-                            ),
-                            DrawerItemWidget(
-                              title: "Subscription",
-                              onTap: () {
-                                Get.toNamed(Routes.subscription);
-                              },
-                            ),
-                            DrawerItemWidget(
-                              title: "Chat",
-                              onTap: () {
-                                Get.toNamed(Routes.chat);
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
+                      child: SingleChildScrollView(child: Column(children: [])),
                     ),
-                    AppText("V 1.0.0", fontSize: 12, color: Colors.grey),
+                    Divider(),
+                    AppText("V 1.0.0", fontSize: 16),
                   ],
                 ),
               ),
@@ -194,12 +143,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: InkWell(
                         onTap: () => controller.changePage(index),
                         borderRadius: BorderRadius.circular(15),
-                        child: Icon(
-                          _navItems[index]['icon'],
-                          size: 25,
-                          color: isSelected
-                              ? Colors.white
-                              : colorScheme.onSurface.withValues(alpha: 0.7),
+                        child: Center(
+                          child: Icon(
+                            _navItems[index]['icon'],
+                            size: 25,
+                            color: isSelected
+                                ? Colors.white
+                                : colorScheme.onSurface.withValues(alpha: 0.7),
+                          ),
                         ),
                       ),
                     ),

@@ -27,10 +27,18 @@ CpaModel? get authCpa {
   }
 }
 
+AdminModel? get authAdmin {
+  try {
+    return Get.find<AuthController>().admin;
+  } catch (_) {
+    return null;
+  }
+}
+
 AuthController get authController => Get.find<AuthController>();
 
 class AuthController extends GetxController {
-  /// either UserModel or CpaModel
+  /// either UserModel/CpaModel/AdminModel
   Rx<dynamic> rxUser = Rx<dynamic>(null);
 
   Rx<PersonModel?> rxPersonModel = Rx<PersonModel?>(null);
@@ -38,6 +46,7 @@ class AuthController extends GetxController {
 
   UserModel get user => rxUser.value as UserModel;
   CpaModel get cpa => rxUser.value as CpaModel;
+  AdminModel get admin => rxUser.value as AdminModel;
 
   AuthController({required Map<String, dynamic> userJson}) {
     _initilizeUser(userJson, shouldUpdate: false);
@@ -53,6 +62,8 @@ class AuthController extends GetxController {
       rxUser.value = UserModel.fromJson(userJson);
     } else if (person?.role == UserRole.cpa) {
       rxUser.value = CpaModel.fromJson(userJson);
+    } else if (person?.role == UserRole.admin) {
+      rxUser.value = AdminModel.fromJson(userJson);
     }
     if (shouldUpdate) {
       update();

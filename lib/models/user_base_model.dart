@@ -2,6 +2,7 @@ import '../helpers/json_helper.dart';
 
 part 'user_model.dart';
 part 'cpa_model.dart';
+part 'admin_model.dart';
 
 enum UserRole { user, cpa, admin }
 

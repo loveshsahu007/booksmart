@@ -16,10 +16,14 @@ class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _emailController = TextEditingController(
-    text: "shahzadqaisarkhan@gmail.com",
+    text: isDevelopmentMode ? "shahzadqaisarkhan@gmail.com" : null,
   );
-  final _passwordController = TextEditingController(text: "Sp17bcs052@");
-  final _confirmPasswordController = TextEditingController(text: "Sp17bcs052@");
+  final _passwordController = TextEditingController(
+    text: isDevelopmentMode ? "Sp17bcs052@" : null,
+  );
+  final _confirmPasswordController = TextEditingController(
+    text: isDevelopmentMode ? "Sp17bcs052@" : null,
+  );
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;

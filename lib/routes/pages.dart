@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/modules/admin/ui/settings_screen.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
@@ -19,6 +20,11 @@ import 'package:booksmart/utils/initial_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../models/user_base_model.dart';
+import '../modules/admin/ui/categories_screen.dart';
+import '../modules/admin/ui/cpa_list_screen.dart';
+import '../modules/admin/ui/home/home_screen.dart';
+import '../modules/admin/ui/home/template/web_template.dart';
+import '../modules/admin/ui/user_list_screen.dart';
 import '../modules/common/ui/authentication/verify_email_screen.dart';
 import '../modules/common/ui/error_screen.dart';
 import '../modules/cpa/ui/earning_screen.dart';
@@ -65,8 +71,12 @@ class AppPages {
     ),
     GetPage(
       name: Routes.rulesManagement,
-      page: () =>
-          getRequiredScreen(const RulesManagementScreen(), UserRole.user),
+      page: () => getRequiredScreen(
+        kIsWeb
+            ? WebTemplate(child: RulesManagementScreen())
+            : RulesManagementScreen(),
+        UserRole.user,
+      ),
     ),
     GetPage(
       name: Routes.subscription,
@@ -205,6 +215,50 @@ class AppPages {
       page: () =>
           getRequiredScreen(ProfileUnderReviewScreenCPA(), UserRole.cpa),
     ),
+
+    /*
+      =====
+      ===== ADMIN MODULE ROUTES
+      ===== 
+    */
+    GetPage(
+      name: Routes.adminHome,
+      page: () => getRequiredScreen(HomeScreenAdmin(), UserRole.admin),
+    ),
+    GetPage(
+      name: Routes.adminUsers,
+      page: () => getRequiredScreen(
+        kIsWeb ? WebTemplateAdmin(child: UserListScreen()) : UserListScreen(),
+        UserRole.admin,
+      ),
+    ),
+    GetPage(
+      name: Routes.adminCPAs,
+      page: () => getRequiredScreen(
+        kIsWeb
+            ? WebTemplateAdmin(child: CpaListScreenAdmin())
+            : CpaListScreenAdmin(),
+        UserRole.admin,
+      ),
+    ),
+    GetPage(
+      name: Routes.adminCategories,
+      page: () => getRequiredScreen(
+        kIsWeb
+            ? WebTemplateAdmin(child: AdminCategoriesScreen())
+            : AdminCategoriesScreen(),
+        UserRole.admin,
+      ),
+    ),
+    GetPage(
+      name: Routes.adminSettings,
+      page: () => getRequiredScreen(
+        kIsWeb
+            ? WebTemplateAdmin(child: SettingsScreenAdmin())
+            : SettingsScreenAdmin(),
+        UserRole.admin,
+      ),
+    ),
   ];
 }
 
@@ -267,7 +321,9 @@ String getHomeScreenRoute() {
       return Routes.userHome;
     case UserRole.cpa:
       return Routes.cpaHome;
+    case UserRole.admin:
+      return Routes.adminHome;
     default:
-      return Routes.userHome;
+      return "---error---";
   }
 }

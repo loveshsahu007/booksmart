@@ -1,30 +1,26 @@
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
-import 'package:booksmart/modules/user/ui/bank/bank_list_screen.dart';
-import 'package:booksmart/modules/user/ui/financial_statement/document_repository_screen.dart';
-import 'package:booksmart/modules/user/ui/organization/organization_list_screen.dart';
-import 'package:booksmart/modules/user/ui/sponsored_offers/sponsored_offers_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../../../common/controllers/auth_controller.dart';
-import '../../../../helpers/name_initial_helper.dart';
-import '../../../../routes/routes.dart';
 import '../../../../widgets/app_text.dart';
 
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+class SettingsScreenAdmin extends StatefulWidget {
+  const SettingsScreenAdmin({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<SettingsScreenAdmin> createState() => _SettingsScreenAdminState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool _autoReviewResults = true;
-  bool _proTips = true;
+class _SettingsScreenAdminState extends State<SettingsScreenAdmin> {
   bool _isDarkMode = Get.isDarkMode;
+  AdminModel? admin = authAdmin;
 
-  UserModel? user = authUser;
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,20 +35,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Profile section
           Obx(() {
-            // here use RX ersion, required by OBX
             if (authController.rxUser.value == null) {
               return SizedBox();
             }
+
             return Material(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(10),
               child: InkWell(
-                onTap: () {
-                  Get.toNamed(Routes.userProfile);
-                },
-                borderRadius: BorderRadius.circular(10),
                 child: Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -72,7 +63,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         radius: 26,
                         backgroundColor: colorScheme.primary,
                         child: AppText(
-                          getNameInitials(user!.firstName, user!.lastName),
+                          admin!.firstName[0] + admin!.lastName[0],
                           color: Colors.white,
                           fontSize: 14,
                         ),
@@ -82,12 +73,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           AppText(
-                            "${user?.firstName} ${user?.lastName}",
+                            "${admin?.firstName} ${admin?.lastName}",
                             fontSize: 18,
+                            fontWeight: FontWeight.w600,
                             color: colorScheme.onSurface,
                           ),
                           AppText(
-                            user?.email ?? "your@email.com",
+                            admin?.email ?? "---",
                             color: colorScheme.onSurface.withValues(alpha: 0.7),
                             fontSize: 14,
                           ),
@@ -104,89 +96,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           ListTile(
             title: AppText("Notifications", fontSize: 14),
-            trailing: Icon(Icons.chevron_right, size: 22),
+            trailing: Icon(Icons.chevron_right, size: 14),
             onTap: () {},
           ),
+
           const SizedBox(height: 10),
 
           SwitchListTile.adaptive(
-            title: AppText(
-              "Auto Review Results",
-              fontSize: 14,
-              color: colorScheme.onSurface,
-            ),
-            value: _autoReviewResults,
-            onChanged: (value) {
-              setState(() => _autoReviewResults = value);
-            },
-            activeThumbColor: colorScheme.primary,
-          ),
-          const SizedBox(height: 10),
-
-          SwitchListTile.adaptive(
-            title: AppText(
-              "Pro Tips",
-              fontSize: 14,
-              color: colorScheme.onSurface,
-            ),
-            value: _proTips,
-            onChanged: (value) {
-              setState(() => _proTips = value);
-            },
-            activeThumbColor: colorScheme.primary,
-          ),
-          const SizedBox(height: 10),
-
-          SwitchListTile.adaptive(
-            title: AppText(
-              "Dark Mode",
-              fontSize: 14,
-              color: colorScheme.onSurface,
-            ),
+            title: AppText("Dark Mode", fontSize: 14),
             value: _isDarkMode,
             onChanged: (value) {
-              setState(() {
-                _isDarkMode = value;
-              });
+              setState(() => _isDarkMode = value);
               Get.changeThemeMode(value ? ThemeMode.dark : ThemeMode.light);
             },
             activeThumbColor: colorScheme.primary,
           ),
+
           const SizedBox(height: 10),
 
-          buildTile("Category Rules", () {
-            Get.toNamed(Routes.rulesManagement);
-          }),
-          const SizedBox(height: 10),
-
-          buildTile("Documents Repository", () {
-            goToDocumentRepositoryScreen(shouldCloseBefore: false);
-          }),
-          const SizedBox(height: 10),
-
-          buildTile("Sponsored Offers", () {
-            goToSponsoredOffersScreen(shouldCloseBefore: false);
-          }),
-          const SizedBox(height: 10),
-
-          buildTile("Organizations", () {
-            goToOrganizationListScreen();
-          }),
-          const SizedBox(height: 10),
-
-          buildTile("Banks", () {
-            goToBanksListScreen(shouldCloseBefore: false);
-          }),
-          const SizedBox(height: 10),
-
-          buildTile("Delete Account", () {}, isDestructive: false),
+          buildTile("Delete Account", () {}, isDestructive: true),
           const SizedBox(height: 10),
 
           buildTile("Logout", () {
             logOut();
           }, isDestructive: true),
-
-          const SizedBox(height: 100),
         ],
       ),
     );
@@ -205,13 +138,7 @@ ListTile buildTile(
       fontSize: 14,
       color: isDestructive ? colorScheme.error : colorScheme.onSurface,
     ),
-    trailing: Icon(
-      Icons.chevron_right,
-      color: isDestructive
-          ? colorScheme.error
-          : colorScheme.onSurface.withValues(alpha: 0.7),
-      size: 20,
-    ),
+    trailing: Icon(Icons.chevron_right, size: 20),
     onTap: onTap,
   );
 }

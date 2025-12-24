@@ -14,8 +14,6 @@ class CategoryAdminController extends GetxController {
     super.onInit();
   }
 
-  // ================= CATEGORY =================
-
   Future<void> fetchCategories() async {
     try {
       final res = await SupabaseCrudService.read(table: 'category');

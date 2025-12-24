@@ -6,8 +6,8 @@ import 'package:get/get.dart';
 import 'controllers/category_controler.dart';
 import 'category_dialogs.dart';
 
-class AdminDashboard extends StatelessWidget {
-  AdminDashboard({super.key});
+class TempAdminDashboard extends StatelessWidget {
+  TempAdminDashboard({super.key});
 
   final CategoryAdminController categoryController = Get.put(
     CategoryAdminController(),

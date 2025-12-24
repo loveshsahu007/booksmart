@@ -44,4 +44,18 @@ abstract class Routes {
   static const String cpaSettings = '/cpa/settings';
   static const String cpaProfile = '/cpa/profile';
   static const String cpaProfileUnderReview = '/cpa/profile-under-review';
+
+  /// ====
+  /// =====
+  /// ======
+  /// Admin MODULE ROUTES
+  /// ======
+  /// =====
+  /// ====
+
+  static const String adminHome = '/admin/';
+  static const String adminUsers = '/admin/users';
+  static const String adminCPAs = '/admin/cpas';
+  static const String adminCategories = '/admin/categories';
+  static const String adminSettings = '/admin/settings';
 }
