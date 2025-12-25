@@ -2,7 +2,7 @@ import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/modules/admin/ui/categories_screen.dart';
 import 'package:booksmart/modules/admin/ui/cpa_list_screen.dart';
 import 'package:booksmart/modules/admin/ui/dashboard_screen.dart';
-import 'package:booksmart/modules/admin/ui/widgets/user_list_screen.dart';
+import 'package:booksmart/modules/admin/ui/user_list_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 

@@ -1,4 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
@@ -58,8 +59,8 @@ class _AddTransactionScreenManualState
   final _formKey = GlobalKey<FormState>();
   final TransactionController transactionC = Get.find();
 
-  String? _selectedCategory;
-  String? _selectedSubcategory;
+  int? _selectedCategory;
+  int? _selectedSubcategory;
   bool deductible = false;
   XFile? _selectedFile;
   String _selectedType = "Personal"; // Add this to track the selected type
@@ -70,10 +71,16 @@ class _AddTransactionScreenManualState
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
   final typeDropdownKey = GlobalKey<DropdownSearchState<String>>();
-
+  late CategoryAdminController categoryController;
   @override
   void initState() {
     super.initState();
+    if (Get.isRegistered<CategoryAdminController>()) {
+      categoryController = Get.find<CategoryAdminController>();
+    } else {
+      categoryController = Get.put(CategoryAdminController(), permanent: true);
+    }
+
     if (widget.transaction != null) {
       updateData();
     }
@@ -116,12 +123,13 @@ class _AddTransactionScreenManualState
       selectedCategory: _selectedCategory,
       selectedSubcategory: _selectedSubcategory,
     );
-    if (result != null) {
-      setState(() {
-        _selectedCategory = result.keys.first;
-        _selectedSubcategory = result.values.first;
-      });
-    }
+
+    if (result == null) return;
+
+    setState(() {
+      _selectedCategory = result['categoryId'] as int;
+      _selectedSubcategory = result['subcategoryId'] as int;
+    });
   }
 
   Future<void> _attachReceipt() async {
@@ -165,6 +173,7 @@ class _AddTransactionScreenManualState
         id: widget.transaction?.id ?? 0,
       );
     }
+    updateData();
   }
 
   @override
@@ -227,7 +236,7 @@ class _AddTransactionScreenManualState
                 child: Text(
                   _selectedCategory == null
                       ? "Select Category"
-                      : "$_selectedCategory: $_selectedSubcategory",
+                      : "${categoryController.getCategoryName(_selectedCategory ?? 1)}: ${categoryController.getSubCategoryName(_selectedSubcategory ?? 1)}",
                 ),
               ),
             ),

@@ -1,4 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/modules/user/ui/bulk_review/bulk_review_screen.dart';
@@ -35,10 +36,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     if (searchQuery.isNotEmpty) {
       filtered = filtered
           .where(
-            (t) =>
-                t.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
-                t.category.toLowerCase().contains(searchQuery.toLowerCase()) ||
-                t.subcategory.toLowerCase().contains(searchQuery.toLowerCase()),
+            (t) => t.title.toLowerCase().contains(searchQuery.toLowerCase()),
           )
           .toList();
     }
@@ -225,7 +223,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
       searchQuery.isNotEmpty;
 
   late TransactionController transactionC;
-
+  late CategoryAdminController categoryController;
   @override
   void initState() {
     if (Get.isRegistered<TransactionController>()) {
@@ -237,6 +235,15 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
         TransactionController(),
         tag: getCurrentOrganization!.id.toString(),
       );
+
+      if (Get.isRegistered<CategoryAdminController>()) {
+        categoryController = Get.find<CategoryAdminController>();
+      } else {
+        categoryController = Get.put(
+          CategoryAdminController(),
+          permanent: true,
+        );
+      }
     }
     super.initState();
   }
@@ -320,26 +327,35 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                             child: ListTile(
                               title: AppText(
                                 t.title,
-                                fontSize: 14,
+                                fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   AppText(
-                                    "${t.date} • ${t.category}",
+                                    "${categoryController.getCategoryName(t.category)} • ${categoryController.getSubCategoryName(t.subcategory)}",
                                     fontSize: 12,
                                   ),
                                   AppText(
-                                    "${t.type} • ${t.deductible ? "Deductible" : ""}",
+                                    "Type : ${t.type} • ${t.deductible ? "Deductible" : ""}",
                                     fontSize: 11,
                                   ),
                                 ],
                               ),
-                              trailing: AppText(
-                                "\$${t.amount.toStringAsFixed(2)}",
-                                color: amountColor,
-                                fontWeight: FontWeight.bold,
+                              trailing: Column(
+                                children: [
+                                  AppText(
+                                    t.date,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  AppText(
+                                    "\$${t.amount.toStringAsFixed(2)}",
+                                    color: amountColor,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ],
                               ),
                             ),
                           ),

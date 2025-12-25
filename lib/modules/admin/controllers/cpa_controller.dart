@@ -5,8 +5,8 @@ import 'package:booksmart/supabase/tables.dart';
 import 'package:get/get.dart';
 import '../../../models/user_base_model.dart';
 
-class AdminUsersController extends GetxController {
-  final List<PersonModel> users = [];
+class AdminCpaController extends GetxController {
+  final List<CpaModel> cpas = [];
   bool isLoading = false;
 
   String table = SupabaseTable.user; // or profiles/persons table
@@ -25,15 +25,15 @@ class AdminUsersController extends GetxController {
       final result = await SupabaseCrudService.read(
         table: table,
         filters: {
-          'role': 'user', // 👈 ONLY fetch users with role = user
+          'role': 'cpa', // 👈 ONLY fetch users with role = user
         },
       );
 
-      users.clear();
+      cpas.clear();
 
       if (result is List) {
         for (final json in result) {
-          users.add(PersonModel.fromJson(json));
+          cpas.add(CpaModel.fromJson(json));
         }
       }
     } catch (e, s) {
@@ -43,6 +43,27 @@ class AdminUsersController extends GetxController {
     } finally {
       isLoading = false;
       update();
+    }
+  }
+
+  Future<void> updateVerificationStatus({
+    required int cpaId,
+    required CpaVerificationStatus status,
+  }) async {
+    try {
+      await SupabaseCrudService.update(
+        table: table,
+        data: {'verification_status': status.name},
+        filters: {'id': cpaId},
+      );
+
+      // refresh list
+      await fetchUsers();
+      update();
+    } catch (e, s) {
+      log('❌ updateVerificationStatus error');
+      log(e.toString());
+      log(s.toString());
     }
   }
 }

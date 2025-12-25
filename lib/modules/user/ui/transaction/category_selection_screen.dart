@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 Future<dynamic> goToCategorySelectionScreen({
-  String? selectedCategory,
-  String? selectedSubcategory,
+  int? selectedCategory,
+  int? selectedSubcategory,
 }) async {
   if (kIsWeb) {
     return customDialog(
@@ -27,8 +27,8 @@ Future<dynamic> goToCategorySelectionScreen({
 }
 
 class CategorySelectionScreen extends StatefulWidget {
-  final String? selectedCategory;
-  final String? selectedSubcategory;
+  final int? selectedCategory;
+  final int? selectedSubcategory;
 
   const CategorySelectionScreen({
     super.key,
@@ -46,7 +46,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
 
   final TextEditingController _searchController = TextEditingController();
 
-  String? _selectedSubcategory;
+  int? _selectedSubcategory;
   String _searchQuery = '';
 
   @override
@@ -55,9 +55,13 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     _selectedSubcategory = widget.selectedSubcategory;
   }
 
-  void _selectSubcategory(String category, String subcategory) {
-    Get.back(result: {category: subcategory});
-  }
+void _selectSubcategory(int categoryId, int subcategoryId) {
+  Get.back(result: {
+    'categoryId': categoryId,
+    'subcategoryId': subcategoryId,
+  });
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -179,7 +183,10 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                         ? Icon(Icons.check, color: colorScheme.primary)
                         : null,
                     dense: true,
-                    onTap: () => _selectSubcategory(categoryName, sub.name),
+                    onTap: () => _selectSubcategory(
+                      categoryId,
+                      sub.id,
+                    ),
                   );
                 }).toList(),
               );

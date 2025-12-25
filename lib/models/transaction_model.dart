@@ -2,8 +2,8 @@ class TransactionModel {
   final int id;
   final String title;
   final double amount;
-  final String category;
-  final String subcategory;
+  final int category;
+  final int subcategory;
   final String type; // Personal / Business
   final bool deductible;
   final String notes;
@@ -31,8 +31,8 @@ class TransactionModel {
     'id': id,
     'title': title,
     'amount': amount,
-    'category': category,
-    'subcategory': subcategory,
+    'category_id': category,
+    'subcategory_id': subcategory,
     'type': type,
     'deductible': deductible,
     'notes': notes,
@@ -47,8 +47,8 @@ class TransactionModel {
         id: json['id'],
         title: json['title'] as String,
         amount: (json['amount'] as num).toDouble(),
-        category: json['category'] as String,
-        subcategory: json['subcategory'] as String,
+        category: json['category_id'],
+        subcategory: json['subcategory_id'],
         type: json['type'] as String,
         deductible: json['deductible'] as bool,
         notes: json['notes'] as String? ?? '',
