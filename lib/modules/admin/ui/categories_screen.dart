@@ -29,66 +29,53 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: kIsWeb ? null : AppBar(title: const Text("Categories")),
-      body: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.add),
-                onPressed: () =>
-                    showSaveCategoryDialog(controller: categoryController),
-              ),
-            ],
-          ),
-          Expanded(child: _buildCategories()),
-        ],
-      ),
-    );
-  }
+      body: GetBuilder<CategoryAdminController>(
+        builder: (controller) {
+          if (controller.categories.isEmpty) {
+            return const Center(child: AppText('No categories found'));
+          }
 
-  Widget _buildCategories() {
-    return GetBuilder<CategoryAdminController>(
-      builder: (controller) {
-        if (controller.categories.isEmpty) {
-          return const Center(child: AppText('No categories found'));
-        }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: controller.categories.length,
+            itemBuilder: (_, index) {
+              final cat = controller.categories[index];
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: controller.categories.length,
-          itemBuilder: (_, index) {
-            final cat = controller.categories[index];
-
-            return Card(
-              child: ListTile(
-                title: AppText(cat.name, fontWeight: FontWeight.w600),
-                onTap: () =>
-                    showSubCategoryListDialog(controller, cat.id, cat.name),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => showSaveCategoryDialog(
-                        controller: controller,
-                        category: cat,
+              return Card(
+                child: ListTile(
+                  title: AppText(cat.name, fontWeight: FontWeight.w600),
+                  onTap: () =>
+                      showSubCategoryListDialog(controller, cat.id, cat.name),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        onPressed: () => showSaveCategoryDialog(
+                          controller: controller,
+                          category: cat,
+                        ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => showConfirmDeleteDialog(
-                        title: 'Delete Category?',
-                        onConfirm: () => controller.deleteCategory(cat.id),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => showConfirmDeleteDialog(
+                          title: 'Delete Category?',
+                          onConfirm: () => controller.deleteCategory(cat.id),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => showSaveCategoryDialog(controller: categoryController),
+        tooltip: "Add Category",
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }

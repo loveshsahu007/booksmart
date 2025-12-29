@@ -1,4 +1,4 @@
-import 'package:booksmart/models/category_rules_model.dart';
+import 'package:booksmart/models/category_rule_model.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';

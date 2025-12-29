@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../constant/app_colors.dart';
 import '../../../routes/pages.dart';
 import '../../../routes/routes.dart';
 
@@ -25,7 +24,7 @@ class ErrorScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: orangeColor,
+      backgroundColor: Get.theme.colorScheme.surface,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final bool isWide = constraints.maxWidth > 900;
@@ -59,7 +58,7 @@ class ErrorScreen extends StatelessWidget {
   Widget _homeIcon() {
     return GestureDetector(
       onTap: () => Get.offNamed(getHomeScreenRoute()),
-      child: const Icon(Icons.home_rounded, color: Colors.white, size: 96),
+      child: Icon(Icons.home_rounded, color: Get.theme.primaryColor, size: 96),
     );
   }
 
@@ -170,7 +169,6 @@ class ErrorScreen extends StatelessWidget {
           title,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white,
             fontSize: isWide ? 32 : 26,
             fontWeight: FontWeight.w600,
           ),
@@ -179,30 +177,15 @@ class ErrorScreen extends StatelessWidget {
         Text(
           description,
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.9),
-            fontSize: isWide ? 18 : 16,
-          ),
+          style: TextStyle(fontSize: isWide ? 18 : 16),
         ),
         const SizedBox(height: 32),
-        SizedBox(
-          width: isWide ? 220 : double.infinity,
-          child: ElevatedButton(
-            onPressed: onPressed,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon),
-                const SizedBox(width: 8),
-                Text(buttonText),
-              ],
-            ),
+        ElevatedButton(
+          onPressed: onPressed,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [Icon(icon), const SizedBox(width: 8), Text(buttonText)],
           ),
         ),
       ],

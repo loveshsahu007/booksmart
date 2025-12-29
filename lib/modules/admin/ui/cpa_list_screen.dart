@@ -28,7 +28,10 @@ class _CpaListScreenAdminState extends State<CpaListScreenAdmin> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: kIsWeb ? null : AppBar(title: const Text("Users")),
+      appBar: AppBar(
+        title: const Text("Users"),
+        automaticallyImplyLeading: !kIsWeb,
+      ),
       body: GetBuilder<AdminCpaController>(
         builder: (controller) {
           if (controller.isLoading) {

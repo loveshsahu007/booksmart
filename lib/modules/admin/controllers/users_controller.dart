@@ -7,7 +7,7 @@ import '../../../models/user_base_model.dart';
 
 class AdminUsersController extends GetxController {
   final List<PersonModel> users = [];
-  bool isLoading = false;
+  RxBool isLoading = false.obs;
 
   String table = SupabaseTable.user; // or profiles/persons table
 
@@ -19,8 +19,7 @@ class AdminUsersController extends GetxController {
 
   Future<void> fetchUsers() async {
     try {
-      isLoading = true;
-      update();
+      isLoading.value = true;
 
       final result = await SupabaseCrudService.read(
         table: table,
@@ -41,7 +40,7 @@ class AdminUsersController extends GetxController {
       log(e.toString());
       log(s.toString());
     } finally {
-      isLoading = false;
+      isLoading.value = false;
       update();
     }
   }

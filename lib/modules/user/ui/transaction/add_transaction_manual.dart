@@ -255,7 +255,7 @@ class _AddTransactionScreenManualState
                 });
               },
             ),
-            0.01.verticalSpace,
+            0.02.verticalSpace,
 
             SwitchListTile(
               title: const AppText("Deductible"),

@@ -1,5 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/models/category_rules_model.dart';
+import 'package:booksmart/models/category_rule_model.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/modules/user/controllers/rules_controller.dart';
@@ -19,7 +19,7 @@ void showAddEditRuleDialog({CategoryRuleModel? rule}) {
     title: rule == null ? 'Add Rule' : 'Edit Rule',
     child: StatefulBuilder(
       builder: (context, setState) {
-        return Padding(
+        return SingleChildScrollView(
           padding: const EdgeInsets.all(6),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -49,10 +49,9 @@ void showAddEditRuleDialog({CategoryRuleModel? rule}) {
                 },
               ),
 
-              0.04.verticalSpace,
-
               /// SUB CATEGORY DROPDOWN
-              if (selectedCategory != null)
+              if (selectedCategory != null) ...[
+                0.04.verticalSpace,
                 DropdownButtonFormField<int>(
                   value: selectedSubCategory,
                   hint: const Text('Select Sub Category'),
@@ -69,6 +68,7 @@ void showAddEditRuleDialog({CategoryRuleModel? rule}) {
                     });
                   },
                 ),
+              ],
 
               0.06.verticalSpace,
 
