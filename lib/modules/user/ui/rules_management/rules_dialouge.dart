@@ -4,7 +4,9 @@ import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/modules/user/controllers/rules_controller.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
+import 'package:booksmart/widgets/custom_drop_down.dart';
 import 'package:get/get.dart';
+import 'package:dropdown_search/dropdown_search.dart';
 
 void showAddEditRuleDialog({CategoryRuleModel? rule}) {
   final rulesC = Get.find<RulesController>();
@@ -15,6 +17,9 @@ void showAddEditRuleDialog({CategoryRuleModel? rule}) {
   int? selectedCategory = rule?.categoryId;
   int? selectedSubCategory = rule?.subCategoryId;
 
+  final categoryDropdownKey = GlobalKey<DropdownSearchState<int>>();
+  final subCategoryDropdownKey = GlobalKey<DropdownSearchState<int>>();
+
   customDialog(
     title: rule == null ? 'Add Rule' : 'Edit Rule',
     child: StatefulBuilder(
@@ -24,6 +29,7 @@ void showAddEditRuleDialog({CategoryRuleModel? rule}) {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              /// MEMO
               AppTextField(
                 controller: memoCtrl,
                 labelText: 'Memo contains',
@@ -33,18 +39,16 @@ void showAddEditRuleDialog({CategoryRuleModel? rule}) {
               0.04.verticalSpace,
 
               /// CATEGORY DROPDOWN
-              DropdownButtonFormField<int>(
-                value: selectedCategory,
-                hint: const Text('Select Category'),
-                items: categoryC.categories
-                    .map(
-                      (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
-                    )
-                    .toList(),
+              CustomDropDownWidget<int>(
+                dropDownKey: categoryDropdownKey,
+                hint: 'Select Category',
+                selectedItem: selectedCategory,
+                items: categoryC.categories.map((c) => c.id).toList(),
+                itemAsString: (id) => categoryC.getCategoryName(id),
                 onChanged: (val) {
                   setState(() {
                     selectedCategory = val;
-                    selectedSubCategory = null; // reset sub
+                    selectedSubCategory = null; // reset sub-category
                   });
                 },
               ),
@@ -52,16 +56,15 @@ void showAddEditRuleDialog({CategoryRuleModel? rule}) {
               /// SUB CATEGORY DROPDOWN
               if (selectedCategory != null) ...[
                 0.04.verticalSpace,
-                DropdownButtonFormField<int>(
-                  value: selectedSubCategory,
-                  hint: const Text('Select Sub Category'),
+                CustomDropDownWidget<int>(
+                  dropDownKey: subCategoryDropdownKey,
+                  hint: 'Select Sub Category',
+                  selectedItem: selectedSubCategory,
                   items: categoryC
                       .getSubCategoriesByCategory(selectedCategory!)
-                      .map(
-                        (s) =>
-                            DropdownMenuItem(value: s.id, child: Text(s.name)),
-                      )
+                      .map((s) => s.id)
                       .toList(),
+                  itemAsString: (id) => categoryC.getSubCategoryName(id),
                   onChanged: (val) {
                     setState(() {
                       selectedSubCategory = val;
@@ -72,6 +75,7 @@ void showAddEditRuleDialog({CategoryRuleModel? rule}) {
 
               0.06.verticalSpace,
 
+              /// SAVE / UPDATE BUTTON
               AppButton(
                 buttonText: rule == null ? 'Save Rule' : 'Update Rule',
                 onTapFunction: () {

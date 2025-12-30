@@ -72,7 +72,6 @@ class CpaModel extends Core {
           handleResponseFromJson<String>(json, "license_copy_url") ?? "",
       termsAgreed: handleResponseFromJson<bool>(json, "terms_agreed") ?? false,
       verificationStatus: () {
-        // TODO: change status to verification_status in db as well, and in profile_screen json
         String status =
             handleResponseFromJson<String>(json, "verification_status") ??
             CpaVerificationStatus.pending.name;

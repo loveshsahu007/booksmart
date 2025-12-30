@@ -1,5 +1,6 @@
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/admin/controllers/cpa_controller.dart';
+import 'package:booksmart/modules/admin/ui/widgets/cpa_detail_screen.dart';
 import 'package:booksmart/widgets/app_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -68,6 +69,7 @@ class _CpaListScreenAdminState extends State<CpaListScreenAdmin> {
                     ],
                   ),
                   trailing: _buildRoleChip(user),
+                    onTap: () => showCpaDetailsDialog(user),
                 ),
               );
             },

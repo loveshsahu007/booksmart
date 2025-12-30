@@ -2,6 +2,7 @@ class CategoryModel {
   final int id;
   final String name;
   final int addedBy;
+  final bool isDeleted;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -9,6 +10,7 @@ class CategoryModel {
     required this.id,
     required this.name,
     required this.addedBy,
+    required this.isDeleted,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -18,27 +20,14 @@ class CategoryModel {
       id: json['id'],
       name: json['name'] ?? '',
       addedBy: json['added_by'],
+      isDeleted: json['is_deleted'] ?? false,
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'added_by': addedBy,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-    };
-  }
-
-  Map<String, dynamic> toJsonForUpdate() {
-    final map = toJson();
-    map.remove('id');
-    map.remove('added_by');
-    map.remove('created_at');
-    return map;
+  Map<String, dynamic> toJsonForStatusUpdate() {
+    return {'is_deleted': isDeleted};
   }
 }
 
@@ -47,6 +36,7 @@ class SubCategoryModel {
   final int categoryId;
   final String name;
   final int addedBy;
+  final bool isDeleted;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -55,6 +45,7 @@ class SubCategoryModel {
     required this.categoryId,
     required this.name,
     required this.addedBy,
+    required this.isDeleted,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -65,28 +56,9 @@ class SubCategoryModel {
       categoryId: json['category_id'],
       name: json['name'] ?? '',
       addedBy: json['added_by'],
+      isDeleted: json['is_deleted'] ?? false,
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'category_id': categoryId,
-      'name': name,
-      'added_by': addedBy,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt.toIso8601String(),
-    };
-  }
-
-  Map<String, dynamic> toJsonForUpdate() {
-    final map = toJson();
-    map.remove('id');
-    map.remove('category_id');
-    map.remove('added_by');
-    map.remove('created_at');
-    return map;
   }
 }

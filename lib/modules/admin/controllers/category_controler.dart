@@ -9,16 +9,27 @@ class CategoryAdminController extends GetxController {
   final categories = <CategoryModel>[];
   final subCategories = <SubCategoryModel>[];
 
+  bool isLoading = false;
+
   @override
   void onInit() {
     fetchAll();
     super.onInit();
   }
 
+  // ================= LOADING HANDLER =================
+
+  void _setLoading(bool value) {
+    isLoading = value;
+    update();
+  }
+
   // ================= FETCH ALL =================
 
   Future<void> fetchAll() async {
     try {
+      _setLoading(true);
+
       final categoryRes = await SupabaseCrudService.read(
         table: SupabaseTable.category,
       );
@@ -38,14 +49,17 @@ class CategoryAdminController extends GetxController {
         );
     } catch (e) {
       somethingWentWrongSnackbar();
+    } finally {
+      _setLoading(false);
     }
-    update();
   }
 
   // ================= CATEGORY =================
 
   Future<void> saveCategory({int? id, required String name}) async {
     try {
+      _setLoading(true);
+
       if (id == null) {
         await SupabaseCrudService.insert(
           table: SupabaseTable.category,
@@ -60,22 +74,30 @@ class CategoryAdminController extends GetxController {
         );
         showSnackBar('Category updated');
       }
-      fetchAll();
+
+      await fetchAll();
     } catch (e) {
       somethingWentWrongSnackbar();
+    } finally {
+      _setLoading(false);
     }
   }
 
   Future<void> deleteCategory(int id) async {
     try {
+      _setLoading(true);
+
       await SupabaseCrudService.delete(
         table: SupabaseTable.category,
         filters: {'id': id},
       );
+
       showSnackBar('Category deleted');
-      fetchAll();
+      await fetchAll();
     } catch (e) {
       somethingWentWrongSnackbar();
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -91,6 +113,8 @@ class CategoryAdminController extends GetxController {
     required String name,
   }) async {
     try {
+      _setLoading(true);
+
       if (id == null) {
         await SupabaseCrudService.insert(
           table: SupabaseTable.subCategory,
@@ -109,24 +133,34 @@ class CategoryAdminController extends GetxController {
         );
         showSnackBar('Sub-category updated');
       }
-      fetchAll();
+
+      await fetchAll();
     } catch (e) {
       somethingWentWrongSnackbar();
+    } finally {
+      _setLoading(false);
     }
   }
 
   Future<void> deleteSubCategory(int id) async {
     try {
+      _setLoading(true);
+
       await SupabaseCrudService.delete(
         table: SupabaseTable.subCategory,
         filters: {'id': id},
       );
+
       showSnackBar('Sub-category deleted');
-      fetchAll();
+      await fetchAll();
     } catch (e) {
       somethingWentWrongSnackbar();
+    } finally {
+      _setLoading(false);
     }
   }
+
+  // ================= HELPERS =================
 
   String getCategoryName(int id) {
     try {
@@ -144,4 +178,50 @@ class CategoryAdminController extends GetxController {
       return '-';
     }
   }
+
+  Future<void> toggleCategoryStatus(CategoryModel category) async {
+  try {
+    _setLoading(true);
+
+    await SupabaseCrudService.update(
+      table: SupabaseTable.category,
+      data: {'is_deleted': !category.isDeleted},
+      filters: {'id': category.id},
+    );
+
+    showSnackBar(
+      category.isDeleted ? 'Category restored' : 'Category marked deleted',
+    );
+
+    await fetchAll();
+  } catch (e) {
+    somethingWentWrongSnackbar();
+  } finally {
+    _setLoading(false);
+  }
+}
+Future<void> toggleSubCategoryStatus(SubCategoryModel sub) async {
+  try {
+    _setLoading(true);
+
+    await SupabaseCrudService.update(
+      table: SupabaseTable.subCategory,
+      data: {'is_deleted': !sub.isDeleted},
+      filters: {'id': sub.id},
+    );
+
+    showSnackBar(
+      sub.isDeleted
+          ? 'Sub-category restored'
+          : 'Sub-category marked deleted',
+    );
+
+    await fetchAll();
+  } catch (e) {
+    somethingWentWrongSnackbar();
+  } finally {
+    _setLoading(false);
+  }
+}
+
 }

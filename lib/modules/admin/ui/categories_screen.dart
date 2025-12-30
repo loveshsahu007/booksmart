@@ -1,5 +1,6 @@
 import 'package:booksmart/modules/admin/ui/widgets/category_dialogs.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
+import 'package:booksmart/widgets/app_button.dart';
 import 'package:booksmart/widgets/app_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -56,13 +57,30 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
                           category: cat,
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => showConfirmDeleteDialog(
-                          title: 'Delete Category?',
-                          onConfirm: () => controller.deleteCategory(cat.id),
+
+                      AppButton(
+                        buttonText: cat.isDeleted ? "Deleted" : "Live",
+                        buttonColor: cat.isDeleted ? Colors.red : Colors.green,
+                        onTapFunction: () => showConfirmDeleteDialog(
+                          title: cat.isDeleted
+                              ? 'Restore Sub-Category?'
+                              : 'Mark Sub-Category as Deleted?',
+                          onConfirm: () => controller.toggleCategoryStatus(cat),
                         ),
                       ),
+                      // IconButton(
+                      //   icon: Icon(
+                      //     Icons.circle,
+                      //     color: cat.isDeleted ? Colors.red : Colors.green,
+                      //   ),
+                      //   tooltip: cat.isDeleted ? 'Deleted' : 'Live',
+                      //   onPressed: () => showConfirmDeleteDialog(
+                      //     title: cat.isDeleted
+                      //         ? 'Restore Category?'
+                      //         : 'Mark Category as Deleted?',
+                      //     onConfirm: () => controller.toggleCategoryStatus(cat),
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),

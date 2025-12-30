@@ -31,6 +31,8 @@ class CustomDropDownWidget<T> extends StatefulWidget {
 class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return DropdownSearch<T>(
       key: widget.dropDownKey,
       selectedItem: widget.selectedItem,
@@ -39,9 +41,12 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
       onChanged: widget.onChanged, // Add this
       decoratorProps: DropDownDecoratorProps(
         decoration: InputDecoration(
+          filled: true,
+          fillColor: colors.surface,
+          isDense: true,
           labelText: widget.label,
           hint: widget.hint == null ? null : FittedText(widget.hint!),
-          isDense: true,
+          
         ),
       ),
       // ... rest of your code

@@ -89,10 +89,31 @@ void showSubCategoryListDialog(
                           subCategory: sub,
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => controller.deleteSubCategory(sub.id),
+
+                      AppButton(
+                        buttonText: sub.isDeleted ? "Deleted" : "Live",
+                        buttonColor: sub.isDeleted ? Colors.red : Colors.green,
+                        onTapFunction: () => showConfirmDeleteDialog(
+                          title: sub.isDeleted
+                              ? 'Restore Sub-Category?'
+                              : 'Mark Sub-Category as Deleted?',
+                          onConfirm: () =>
+                              controller.toggleSubCategoryStatus(sub),
+                        ),
                       ),
+                      // IconButton(
+                      //   icon: Icon(
+                      //     Icons.circle,
+                      //     color: sub.isDeleted ? Colors.red : Colors.green,
+                      //   ),
+                      //   onPressed: () => showConfirmDeleteDialog(
+                      //     title: sub.isDeleted
+                      //         ? 'Restore Sub-Category?'
+                      //         : 'Mark Sub-Category as Deleted?',
+                      //     onConfirm: () =>
+                      //         controller.toggleSubCategoryStatus(sub),
+                      //   ),
+                      // ),
                     ],
                   ),
                 ),
@@ -159,32 +180,33 @@ void showConfirmDeleteDialog({
 }) {
   customDialog(
     title: title,
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const AppText('This action cannot be undone'),
-        0.06.verticalSpace,
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: Get.back,
-                child: const Text('Cancel'),
+    child: Container(
+      padding: EdgeInsets.all(6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: Get.back,
+                  child: const Text('Cancel'),
+                ),
               ),
-            ),
-            0.03.horizontalSpace,
-            Expanded(
-              child: AppButton(
-                buttonText: 'Delete',
-                onTapFunction: () {
-                  onConfirm();
-                  Get.back();
-                },
+              0.03.horizontalSpace,
+              Expanded(
+                child: AppButton(
+                  buttonText: title.contains("Restore") ? "Restore" : 'Delete',
+                  onTapFunction: () {
+                    onConfirm();
+                    Get.back();
+                  },
+                ),
               ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     ),
   );
 }
