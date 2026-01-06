@@ -4,6 +4,7 @@ import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/widgets/snackbar.dart';
+import 'package:booksmart/utils/supabase.dart';
 import 'package:get/get.dart';
 
 TransactionController transactionControllerInstance =
@@ -14,35 +15,129 @@ class TransactionController extends GetxController {
   final String table = SupabaseTable.transaction;
 
   RxBool isLoading = false.obs;
+  RxBool isLoadMoreLoading = false.obs;
   RxList<TransactionModel> transactions = <TransactionModel>[].obs;
+  bool hasMore = true;
+  int _offset = 0;
+  final int _limit = 10;
 
   @override
   void onInit() {
     super.onInit();
-    getAllTransactions();
+    getTransactions();
   }
 
-  Future<void> getAllTransactions() async {
+  Future<void> getTransactions({
+    bool isLoadMore = false,
+    String? searchQuery,
+    Object? category,
+    String? type,
+    String? amountRange,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
     try {
-      isLoading.value = true;
+      if (isLoadMore) {
+        if (!hasMore || isLoadMoreLoading.value) return;
+        isLoadMoreLoading.value = true;
+      } else {
+        isLoading.value = true;
+        _offset = 0;
+        hasMore = true;
+        transactions.clear();
+      }
 
-      final res = await SupabaseCrudService.read(
-        table: table,
-        filters: {'organization_id': getCurrentOrganization!.id},
-      );
-      transactions.value = (res as List)
+      dynamic query = supabase
+          .from(table)
+          .select()
+          .eq('organization_id', getCurrentOrganization!.id);
+
+      // Search filter
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        query = query.ilike('title', '%$searchQuery%');
+      }
+
+      // Category filter
+      if (category != null && category != "All") {
+        query = query.eq('category_id', category);
+      }
+
+      // Type filter
+      if (type != null && type != "All") {
+        query = query.eq('type', type);
+      }
+
+      // Amount Range filter
+      if (amountRange != null && amountRange != "All") {
+        switch (amountRange) {
+          case "Under \$50":
+            query = query.lt('amount', 50).gt('amount', -50);
+            break;
+          case "\$50 - \$200":
+            // For both positive and negative (expenses/income)
+            // This logic might be tricky with just Supabase query.
+            // Usually absolute value is better but Supabase doesn't have abs() in simple filter easily.
+            // Let's assume we filter based on positive amount logic or just range.
+            // User's previous code: t.amount.abs() >= 50 && t.amount.abs() <= 200
+            // We can use an OR filter if needed, but for simplicity let's stick to simple range or ask.
+            // Actually, we can use .or('and(amount.gte.50,amount.lte.200),and(amount.lte.-50,amount.gte.-200)')
+            query = query.or(
+              'and(amount.gte.50,amount.lte.200),and(amount.lte.-50,amount.gte.-200)',
+            );
+            break;
+          case "\$200 - \$500":
+            query = query.or(
+              'and(amount.gt.200,amount.lte.500),and(amount.lt.-200,amount.gte.-500)',
+            );
+            break;
+          case "Over \$500":
+            query = query.or('amount.gt.500,amount.lt.-500');
+            break;
+        }
+      }
+
+      // Date filter
+      if (startDate != null && endDate != null) {
+        query = query.gte('date', startDate.toIso8601String().split('T')[0]);
+        query = query.lte('date', endDate.toIso8601String().split('T')[0]);
+      }
+
+      // Pagination and Sorting
+      query = query
+          .order('date', ascending: false)
+          .range(_offset, _offset + _limit - 1);
+
+      final res = await query;
+
+      final List<TransactionModel> fetchedTransactions = (res as List)
           .map((e) => TransactionModel.fromJson(e))
           .toList();
+
+      if (fetchedTransactions.length < _limit) {
+        hasMore = false;
+      }
+
+      if (isLoadMore) {
+        transactions.addAll(fetchedTransactions);
+        _offset += _limit;
+      } else {
+        transactions.value = fetchedTransactions;
+        _offset = _limit;
+      }
     } catch (e, s) {
-      log("❌ getAllTransactions ERROR");
+      log("❌ getTransactions ERROR");
       log(e.toString());
       log(s.toString());
       somethingWentWrongSnackbar();
     } finally {
       isLoading.value = false;
+      isLoadMoreLoading.value = false;
       update();
     }
   }
+
+  /// Alias for backward compatibility if needed elsewhere
+  Future<void> getAllTransactions() async => getTransactions();
 
   Future<void> addTransaction(TransactionModel transaction) async {
     try {

@@ -1,7 +1,7 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
-import 'package:booksmart/models/transaction_model.dart';
+import 'dart:async';
 import 'package:booksmart/modules/user/ui/bulk_review/bulk_review_screen.dart';
 import 'package:booksmart/modules/user/ui/transaction/add_transaction_manual.dart';
 import 'package:booksmart/widgets/date_range_picker.dart';
@@ -22,76 +22,41 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   String searchQuery = "";
   DateTime? startDate;
   DateTime? endDate;
+  Timer? _debounce;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
 
   // Filter dropdown keys
   final categoryDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final typeDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final amountRangeDropdownKey = GlobalKey<DropdownSearchState<String>>();
 
-  /// Filtered transactions based on model
-  List<TransactionModel> get filteredTransactions {
-    List<TransactionModel> filtered = transactionC.transactions.toList();
-
-    // Search filter
-    if (searchQuery.isNotEmpty) {
-      filtered = filtered
-          .where(
-            (t) => t.title.toLowerCase().contains(searchQuery.toLowerCase()),
-          )
-          .toList();
-    }
-
-    // Category filter
-    final selectedCategory = categoryDropdownKey.currentState?.getSelectedItem;
-    if (selectedCategory != null && selectedCategory != "All") {
-      filtered = filtered.where((t) => t.category == selectedCategory).toList();
-    }
-
-    // Type filter
-    final selectedType = typeDropdownKey.currentState?.getSelectedItem;
-    if (selectedType != null && selectedType != "All") {
-      filtered = filtered.where((t) => t.type == selectedType).toList();
-    }
-
-    // Amount range filter
-    final selectedAmountRange =
-        amountRangeDropdownKey.currentState?.getSelectedItem;
-    if (selectedAmountRange != null && selectedAmountRange != "All") {
-      switch (selectedAmountRange) {
-        case "Under \$50":
-          filtered = filtered.where((t) => t.amount.abs() < 50).toList();
-          break;
-        case "\$50 - \$200":
-          filtered = filtered
-              .where((t) => t.amount.abs() >= 50 && t.amount.abs() <= 200)
-              .toList();
-          break;
-        case "\$200 - \$500":
-          filtered = filtered
-              .where((t) => t.amount.abs() > 200 && t.amount.abs() <= 500)
-              .toList();
-          break;
-        case "Over \$500":
-          filtered = filtered.where((t) => t.amount.abs() > 500).toList();
-          break;
+  void _applyFilters() {
+    final selectedCategoryName =
+        categoryDropdownKey.currentState?.getSelectedItem;
+    Object? categoryId;
+    if (selectedCategoryName != null && selectedCategoryName != "All") {
+      try {
+        categoryId = categoryController.categories
+            .firstWhere((c) => c.name == selectedCategoryName)
+            .id;
+      } catch (_) {
+        categoryId = selectedCategoryName; // Fallback to name if not found
       }
     }
 
-    // Date range filter
-    if (startDate != null && endDate != null) {
-      filtered = filtered.where((t) {
-        final date = DateTime.parse(t.date); // yyyy-MM-dd in model
-        return date.isAfter(startDate!.subtract(const Duration(days: 1))) &&
-            date.isBefore(endDate!.add(const Duration(days: 1)));
-      }).toList();
-    }
-
-    // Sort by date descending
-    filtered.sort(
-      (a, b) => DateTime.parse(b.date).compareTo(DateTime.parse(a.date)),
-    ); // latest first
-
-    return filtered;
+    transactionC.getTransactions(
+      searchQuery: searchQuery,
+      category: categoryId ?? "All",
+      type: typeDropdownKey.currentState?.getSelectedItem,
+      amountRange: amountRangeDropdownKey.currentState?.getSelectedItem,
+      startDate: startDate,
+      endDate: endDate,
+    );
   }
 
   Future<void> _showFilterDialog() async {
@@ -104,17 +69,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
           // Category filter
           _buildFilterDropdown(
             label: "Category",
-            items: [
-              'All',
-              'Transportation',
-              'Operational Costs',
-              'Income',
-              'Food & Drink',
-              'Software',
-              'Utilities',
-              'Entertainment',
-              'Travel',
-            ],
+            items: ['All', ...categoryController.categories.map((e) => e.name)],
             dropDownKey: categoryDropdownKey,
           ),
           const SizedBox(height: 16),
@@ -168,13 +123,17 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
               TextButton(
                 onPressed: () {
                   clearFilters();
+                  _applyFilters();
                   Get.back();
                 },
                 child: AppText("Reset", color: Colors.red, fontSize: 14),
               ),
               const SizedBox(width: 10),
               TextButton(
-                onPressed: () => Get.back(),
+                onPressed: () {
+                  _applyFilters();
+                  Get.back();
+                },
                 child: AppText("Apply", fontSize: 14),
               ),
             ],
@@ -226,7 +185,9 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   late CategoryAdminController categoryController;
   @override
   void initState() {
-    if (Get.isRegistered<TransactionController>()) {
+    if (Get.isRegistered<TransactionController>(
+      tag: getCurrentOrganization!.id.toString(),
+    )) {
       transactionC = Get.find<TransactionController>(
         tag: getCurrentOrganization!.id.toString(),
       );
@@ -235,15 +196,12 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
         TransactionController(),
         tag: getCurrentOrganization!.id.toString(),
       );
+    }
 
-      if (Get.isRegistered<CategoryAdminController>()) {
-        categoryController = Get.find<CategoryAdminController>();
-      } else {
-        categoryController = Get.put(
-          CategoryAdminController(),
-          permanent: true,
-        );
-      }
+    if (Get.isRegistered<CategoryAdminController>()) {
+      categoryController = Get.find<CategoryAdminController>();
+    } else {
+      categoryController = Get.put(CategoryAdminController(), permanent: true);
     }
     super.initState();
   }
@@ -253,8 +211,6 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Obx(() {
-      final transactions = filteredTransactions;
-
       return Scaffold(
         appBar: AppBar(title: const Text("Transaction History")),
         body: Padding(
@@ -267,7 +223,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                 children: [
                   AppText(
                     isAnyActiveFilter
-                        ? "Showing ${transactions.length} transactions"
+                        ? "Showing ${transactionC.transactions.length} transactions"
                         : "Total ${transactionC.transactions.length} transactions",
                     fontSize: 12,
                     color: colorScheme.onSurfaceVariant,
@@ -283,11 +239,16 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Search
               AppTextField(
                 hintText: "Search transactions",
                 prefixWidget: const Icon(Icons.search),
-                onChanged: (value) => setState(() => searchQuery = value),
+                onChanged: (value) {
+                  searchQuery = value;
+                  if (_debounce?.isActive ?? false) _debounce!.cancel();
+                  _debounce = Timer(const Duration(milliseconds: 500), () {
+                    _applyFilters();
+                  });
+                },
               ),
               const SizedBox(height: 12),
               Expanded(
@@ -305,9 +266,41 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                     final allTransactions = controller.transactions;
 
                     return ListView.separated(
-                      itemCount: allTransactions.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      itemCount:
+                          allTransactions.length + (controller.hasMore ? 1 : 0),
+                      separatorBuilder: (_, index) {
+                        return const SizedBox(height: 8);
+                      },
                       itemBuilder: (context, index) {
+                        if (index == allTransactions.length) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            child: controller.isLoadMoreLoading.value
+                                ? const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
+                                : ElevatedButton(
+                                    onPressed: () {
+                                      controller.getTransactions(
+                                        isLoadMore: true,
+                                        searchQuery: searchQuery,
+                                        category: categoryDropdownKey
+                                            .currentState
+                                            ?.getSelectedItem,
+                                        type: typeDropdownKey
+                                            .currentState
+                                            ?.getSelectedItem,
+                                        amountRange: amountRangeDropdownKey
+                                            .currentState
+                                            ?.getSelectedItem,
+                                        startDate: startDate,
+                                        endDate: endDate,
+                                      );
+                                    },
+                                    child: const Text("Load More"),
+                                  ),
+                          );
+                        }
                         final t = allTransactions[index];
                         final amountColor = t.amount < 0
                             ? Colors.red
