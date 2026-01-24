@@ -62,7 +62,7 @@ class AppTextField extends StatelessWidget {
           hintText: hintText,
           suffixIcon: suffixWidget,
           prefixIcon: prefixWidget,
-          labelText: hintText,
+          // labelText: hintText,
 
           // 🪄 All styling (borders, hintStyle, colors) comes from theme.inputDecorationTheme
         ),

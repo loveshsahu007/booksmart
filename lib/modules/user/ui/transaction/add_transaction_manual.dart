@@ -5,17 +5,20 @@ import 'package:booksmart/modules/user/controllers/organization_controller.dart'
 import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/modules/user/ui/transaction/category_selection_screen.dart';
+import 'package:booksmart/widgets/confirmation_dialog.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:jiffy/jiffy.dart';
 
+import '../../../../utils/date_time_input.dart';
 import '../../../../widgets/custom_dialog.dart';
 import '../../../../widgets/custom_drop_down.dart';
 import 'receipt_scanning_output_screen.dart';
 
 void goToAddTransactionScreen({
-  TransactionModel? tr,
+  TransactionModel? transaction,
   bool shouldCloseBefore = false,
 }) {
   // Ensure the controller is registered before using it
@@ -26,23 +29,43 @@ void goToAddTransactionScreen({
   if (kIsWeb) {
     if (shouldCloseBefore) Get.back();
     customDialog(
-      child: AddTransactionScreenManual(transaction: tr),
-      title: tr != null ? 'Update Transaction' : 'Add Transaction',
+      child: AddTransactionScreenManual(transaction: transaction),
+      title: transaction != null ? 'Update Transaction' : 'Add Transaction',
       barrierDismissible: true,
       actionWidgetList: [
-        IconButton(
-          onPressed: () => Get.back(),
-          icon: const Icon(Icons.delete_forever),
-        ),
+        if (canTransactionBeDeleted(transaction))
+          IconButton(
+            onPressed: () {
+              deleteTransaction(transaction!);
+            },
+            icon: const Icon(Icons.delete_forever),
+          ),
       ],
     );
   } else {
     if (shouldCloseBefore) {
-      Get.off(() => AddTransactionScreenManual(transaction: tr));
+      Get.off(() => AddTransactionScreenManual(transaction: transaction));
     } else {
-      Get.to(() => AddTransactionScreenManual(transaction: tr));
+      Get.to(() => AddTransactionScreenManual(transaction: transaction));
     }
   }
+}
+
+bool canTransactionBeDeleted(TransactionModel? transaction) {
+  if (transaction == null) return false;
+  return transaction.bankId == null;
+}
+
+void deleteTransaction(TransactionModel transaction) {
+  showConfirmationDialog(
+    title: "Delete Transaction",
+    description: "Are you sure you want to delete this transaction?",
+    onYes: () {
+      Get.back(); // pop the confirmation dialog
+      Get.back(); // pop the add-transaction screen
+      transactionControllerInstance.deleteTransaction(transaction.id);
+    },
+  );
 }
 
 class AddTransactionScreenManual extends StatefulWidget {
@@ -57,21 +80,28 @@ class AddTransactionScreenManual extends StatefulWidget {
 class _AddTransactionScreenManualState
     extends State<AddTransactionScreenManual> {
   final _formKey = GlobalKey<FormState>();
-  final TransactionController transactionC = Get.find();
+
+  TransactionController transactionC = transactionControllerInstance;
 
   int? _selectedCategory;
   int? _selectedSubcategory;
   bool deductible = false;
   XFile? _selectedFile;
-  String _selectedType = "Personal"; // Add this to track the selected type
-  Uint8List? _selectedFileBytes; // bytes for web preview
+  String _selectedType = "Personal";
+  Uint8List? _selectedFileBytes;
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
-  final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+
   final TextEditingController _dateController = TextEditingController();
+  DateTime? _selectedDate;
+
   final typeDropdownKey = GlobalKey<DropdownSearchState<String>>();
   late CategoryAdminController categoryController;
+
+  late bool isUpdate;
+
   @override
   void initState() {
     super.initState();
@@ -80,42 +110,23 @@ class _AddTransactionScreenManualState
     } else {
       categoryController = Get.put(CategoryAdminController(), permanent: true);
     }
+    isUpdate = widget.transaction != null;
 
-    if (widget.transaction != null) {
-      updateData();
-    }
+    updateData();
   }
 
   updateData() {
-    final now = DateTime.now();
-
-    _dateController.text = "${now.day} ${_getMonthName(now.month)} ${now.year}";
-
+    _dateController.text = Jiffy.parseFromDateTime(
+      widget.transaction?.dateTime ?? DateTime.now(),
+    ).yMMMdjm;
+    _selectedDate = widget.transaction?.dateTime ?? DateTime.now();
     _titleController.text = widget.transaction?.title ?? '';
     _amountController.text = widget.transaction?.amount.toString() ?? '';
-    _notesController.text = widget.transaction?.notes ?? '';
+    _descriptionController.text = widget.transaction?.description ?? '';
     _selectedType = widget.transaction?.type ?? 'Personal';
     deductible = widget.transaction?.deductible ?? false;
     _selectedCategory = widget.transaction?.category;
     _selectedSubcategory = widget.transaction?.subcategory;
-  }
-
-  String _getMonthName(int month) {
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    return months[month - 1];
   }
 
   Future<void> _selectCategory() async {
@@ -158,11 +169,11 @@ class _AddTransactionScreenManualState
       subcategory: _selectedSubcategory!,
       type: _selectedType,
       deductible: deductible,
-      notes: _notesController.text,
-      date: _dateController.text,
+      description: _descriptionController.text,
+      dateTime: _selectedDate!,
       filePath: _selectedFile?.path,
-      ownerId: authPerson!.id,
-      organizationId: getCurrentOrganization!.id,
+      userId: authPerson!.id,
+      orgId: getCurrentOrganization!.id,
     );
 
     if (widget.transaction == null) {
@@ -173,15 +184,38 @@ class _AddTransactionScreenManualState
         id: widget.transaction?.id ?? 0,
       );
     }
-    updateData();
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    bool isTextFieldEnabled = widget.transaction == null
+        ? true
+        : !widget.transaction!.isFromBank;
+
     return Scaffold(
-      appBar: kIsWeb ? null : AppBar(title: const Text("Add Transaction")),
+      appBar: kIsWeb
+          ? null
+          : AppBar(
+              title: Text(isUpdate ? "Update Transaction" : "Add Transaction"),
+              actions: [
+                if (canTransactionBeDeleted(widget.transaction))
+                  IconButton(
+                    onPressed: () {
+                      if (canTransactionBeDeleted(widget.transaction!)) {
+                        deleteTransaction(widget.transaction!);
+                      } else {
+                        showSnackBar(
+                          "Transaction cannot be deleted",
+                          isError: true,
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.delete_forever),
+                  ),
+              ],
+            ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -199,14 +233,39 @@ class _AddTransactionScreenManualState
 
             AppText("Date", fontSize: 14, fontWeight: FontWeight.w500),
             0.01.verticalSpace,
-            AppTextField(
-              controller: _dateController,
-              hintText: "Transaction date",
-              maxLines: 1,
-              fieldValidator: (v) => v == null || v.isEmpty ? "Required" : null,
+            InkWell(
+              onTap: isTextFieldEnabled
+                  ? () async {
+                      await getDateTimeInput(
+                        context: context,
+                        firstDateTime: DateTime(1900),
+                        lastDate: DateTime.now(),
+                      ).then((DateTime? pickedDate) async {
+                        if (pickedDate != null) {
+                          _selectedDate = pickedDate;
+                          _dateController.text = Jiffy.parseFromDateTime(
+                            _selectedDate!,
+                          ).yMMMdjm;
+                        }
+                      });
+                    }
+                  : null,
+              borderRadius: BorderRadius.circular(20),
+              child: AbsorbPointer(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 5),
+                  child: AppTextField(
+                    controller: _dateController,
+                    hintText: "Transaction date",
+                    maxLines: 1,
+                    isEnabled: isTextFieldEnabled,
+                    fieldValidator: (v) =>
+                        v == null || v.isEmpty ? "Required" : null,
+                  ),
+                ),
+              ),
             ),
             0.01.verticalSpace,
-
             AppText("Amount", fontSize: 14, fontWeight: FontWeight.w500),
             0.01.verticalSpace,
             AppTextField(
@@ -215,6 +274,7 @@ class _AddTransactionScreenManualState
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              isEnabled: isTextFieldEnabled,
               fieldValidator: (v) => v == null || v.isEmpty ? "Required" : null,
             ),
             0.01.verticalSpace,
@@ -231,7 +291,7 @@ class _AddTransactionScreenManualState
                 decoration: BoxDecoration(
                   color: colorScheme.surface,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: colorScheme.outline),
+                  border: Border.all(color: colorScheme.outline, width: 0.2),
                 ),
                 child: Text(
                   _selectedCategory == null
@@ -257,23 +317,28 @@ class _AddTransactionScreenManualState
             ),
             0.02.verticalSpace,
 
-            SwitchListTile(
-              title: const AppText("Deductible"),
-              value: deductible,
-              onChanged: (val) => setState(() => deductible = val),
+            Material(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+                side: const BorderSide(color: Colors.grey, width: 0.2),
+              ),
+              child: SwitchListTile(
+                title: const AppText("Deductible"),
+                value: deductible,
+                onChanged: (val) => setState(() => deductible = val),
+              ),
             ),
             0.01.verticalSpace,
 
             AppText("Notes", fontSize: 14, fontWeight: FontWeight.w500),
             0.01.verticalSpace,
             AppTextField(
-              controller: _notesController,
+              controller: _descriptionController,
               hintText: "Notes (optional)",
               maxLines: 3,
             ),
             0.01.verticalSpace,
 
-            // With this:
             if (_selectedFile != null || (_selectedFileBytes != null && kIsWeb))
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -292,13 +357,23 @@ class _AddTransactionScreenManualState
             ElevatedButton.icon(
               onPressed: _attachReceipt,
               icon: const Icon(Icons.camera_alt, color: primaryColor),
-              label: const AppText("Attach Receipt", color: primaryColor),
+              label: const AppText(
+                "Attach Receipt",
+                color: primaryColor,
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
+              ),
             ),
             0.01.verticalSpace,
 
             ElevatedButton(
               onPressed: _saveTransaction,
-              child: const AppText("Save Transaction", color: primaryColor),
+              child: AppText(
+                isUpdate ? "Update Transaction" : "Save Transaction",
+                color: primaryColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 16,
+              ),
             ),
           ],
         ),

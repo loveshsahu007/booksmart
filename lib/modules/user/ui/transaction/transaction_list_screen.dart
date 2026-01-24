@@ -7,9 +7,11 @@ import 'package:booksmart/modules/user/ui/transaction/add_transaction_manual.dar
 import 'package:booksmart/widgets/date_range_picker.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:get/get.dart';
+import '../../controllers/bank_controller.dart';
 import '../../controllers/organization_controller.dart';
 import '../../../../widgets/custom_drop_down.dart';
 import '../../../../widgets/custom_dialog.dart';
+import 'components/transaction_card.dart';
 
 class TransactionListScreen extends StatefulWidget {
   const TransactionListScreen({super.key});
@@ -45,7 +47,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
             .firstWhere((c) => c.name == selectedCategoryName)
             .id;
       } catch (_) {
-        categoryId = selectedCategoryName; // Fallback to name if not found
+        categoryId = selectedCategoryName;
       }
     }
 
@@ -143,6 +145,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     ).then((_) => setState(() {}));
   }
 
+  // TODO: Shahzad Please show the bank accounts in the filter dropdown and handle it inside query
   Widget _buildFilterDropdown({
     required String label,
     required List<String> items,
@@ -203,6 +206,11 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     } else {
       categoryController = Get.put(CategoryAdminController(), permanent: true);
     }
+    if (!Get.isRegistered<BankController>(
+      tag: getCurrentOrganization!.id.toString(),
+    )) {
+      Get.put(BankController(), tag: getCurrentOrganization!.id.toString());
+    }
     super.initState();
   }
 
@@ -210,207 +218,160 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Obx(() {
-      return Scaffold(
-        appBar: AppBar(title: const Text("Transaction History")),
-        body: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          child: Row(
             children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  AppText(
-                    isAnyActiveFilter
-                        ? "Showing ${transactionC.transactions.length} transactions"
-                        : "Total ${transactionC.transactions.length} transactions",
-                    fontSize: 12,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  IconButton(
-                    icon: Badge(
-                      isLabelVisible: isAnyActiveFilter,
-                      child: const Icon(Icons.filter_list),
-                    ),
-                    onPressed: _showFilterDialog,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-
-              AppTextField(
-                hintText: "Search transactions",
-                prefixWidget: const Icon(Icons.search),
-                onChanged: (value) {
-                  searchQuery = value;
-                  if (_debounce?.isActive ?? false) _debounce!.cancel();
-                  _debounce = Timer(const Duration(milliseconds: 500), () {
-                    _applyFilters();
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
               Expanded(
-                child: GetBuilder<TransactionController>(
-                  tag: getCurrentOrganization!.id.toString(),
-                  builder: (controller) {
-                    if (controller.isLoading.value) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    if (controller.transactions.isEmpty) {
-                      return const Center(child: Text("No transactions found"));
-                    }
-
-                    final allTransactions = controller.transactions;
-
-                    return ListView.separated(
-                      itemCount:
-                          allTransactions.length + (controller.hasMore ? 1 : 0),
-                      separatorBuilder: (_, index) {
-                        return const SizedBox(height: 8);
-                      },
-                      itemBuilder: (context, index) {
-                        if (index == allTransactions.length) {
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            child: controller.isLoadMoreLoading.value
-                                ? const Center(
-                                    child: CircularProgressIndicator(),
-                                  )
-                                : ElevatedButton(
-                                    onPressed: () {
-                                      controller.getTransactions(
-                                        isLoadMore: true,
-                                        searchQuery: searchQuery,
-                                        category: categoryDropdownKey
-                                            .currentState
-                                            ?.getSelectedItem,
-                                        type: typeDropdownKey
-                                            .currentState
-                                            ?.getSelectedItem,
-                                        amountRange: amountRangeDropdownKey
-                                            .currentState
-                                            ?.getSelectedItem,
-                                        startDate: startDate,
-                                        endDate: endDate,
-                                      );
-                                    },
-                                    child: const Text("Load More"),
-                                  ),
-                          );
-                        }
-                        final t = allTransactions[index];
-                        final amountColor = t.amount < 0
-                            ? Colors.red
-                            : Colors.green;
-
-                        return InkWell(
-                          onTap: () {
-                            goToAddTransactionScreen(tr: t);
-                          },
-                          child: Card(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ListTile(
-                              title: AppText(
-                                t.title,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  AppText(
-                                    "${categoryController.getCategoryName(t.category)} • ${categoryController.getSubCategoryName(t.subcategory)}",
-                                    fontSize: 12,
-                                  ),
-                                  AppText(
-                                    "Type : ${t.type} • ${t.deductible ? "Deductible" : ""}",
-                                    fontSize: 11,
-                                  ),
-                                ],
-                              ),
-                              trailing: Column(
-                                children: [
-                                  AppText(
-                                    t.date,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  AppText(
-                                    "\$${t.amount.toStringAsFixed(2)}",
-                                    color: amountColor,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    );
+                child: AppTextField(
+                  hintText: "Search transactions",
+                  prefixWidget: const Icon(Icons.search),
+                  onChanged: (value) {
+                    searchQuery = value;
+                    if (_debounce?.isActive ?? false) _debounce!.cancel();
+                    _debounce = Timer(const Duration(milliseconds: 500), () {
+                      _applyFilters();
+                    });
                   },
                 ),
               ),
-              // Bottom buttons
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () =>
-                          goToBulkReviewScreen(shouldCloseBefore: false),
-                      icon: const Icon(
-                        Icons.category_outlined,
-                        color: Colors.black,
-                      ),
-                      label: const AppText(
-                        "AI Categorization",
-                        color: Colors.black,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => goToAddTransactionScreen(),
-                      icon: const Icon(Icons.add, color: Colors.black),
-                      label: const AppText(
-                        "Add Transaction",
-                        color: Colors.black,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              IconButton(
+                icon: Badge(
+                  isLabelVisible: isAnyActiveFilter,
+                  child: const Icon(Icons.filter_list),
+                ),
+                onPressed: _showFilterDialog,
               ),
             ],
           ),
         ),
-      );
-    });
+        const SizedBox(height: 12),
+        Expanded(
+          child: GetBuilder<BankController>(
+            tag: getCurrentOrganization!.id.toString(),
+            builder: (bankController) {
+              if (bankController.isLoading.value) {
+                return const Center(
+                  child: CircularProgressIndicator.adaptive(),
+                );
+              }
+              return GetBuilder<TransactionController>(
+                tag: getCurrentOrganization!.id.toString(),
+                builder: (controller) {
+                  if (controller.isLoading.value) {
+                    return const Center(
+                      child: CircularProgressIndicator.adaptive(),
+                    );
+                  }
+
+                  if (controller.transactions.isEmpty) {
+                    return const Center(child: Text("No transactions found"));
+                  }
+
+                  final allTransactions = controller.transactions;
+
+                  return ListView.separated(
+                    padding: EdgeInsets.symmetric(horizontal: 15),
+                    itemCount:
+                        allTransactions.length + (controller.hasMore ? 1 : 0),
+                    separatorBuilder: (_, index) {
+                      return const SizedBox(height: 20);
+                    },
+                    itemBuilder: (context, index) {
+                      if (index == allTransactions.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          child: controller.isLoadMoreLoading.value
+                              ? const Center(child: CircularProgressIndicator())
+                              : ElevatedButton(
+                                  onPressed: () {
+                                    controller.getTransactions(
+                                      isLoadMore: true,
+                                      searchQuery: searchQuery,
+                                      category: categoryDropdownKey
+                                          .currentState
+                                          ?.getSelectedItem,
+                                      type: typeDropdownKey
+                                          .currentState
+                                          ?.getSelectedItem,
+                                      amountRange: amountRangeDropdownKey
+                                          .currentState
+                                          ?.getSelectedItem,
+                                      startDate: startDate,
+                                      endDate: endDate,
+                                    );
+                                  },
+                                  child: const Text("Load More"),
+                                ),
+                        );
+                      }
+
+                      return TransactionCard(
+                        transaction: allTransactions[index],
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        // Bottom buttons
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () =>
+                      goToBulkReviewScreen(shouldCloseBefore: false),
+                  icon: const Icon(
+                    Icons.category_outlined,
+                    color: Colors.black,
+                  ),
+                  label: const AppText(
+                    "AI Categorization",
+                    color: Colors.black,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => goToAddTransactionScreen(),
+                  icon: const Icon(Icons.add, color: Colors.black),
+                  label: const AppText(
+                    "Add Transaction",
+                    color: Colors.black,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }

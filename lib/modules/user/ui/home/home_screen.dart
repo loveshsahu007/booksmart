@@ -138,7 +138,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               },
                               trallingIcon: Icons.swap_horiz_outlined,
                             ),
-
                             DrawerItemWidget(
                               title: "AI Chat",
                               onTap: () {

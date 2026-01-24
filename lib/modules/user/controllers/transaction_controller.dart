@@ -50,7 +50,7 @@ class TransactionController extends GetxController {
       dynamic query = supabase
           .from(table)
           .select()
-          .eq('organization_id', getCurrentOrganization!.id);
+          .eq('org_id', getCurrentOrganization!.id);
 
       // Search filter
       if (searchQuery != null && searchQuery.isNotEmpty) {
@@ -98,13 +98,16 @@ class TransactionController extends GetxController {
 
       // Date filter
       if (startDate != null && endDate != null) {
-        query = query.gte('date', startDate.toIso8601String().split('T')[0]);
-        query = query.lte('date', endDate.toIso8601String().split('T')[0]);
+        query = query.gte(
+          'date_time',
+          startDate.toIso8601String().split('T')[0],
+        );
+        query = query.lte('date_time', endDate.toIso8601String().split('T')[0]);
       }
 
       // Pagination and Sorting
       query = query
-          .order('date', ascending: false)
+          .order('date_time', ascending: false)
           .range(_offset, _offset + _limit - 1);
 
       final res = await query;
@@ -143,12 +146,15 @@ class TransactionController extends GetxController {
     try {
       Map<String, dynamic> json = transaction.toJson();
       json.remove("id");
-      await SupabaseCrudService.create(table: table, data: json);
+      await SupabaseCrudService.create(
+        table: table,
+        data: json,
+        isShowLoading: true,
+      );
       getAllTransactions();
       Get.back();
       showSnackBar("Transaction added successfully");
     } catch (e, s) {
-      log("❌ addTransaction ERROR");
       log(e.toString());
       log(s.toString());
       somethingWentWrongSnackbar();
@@ -168,6 +174,7 @@ class TransactionController extends GetxController {
         table: table,
         data: json,
         filters: {'id': id},
+        isShowLoading: true,
       );
       getAllTransactions();
       Get.back();
@@ -185,13 +192,14 @@ class TransactionController extends GetxController {
     try {
       await SupabaseCrudService.delete(table: table, filters: {'id': id});
       transactions.removeWhere((tx) => tx.id == id);
-      update();
       showSnackBar("Transaction deleted");
     } catch (e, s) {
       log("❌ deleteTransaction ERROR");
       log(e.toString());
       log(s.toString());
       somethingWentWrongSnackbar();
+    } finally {
+      update();
     }
   }
 }

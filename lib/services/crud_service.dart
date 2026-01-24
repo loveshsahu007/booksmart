@@ -2,6 +2,8 @@ import 'dart:developer';
 
 import 'package:booksmart/utils/supabase.dart';
 
+import '../widgets/loading.dart';
+
 class SupabaseCrudService {
   /// ---------------------------
   /// CREATE (INSERT) - Add alias for create
@@ -9,16 +11,24 @@ class SupabaseCrudService {
   static Future<dynamic> create({
     required String table,
     required Map<String, dynamic> data,
+    bool isShowLoading = false,
   }) async {
+    if (isShowLoading) {
+      showLoading();
+    }
     try {
       final res = await supabase.from(table).insert(data).select().whenComplete(
         () {
-          log("***/////***???---- Data inserted ");
+          log("***/////***???---- Data inserted in $table");
         },
       );
-      return res; // returns inserted row(s)
+      return res;
     } catch (e) {
       throw Exception("Insert failed: $e");
+    } finally {
+      if (isShowLoading) {
+        dismissLoadingWidget();
+      }
     }
   }
 
@@ -73,7 +83,11 @@ class SupabaseCrudService {
     required String table,
     required Map<String, dynamic> data,
     required Map<String, dynamic> filters,
+    bool isShowLoading = false,
   }) async {
+    if (isShowLoading) {
+      showLoading();
+    }
     try {
       var query = supabase.from(table).update(data);
 
@@ -85,6 +99,10 @@ class SupabaseCrudService {
       return res;
     } catch (e) {
       throw Exception("Update failed: $e");
+    } finally {
+      if (isShowLoading) {
+        dismissLoadingWidget();
+      }
     }
   }
 

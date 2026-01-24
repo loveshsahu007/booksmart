@@ -155,14 +155,14 @@ class AppTheme {
         ),
       ),
       listTileTheme: const ListTileThemeData(
-        tileColor: Color.fromARGB(66, 187, 187, 187),
+        // tileColor: Color.fromARGB(66, 187, 187, 187),
         textColor: Colors.black,
         iconColor: Colors.black,
         selectedColor: AppColorsDark.primary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(8.0)),
         ),
-        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12),
       ),
 
       dividerColor: AppColorsLight.divider,
@@ -226,7 +226,7 @@ class AppTheme {
         textTheme: ButtonTextTheme.primary,
       ),
       listTileTheme: const ListTileThemeData(
-        tileColor: AppColorsDark.surface, // background for list tiles
+        // tileColor: AppColorsDark.surface, // background for list tiles
         textColor: Color(0xFFE8F0FE),
         iconColor: Color(0xFFE8F0FE),
         selectedColor: AppColorsLight.primary,
@@ -235,7 +235,7 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(8.0)),
         ),
-        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12),
       ),
       // 🌙 DARK THEME
       inputDecorationTheme: InputDecorationTheme(

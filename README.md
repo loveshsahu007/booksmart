@@ -16,3 +16,6 @@
 
 ## Supabase Tables
 - id type should be int8 and from setting icon set it to IDENTITY
+
+## TODO
+- confirm transaction TYPE again, and also adjust it in case of PLAID ... 

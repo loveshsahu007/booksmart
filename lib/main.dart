@@ -13,6 +13,8 @@ import 'modules/common/ui/error_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   setPathUrlStrategy();
+  // final fetchClient = FetchClient(mode: RequestMode.cors);
+
   await Supabase.initialize(
     url: 'https://pvppwmkswnluidlwnnck.supabase.co',
     anonKey:

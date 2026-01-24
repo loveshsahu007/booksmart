@@ -59,6 +59,8 @@ dependencies:
   path: ^1.9.1
   uuid: ^4.5.2
   jiffy: ^6.4.4
+  plaid_flutter: ^5.0.5
+  google_fonts: ^7.0.2
 
 dev_dependencies:
   flutter_test:

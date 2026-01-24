@@ -55,13 +55,11 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     _selectedSubcategory = widget.selectedSubcategory;
   }
 
-void _selectSubcategory(int categoryId, int subcategoryId) {
-  Get.back(result: {
-    'categoryId': categoryId,
-    'subcategoryId': subcategoryId,
-  });
-}
-
+  void _selectSubcategory(int categoryId, int subcategoryId) {
+    Get.back(
+      result: {'categoryId': categoryId, 'subcategoryId': subcategoryId},
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -183,10 +181,7 @@ void _selectSubcategory(int categoryId, int subcategoryId) {
                         ? Icon(Icons.check, color: colorScheme.primary)
                         : null,
                     dense: true,
-                    onTap: () => _selectSubcategory(
-                      categoryId,
-                      sub.id,
-                    ),
+                    onTap: () => _selectSubcategory(categoryId, sub.id),
                   );
                 }).toList(),
               );
