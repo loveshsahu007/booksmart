@@ -6,4 +6,6 @@ class SupabaseTable {
   static String category = 'category';
   static String subCategory = 'sub_category';
   static String categoryRules = 'category_rules';
+  static String chats = 'chats';
+  static String messages = 'messages';
 }

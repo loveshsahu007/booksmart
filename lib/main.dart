@@ -40,7 +40,7 @@ class MyApp extends StatelessWidget {
       navigatorKey: navigatorKey,
       theme: AppTheme.lightTheme(),
       darkTheme: AppTheme.darkTheme(),
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark,
       initialRoute: initialRoute,
       getPages: AppPages.routes,
       defaultTransition: kIsWeb ? Transition.noTransition : null,

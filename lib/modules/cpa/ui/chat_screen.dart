@@ -2,121 +2,57 @@ import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:booksmart/models/user_base_model.dart';
+import '../controllers/chat_controller.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 
 // Add this function to open chat as dialog on web
-void goToChatScreen({bool shouldCloseBefore = false}) {
+void goToChatScreen(PersonModel otherUser, {bool shouldCloseBefore = false}) {
   if (kIsWeb) {
     if (shouldCloseBefore) {
       Get.back(); // close previous dialog
     }
     customDialog(
-      child: const ChatScreen(),
+      child: ChatScreen(otherUser: otherUser),
       title: 'Messaging',
       barrierDismissible: true,
       maxWidth: 600, // Adjusted for better chat experience
     );
   } else {
     if (shouldCloseBefore) {
-      Get.off(() => const ChatScreen());
+      Get.off(() => ChatScreen(otherUser: otherUser));
     } else {
-      Get.to(() => const ChatScreen());
+      Get.to(() => ChatScreen(otherUser: otherUser));
     }
   }
 }
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final PersonModel otherUser;
+  const ChatScreen({super.key, required this.otherUser});
 
   @override
-  State<ChatScreen> createState() => _ChatListScreenCPAState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatListScreenCPAState extends State<ChatScreen> {
-  final List<Map<String, dynamic>> messages = [
-    {
-      'text':
-          "I'd like to connect and discuss how I can support your tax planning needs.",
-      'isMe': false,
-      'time': '9:15 AM',
-    },
-    {
-      'text': "Sure, I'd be happy to assist you with that.",
-      'isMe': true,
-      'time': '9:16 AM',
-    },
-    {
-      'text': "Great! When are you available to get started?",
-      'isMe': false,
-      'time': '9:21 AM',
-    },
-    {
-      'text': "Let's schedule an initial meeting next week.",
-      'isMe': true,
-      'time': '9:22 AM',
-    },
-    {
-      'text': "Got it! Let's schedule a 15-minute intro call",
-      'isMe': false,
-      'time': '9:23 AM',
-    },
-    {
-      'text': "Let's schedule an initial meeting next week.",
-      'isMe': true,
-      'time': '9:22 AM',
-    },
-    {
-      'text': "Got it! Let's schedule a 15-minute intro call",
-      'isMe': false,
-      'time': '9:23 AM',
-    },
-    {
-      'text': "Let's schedule an initial meeting next week.",
-      'isMe': true,
-      'time': '9:22 AM',
-    },
-    {
-      'text': "Got it! Let's schedule a 15-minute intro call",
-      'isMe': false,
-      'time': '9:23 AM',
-    },
-    {
-      'text': "Let's schedule an initial meeting next week.",
-      'isMe': true,
-      'time': '9:22 AM',
-    },
-    {
-      'text': "Got it! Let's schedule a 15-minute intro call",
-      'isMe': false,
-      'time': '9:23 AM',
-    },
-    {
-      'text': "Let's schedule an initial meeting next week.",
-      'isMe': true,
-      'time': '9:22 AM',
-    },
-    {
-      'text': "Got it! Let's schedule a 15-minute intro call",
-      'isMe': false,
-      'time': '9:23 AM',
-    },
-  ];
-
+class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
-  bool autoSync = true;
+  final ChatController chatController = Get.put(ChatController());
+
+  // To handle scrolling
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    chatController.loadChat(widget.otherUser.id);
+  }
 
   void _sendMessage() {
     if (_controller.text.trim().isEmpty) return;
-
-    setState(() {
-      messages.add({
-        'text': _controller.text,
-        'isMe': true,
-        'time': _formatTime(DateTime.now()),
-      });
-      _controller.clear();
-    });
-
-    // Auto-scroll to bottom would be nice here
+    chatController.sendMessage(_controller.text);
+    _controller.clear();
+    // Scroll to bottom is handled by list reverse normally, but if needed we can animate
   }
 
   String _formatTime(DateTime time) {
@@ -126,83 +62,106 @@ class _ChatListScreenCPAState extends State<ChatScreen> {
     return '$hour:$minute $period';
   }
 
+  // Calculate isMe helper
+  // Calculate isMe helper
+  bool _isMe(int senderId) {
+    return senderId == (Get.find<AuthController>().person?.id ?? -1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
+    // Use the other user's name
+    final title = "${widget.otherUser.firstName} ${widget.otherUser.lastName}";
 
     return Scaffold(
       // Only show app bar on mobile, dialog handles title on web
       appBar: kIsWeb
           ? null
           : AppBar(
-              title: const AppText(
-                "Messaging",
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              title: AppText(title, fontSize: 18, fontWeight: FontWeight.bold),
               centerTitle: true,
             ),
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: messages.length,
-              reverse: true,
-              itemBuilder: (context, index) {
-                final msg = messages[index];
-                final isMe = msg['isMe'] as bool;
-                return Align(
-                  alignment: isMe
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.75,
-                    ),
-                    margin: const EdgeInsets.symmetric(vertical: 6),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isMe
-                          ? colorScheme.primary.withValues(alpha: 0.9)
-                          : colorScheme.surfaceVariant.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(14),
-                        topRight: const Radius.circular(14),
-                        bottomLeft: isMe
-                            ? const Radius.circular(14)
-                            : const Radius.circular(0),
-                        bottomRight: isMe
-                            ? const Radius.circular(0)
-                            : const Radius.circular(14),
+            child: Obx(() {
+              if (chatController.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              final messages = chatController.messages;
+              if (messages.isEmpty) {
+                return const Center(child: Text("Start the conversation now!"));
+              }
+
+              return ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(16),
+                itemCount: messages.length,
+                reverse:
+                    true, // Show newest at bottom (requires sorted descending)
+                itemBuilder: (context, index) {
+                  final msg = messages[index];
+                  final isMe = _isMe(msg.senderId);
+
+                  return Align(
+                    alignment: isMe
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: Card(
+                      child: Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.75,
+                        ),
+                        margin: const EdgeInsets.symmetric(vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          // color: isMe
+                          //     ? colorScheme.primary.withValues(alpha: 0.9)
+                          //     : colorScheme.surfaceVariant.withValues(
+                          //         alpha: 0.2,
+                          //       ),
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(14),
+                            topRight: const Radius.circular(14),
+                            bottomLeft: isMe
+                                ? const Radius.circular(14)
+                                : const Radius.circular(0),
+                            bottomRight: isMe
+                                ? const Radius.circular(0)
+                                : const Radius.circular(14),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: isMe
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: [
+                            AppText(
+                              msg.content,
+                              fontSize: 14,
+                              //color: isMe ? Colors.black : null,
+                            ),
+                            const SizedBox(height: 4),
+                            AppText(
+                              _formatTime(msg.createdAt.toLocal()),
+                              fontSize: 10,
+                              //color: isMe ? Colors.black : Colors.black,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: isMe
-                          ? CrossAxisAlignment.end
-                          : CrossAxisAlignment.start,
-                      children: [
-                        AppText(
-                          msg['text'],
-                          fontSize: 14,
-                          color: isMe ? Colors.white : null,
-                        ),
-                        const SizedBox(height: 4),
-                        AppText(
-                          msg['time'],
-                          fontSize: 10,
-                          color: isMe ? Colors.white70 : Colors.grey,
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              );
+            }),
           ),
 
           // Text Field and Buttons
@@ -230,6 +189,7 @@ class _ChatListScreenCPAState extends State<ChatScreen> {
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 }

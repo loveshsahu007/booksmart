@@ -66,4 +66,8 @@ class AdminCpaController extends GetxController {
       log(s.toString());
     }
   }
+
+  List<CpaModel> get approvedCpas => cpas
+      .where((c) => c.verificationStatus == CpaVerificationStatus.approved)
+      .toList();
 }
