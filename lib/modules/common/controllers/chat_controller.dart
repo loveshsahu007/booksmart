@@ -33,10 +33,7 @@ class ChatController extends GetxController {
 
       ChatModel? chat = await _getChat(otherUserId);
 
-      if (chat == null) {
-        // Create new chat
-        chat = await _createChat(otherUserId);
-      }
+      chat ??= await _createChat(otherUserId);
 
       if (chat != null) {
         currentChat.value = chat;
@@ -52,23 +49,13 @@ class ChatController extends GetxController {
 
   Future<ChatModel?> _getChat(int otherUserId) async {
     try {
-      Map<String, dynamic> filters = {};
-
-      // Assumption: Current user is User, Other is CPA.
-      // Or we can query both combinations to be safe if roles are fluid.
-      // But based on schema: user_id (User) and cpa_id (Cpa).
-
-      if (currentUserRole == UserRole.cpa) {
-        filters = {'cpa_id': currentUserId, 'user_id': otherUserId};
-      } else {
-        filters = {'user_id': currentUserId, 'cpa_id': otherUserId};
-      }
-
-      final result = await SupabaseCrudService.read(
-        table: SupabaseTable.chats,
-        filters: filters,
-        single: true,
-      );
+      final result = await supabase
+          .from(SupabaseTable.chats)
+          .select()
+          .or(
+            'and(sender_id.eq.$currentUserId,receiver_id.eq.$otherUserId),and(sender_id.eq.$otherUserId,receiver_id.eq.$currentUserId)',
+          )
+          .maybeSingle();
 
       if (result != null) {
         return ChatModel.fromJson(result);
@@ -82,12 +69,12 @@ class ChatController extends GetxController {
 
   Future<ChatModel?> _createChat(int otherUserId) async {
     try {
-      Map<String, dynamic> data = {};
-      if (currentUserRole == UserRole.cpa) {
-        data = {'cpa_id': currentUserId, 'user_id': otherUserId};
-      } else {
-        data = {'user_id': currentUserId, 'cpa_id': otherUserId};
-      }
+      final data = {
+        'sender_id': currentUserId,
+        'receiver_id': otherUserId,
+        'last_message': '',
+        'last_message_time': DateTime.now().toIso8601String(),
+      };
 
       final result = await SupabaseCrudService.insert(
         table: SupabaseTable.chats,
@@ -150,8 +137,41 @@ class ChatController extends GetxController {
 
       // Reload messages to show instantly
       await fetchMessages(currentChat.value!.id);
+
+      // Update chat last message
+      await SupabaseCrudService.update(
+        table: SupabaseTable.chats,
+        data: {
+          'last_message': content,
+          'last_message_time': DateTime.now().toIso8601String(),
+        },
+        filters: {'id': currentChat.value!.id},
+      );
     } catch (e) {
       log("Error sending message: $e");
+    }
+  }
+
+  // --- Recent Chats Logic ---
+
+  final myChats = <ChatModel>[].obs;
+
+  Future<void> fetchMyChats() async {
+    try {
+      isLoading.value = true;
+      final result = await supabase
+          .from(SupabaseTable.chats)
+          .select('*, sender:sender_id(*), receiver:receiver_id(*)')
+          .or('sender_id.eq.$currentUserId,receiver_id.eq.$currentUserId')
+          .order('last_message_time', ascending: false);
+
+      myChats.value = (result as List)
+          .map((e) => ChatModel.fromJson(e))
+          .toList();
+    } catch (e) {
+      log("Error fetching my chats: $e");
+    } finally {
+      isLoading.value = false;
     }
   }
 }

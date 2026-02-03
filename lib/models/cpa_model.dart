@@ -12,6 +12,7 @@ class CpaModel extends Core {
   final String certificationProofUrl;
   final String licenseCopyUrl;
   final bool termsAgreed;
+  final double hourlyRate;
 
   final CpaVerificationStatus verificationStatus;
   final int? verifiedBy;
@@ -41,6 +42,7 @@ class CpaModel extends Core {
     required this.certificationProofUrl,
     required this.licenseCopyUrl,
     required this.termsAgreed,
+    required this.hourlyRate,
     required this.verificationStatus,
     required this.verifiedBy,
     required this.verifiedAt,
@@ -71,6 +73,8 @@ class CpaModel extends Core {
       licenseCopyUrl:
           handleResponseFromJson<String>(json, "license_copy_url") ?? "",
       termsAgreed: handleResponseFromJson<bool>(json, "terms_agreed") ?? false,
+      hourlyRate: (handleResponseFromJson<num>(json, "hourly_rate") ?? 50.0)
+          .toDouble(),
       verificationStatus: () {
         String status =
             handleResponseFromJson<String>(json, "verification_status") ??
@@ -96,6 +100,7 @@ class CpaModel extends Core {
       "certification_proof_url": certificationProofUrl,
       "license_copy_url": licenseCopyUrl,
       "terms_agreed": termsAgreed,
+      "hourly_rate": hourlyRate,
       "verification_status": verificationStatus,
       "verified_by": verifiedBy,
       "verified_at": verifiedAt?.toIso8601String(),

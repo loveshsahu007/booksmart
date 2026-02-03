@@ -1,32 +1,36 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../../widgets/confirmation_dialog.dart';
 import '../../../../widgets/custom_dialog.dart';
 
-void goToCpaDetailScreen({bool shouldCloseBefore = false}) {
+import 'package:booksmart/models/user_base_model.dart';
+
+void goToCpaDetailScreen(CpaModel cpa, {bool shouldCloseBefore = false}) {
   if (kIsWeb) {
     if (shouldCloseBefore) {
       Get.back(); // close previous dialog
     }
     customDialog(
-      child: const CpaDetailScreen(),
+      child: CpaDetailScreen(cpa: cpa),
       title: 'CPA Details',
       barrierDismissible: true,
       maxWidth: 800,
     );
   } else {
     if (shouldCloseBefore) {
-      Get.off(() => const CpaDetailScreen());
+      Get.off(() => CpaDetailScreen(cpa: cpa));
     } else {
-      Get.to(() => const CpaDetailScreen());
+      Get.to(() => CpaDetailScreen(cpa: cpa));
     }
   }
 }
 
 class CpaDetailScreen extends StatelessWidget {
-  const CpaDetailScreen({super.key});
+  final CpaModel cpa;
+  const CpaDetailScreen({super.key, required this.cpa});
 
   @override
   Widget build(BuildContext context) {
@@ -66,29 +70,35 @@ class CpaDetailScreen extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 40,
-                    backgroundColor: Colors.grey,
-                    child: Icon(
-                      Icons.person_outline,
-                      size: 30,
-                      color: scheme.onPrimary,
-                    ),
+                    backgroundColor: scheme.primary.withValues(alpha: 0.1),
+                    backgroundImage: cpa.imgUrl.isNotEmpty
+                        ? NetworkImage(cpa.imgUrl)
+                        : null,
+                    child: cpa.imgUrl.isEmpty
+                        ? Icon(
+                            Icons.person_outline,
+                            size: 30,
+                            color: scheme.primary,
+                          )
+                        : null,
                   ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.yellow[600],
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.verified,
-                        size: 12,
-                        color: Colors.black,
+                  if (cpa.verificationStatus == CpaVerificationStatus.approved)
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.yellow[600],
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.verified,
+                          size: 12,
+                          color: Colors.black,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(width: 16),
@@ -97,13 +107,13 @@ class CpaDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     AppText(
-                      "Laura Green, CPA, EA",
+                      "${cpa.firstName} ${cpa.lastName}",
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
                     const SizedBox(height: 4),
                     AppText(
-                      "Licensed in CA • 12 years experience",
+                      "${cpa.getExperienceInYears} years experience",
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -112,9 +122,9 @@ class CpaDetailScreen extends StatelessWidget {
                     // Star Rating
                     Row(
                       children: [
-                        _buildStarRating(4.8),
+                        _buildStarRating(5.0), // Hardcoded pending reviews impl
                         const SizedBox(width: 8),
-                        AppText("4.8 (23 reviews)", fontSize: 12),
+                        AppText("5.0 (0 reviews)", fontSize: 12),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -130,7 +140,7 @@ class CpaDetailScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: AppText(
-                        "Starting at \$299 for standard filing",
+                        "Starting at \$${cpa.hourlyRate.toStringAsFixed(0)} for standard filing",
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -145,43 +155,33 @@ class CpaDetailScreen extends StatelessWidget {
 
           // Bio Section
           AppText(
-            "Laura specializes in strategic tax planning for self-employed professionals and small business owners. "
-            "With over a decade of experience across real estate, e-commerce, and service-based businesses, she focuses "
-            "on helping clients minimize taxes and maximize growth.",
+            cpa.professionalBio.isNotEmpty
+                ? cpa.professionalBio
+                : "No professional bio available.",
             fontSize: 13,
           ),
           const SizedBox(height: 20),
 
           // Expertise Sections
-          _buildSectionHeader("Tax Expertise", Icons.receipt_long),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildTag("Tax Planning & Strategy"),
-              _buildTag("Small Business Tax"),
-              _buildTag("Cryptocurrency Taxation"),
-              _buildTag("Bookkeeping Clean-up"),
-            ],
-          ),
-          const SizedBox(height: 20),
+          if (cpa.specialties.isNotEmpty) ...[
+            _buildSectionHeader("Specialties", Icons.receipt_long),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: cpa.specialties.map((e) => _buildTag(e)).toList(),
+            ),
+            const SizedBox(height: 20),
+          ],
 
-          _buildSectionHeader(
-            "Industry-Specific Expertise",
-            Icons.business_center,
-          ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _buildTag("Self-Employed"),
-              _buildTag("E-Commerce"),
-              _buildTag("Real Estate"),
-              _buildTag("Investors"),
-            ],
-          ),
-
-          const SizedBox(height: 24),
+          if (cpa.stateFocuses.isNotEmpty) ...[
+            _buildSectionHeader("State Focuses", Icons.map),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: cpa.stateFocuses.map((e) => _buildTag(e)).toList(),
+            ),
+            const SizedBox(height: 24),
+          ],
 
           // Response Time
           AppText("Typically replies within 24 hours", fontSize: 12),
@@ -194,10 +194,10 @@ class CpaDetailScreen extends StatelessWidget {
               showConfirmationDialog(
                 title: "Confirm Selection",
                 description:
-                    "Are you sure you'd like to connect with Laura Green, CPA, EA?",
+                    "Are you sure you'd like to connect with ${cpa.firstName} ${cpa.lastName}?",
                 onYes: () {
-                  Get.back();
-                  // Navigate to Access Granted screen
+                  Get.back(); // close confirm dialog
+                  goToChatScreen(cpa.data, shouldCloseBefore: false);
                 },
               );
             },

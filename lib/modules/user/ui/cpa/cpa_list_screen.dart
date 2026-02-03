@@ -1,6 +1,6 @@
-import 'dart:developer';
-
+import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/widgets/app_text.dart';
+import 'package:booksmart/widgets/app_text_field.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import '../../../../widgets/custom_dialog.dart';
 import '../../../../widgets/custom_drop_down.dart';
 import 'components/cpa_card.dart';
+import '../../../admin/controllers/cpa_controller.dart';
 
 void goToCpaListScreen({bool shouldCloseBefore = false}) {
   if (kIsWeb) {
@@ -38,12 +39,37 @@ class CpaListScreen extends StatefulWidget {
 }
 
 class _CpaListScreenState extends State<CpaListScreen> {
+  final TextEditingController searchController = TextEditingController();
+  String searchQuery = "";
+
   final stateDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final specialityDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final ratingDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final experienceDropdownKey = GlobalKey<DropdownSearchState<String>>();
-
   final pricingDropdownKey = GlobalKey<DropdownSearchState<String>>();
+
+  // Filter State
+  String? selectedState;
+  String? selectedSpecialty;
+  String? selectedRating;
+  String? selectedExperience;
+  String? selectedPricing;
+
+  @override
+  void initState() {
+    super.initState();
+    searchController.addListener(() {
+      setState(() {
+        searchQuery = searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
 
   void clearFilters() {
     stateDropdownKey.currentState?.clear();
@@ -51,6 +77,14 @@ class _CpaListScreenState extends State<CpaListScreen> {
     ratingDropdownKey.currentState?.clear();
     experienceDropdownKey.currentState?.clear();
     pricingDropdownKey.currentState?.clear();
+
+    setState(() {
+      selectedState = null;
+      selectedSpecialty = null;
+      selectedRating = null;
+      selectedExperience = null;
+      selectedPricing = null;
+    });
   }
 
   Future<void> _showFilterDialog() async {
@@ -60,16 +94,14 @@ class _CpaListScreenState extends State<CpaListScreen> {
         padding: EdgeInsets.all(15),
         shrinkWrap: true,
         children: [
-          // State Filter
           _buildFilterDropdown(
             label: "State",
             items: ['CA', 'NY', 'TX', 'FL', 'IL'],
-
             dropDownKey: stateDropdownKey,
+            onChanged: (val) => selectedState = val,
+            selectedItem: selectedState,
           ),
           const SizedBox(height: 16),
-
-          // Specialty Filter
           _buildFilterDropdown(
             label: "Specialty",
             items: [
@@ -84,33 +116,34 @@ class _CpaListScreenState extends State<CpaListScreen> {
               'Estate Planning',
             ],
             dropDownKey: specialityDropdownKey,
+            onChanged: (val) => selectedSpecialty = val,
+            selectedItem: selectedSpecialty,
           ),
           const SizedBox(height: 16),
-
-          // Rating Filter
           _buildFilterDropdown(
             label: "Rating",
             items: ['4.5+', '4.0+', '3.5+'],
             dropDownKey: ratingDropdownKey,
+            onChanged: (val) => selectedRating = val,
+            selectedItem: selectedRating,
           ),
           const SizedBox(height: 16),
-
-          // Experience Filter
           _buildFilterDropdown(
             label: "Experience",
             items: ['10+ years', '5+ years', '3+ years'],
             dropDownKey: experienceDropdownKey,
+            onChanged: (val) => selectedExperience = val,
+            selectedItem: selectedExperience,
           ),
           const SizedBox(height: 16),
-
-          // Pricing Filter
           _buildFilterDropdown(
             label: "Pricing",
             items: ['Budget', 'Moderate', 'Premium'],
             dropDownKey: pricingDropdownKey,
+            onChanged: (val) => selectedPricing = val,
+            selectedItem: selectedPricing,
           ),
           const SizedBox(height: 16),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
@@ -123,22 +156,25 @@ class _CpaListScreenState extends State<CpaListScreen> {
               ),
               SizedBox(width: 10),
               TextButton(
-                onPressed: () => Get.back(),
+                onPressed: () {
+                  setState(() {}); // Trigger rebuild to apply filters
+                  Get.back();
+                },
                 child: AppText("Apply", fontSize: 14),
               ),
             ],
           ),
         ],
       ),
-    ).then((value) {
-      setState(() {});
-    });
+    );
   }
 
   Widget _buildFilterDropdown({
     required String label,
     required List<String> items,
     required GlobalKey<DropdownSearchState<String>> dropDownKey,
+    required Function(String?) onChanged,
+    String? selectedItem,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -150,82 +186,129 @@ class _CpaListScreenState extends State<CpaListScreen> {
           label: label,
           hint: "Select $label",
           items: items,
+          selectedItem: selectedItem,
+          onChanged: onChanged,
         ),
       ],
     );
   }
 
   bool get isAnyActiveFilter =>
-      stateDropdownKey.currentState?.getSelectedItem != null ||
-      specialityDropdownKey.currentState?.getSelectedItem != null ||
-      ratingDropdownKey.currentState?.getSelectedItem != null ||
-      experienceDropdownKey.currentState?.getSelectedItem != null ||
-      pricingDropdownKey.currentState?.getSelectedItem != null;
+      selectedState != null ||
+      selectedSpecialty != null ||
+      selectedRating != null ||
+      selectedExperience != null ||
+      selectedPricing != null;
+
+  List<CpaModel> _filterCpas(List<CpaModel> cpas) {
+    return cpas.where((cpa) {
+      // 1. Search Query
+      if (searchQuery.isNotEmpty) {
+        final query = searchQuery.toLowerCase();
+        final name = "${cpa.firstName} ${cpa.lastName}".toLowerCase();
+        // Also search in bio or specialties if desired
+        if (!name.contains(query)) {
+          return false;
+        }
+      }
+
+      // 2. State Filter
+      if (selectedState != null && !cpa.stateFocuses.contains(selectedState)) {
+        // Assuming stateFocuses holds state codes like 'CA'
+        // If not exact match, logic might need adjustment
+        return false;
+      }
+
+      // 3. Specialty Filter
+      if (selectedSpecialty != null &&
+          !cpa.specialties.contains(selectedSpecialty)) {
+        return false;
+      }
+
+      // 4. Rating Filter (Placeholder logic since reviews not fully implemented)
+      // if (selectedRating != null) ...
+
+      // 5. Experience Filter
+      if (selectedExperience != null) {
+        int yearThreshold = 0;
+        if (selectedExperience!.contains('10+')) {
+          yearThreshold = 10;
+        } else if (selectedExperience!.contains('5+'))
+          yearThreshold = 5;
+        else if (selectedExperience!.contains('3+'))
+          yearThreshold = 3;
+
+        if (cpa.getExperienceInYears < yearThreshold) return false;
+      }
+
+      // 6. Pricing Filter (Logic based on hourly rate ranges)
+      if (selectedPricing != null) {
+        if (selectedPricing == 'Budget' && cpa.hourlyRate > 100) return false;
+        if (selectedPricing == 'Moderate' &&
+            (cpa.hourlyRate <= 100 || cpa.hourlyRate > 250)) {
+          return false;
+        }
+        if (selectedPricing == 'Premium' && cpa.hourlyRate <= 250) return false;
+      }
+
+      return true;
+    }).toList();
+  }
 
   Widget _buildActiveFilters() {
-    log("isAnyActiveFilter: $isAnyActiveFilter");
     if (!isAnyActiveFilter) return const SizedBox();
 
-    final List<GlobalKey<DropdownSearchState<String>>> activeFiltersKeys = [
-      if (stateDropdownKey.currentState?.getSelectedItem != null)
-        stateDropdownKey,
-      if (specialityDropdownKey.currentState?.getSelectedItem != null)
-        specialityDropdownKey,
-      if (ratingDropdownKey.currentState?.getSelectedItem != null)
-        ratingDropdownKey,
-      if (experienceDropdownKey.currentState?.getSelectedItem != null)
-        experienceDropdownKey,
-      if (pricingDropdownKey.currentState?.getSelectedItem != null)
-        pricingDropdownKey,
-    ];
+    final Map<String, VoidCallback> filters = {};
+    if (selectedState != null) {
+      filters[selectedState!] = () => setState(() => selectedState = null);
+    }
+    if (selectedSpecialty != null) {
+      filters[selectedSpecialty!] = () =>
+          setState(() => selectedSpecialty = null);
+    }
+    if (selectedRating != null) {
+      filters[selectedRating!] = () => setState(() => selectedRating = null);
+    }
+    if (selectedExperience != null) {
+      filters[selectedExperience!] = () =>
+          setState(() => selectedExperience = null);
+    }
+    if (selectedPricing != null) {
+      filters[selectedPricing!] = () => setState(() => selectedPricing = null);
+    }
 
-    log("activeFiltersKeys: $activeFiltersKeys");
-
-    return StatefulBuilder(
-      builder: (context, innerState) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          width: double.infinity,
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: activeFiltersKeys.map((filterKey) {
-              return Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      width: double.infinity,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: filters.entries.map((entry) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Get.theme.colorScheme.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Get.theme.colorScheme.primary),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AppText(entry.key, fontSize: 12),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: entry.value,
+                  child: Icon(
+                    Icons.close,
+                    size: 16,
+                    color: Get.theme.colorScheme.primary,
+                  ),
                 ),
-                decoration: BoxDecoration(
-                  color: Get.theme.colorScheme.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Get.theme.colorScheme.primary),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AppText(
-                      filterKey.currentState?.getSelectedItem ?? "---",
-                      fontSize: 12,
-                    ),
-                    const SizedBox(width: 4),
-                    GestureDetector(
-                      onTap: () {
-                        filterKey.currentState?.clear();
-                        // need to handle it seperately
-                      },
-                      child: Icon(
-                        Icons.close,
-                        size: 16,
-                        color: Get.theme.colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -233,51 +316,81 @@ class _CpaListScreenState extends State<CpaListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: kIsWeb ? null : AppBar(title: const Text("CPAs")),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      body: GetBuilder<AdminCpaController>(
+        init: AdminCpaController(),
+        builder: (controller) {
+          if (controller.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final allCpas = controller.approvedCpas;
+          final filteredCpas = _filterCpas(allCpas);
+
+          return Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    AppText(
-                      "Top CPA Matches",
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText(
+                          "Top CPA Matches",
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                        const SizedBox(height: 4),
+                        AppText(
+                          isAnyActiveFilter || searchQuery.isNotEmpty
+                              ? "Showing ${filteredCpas.length} of ${allCpas.length} verified CPAs that fit your preferences."
+                              : "We found ${allCpas.length} verified CPAs that fit your preferences.",
+                          fontSize: 12,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    AppText(
-                      isAnyActiveFilter
-                          ? "Showing ${1} of ${5} verified CPAs that fit your preferences."
-                          : "We found ${5} verified CPAs that fit your preferences.",
-                      fontSize: 12,
+                    IconButton(
+                      icon: Badge(
+                        isLabelVisible: isAnyActiveFilter,
+                        child: Icon(Icons.filter_list),
+                      ),
+                      onPressed: _showFilterDialog,
                     ),
                   ],
                 ),
-                IconButton(
-                  icon: Badge(
-                    isLabelVisible: isAnyActiveFilter,
-                    child: Icon(Icons.filter_list),
-                  ),
-                  onPressed: _showFilterDialog,
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 15),
+                child: AppTextField(
+                  hintText: "Search CPAs by name...",
+                  controller: searchController,
+                  onChanged: (val) {
+                    // Handled by listener but good to have explicit too if needed
+                    // listener calls setState already
+                  },
                 ),
-              ],
-            ),
-          ),
-          _buildActiveFilters(),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: 5,
-              itemBuilder: (context, index) {
-                return CpaCard();
-              },
-            ),
-          ),
-        ],
+              ),
+              _buildActiveFilters(),
+              Expanded(
+                child: filteredCpas.isEmpty
+                    ? const Center(
+                        child: Text("No CPAs found matching your criteria."),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredCpas.length,
+                        itemBuilder: (context, index) {
+                          return CpaCard(cpa: filteredCpas[index]);
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

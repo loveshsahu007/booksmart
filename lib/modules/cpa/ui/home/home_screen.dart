@@ -1,5 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/modules/cpa/ui/chat_list_screen.dart';
+import 'package:booksmart/modules/common/ui/chat/chat_list_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 

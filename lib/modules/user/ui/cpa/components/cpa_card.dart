@@ -1,10 +1,14 @@
 import 'package:get/get.dart';
 
+import 'package:booksmart/models/user_base_model.dart';
+import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
+
 import '../../../../../constant/exports.dart';
 import '../detail_screen.dart';
 
 class CpaCard extends StatelessWidget {
-  const CpaCard({super.key});
+  final CpaModel cpa;
+  const CpaCard({super.key, required this.cpa});
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +31,7 @@ class CpaCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: () {
-            goToCpaDetailScreen();
+            goToCpaDetailScreen(cpa);
           },
           borderRadius: BorderRadius.circular(16),
           child: Padding(
@@ -41,8 +45,17 @@ class CpaCard extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 30,
-                      backgroundColor: Colors.grey,
-                      child: Icon(Icons.person_outline, size: 30),
+                      backgroundColor: scheme.primary.withValues(alpha: 0.1),
+                      backgroundImage: cpa.imgUrl.isNotEmpty
+                          ? NetworkImage(cpa.imgUrl)
+                          : null,
+                      child: cpa.imgUrl.isEmpty
+                          ? Icon(
+                              Icons.person_outline,
+                              size: 30,
+                              color: scheme.primary,
+                            )
+                          : null,
                     ),
                     const SizedBox(height: 5),
                     FittedText("⭐⭐⭐⭐⭐ • 5.0", style: TextStyle(fontSize: 8)),
@@ -55,47 +68,52 @@ class CpaCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       AppText(
-                        "John Doe",
+                        "${cpa.firstName} ${cpa.lastName}",
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
                       ),
                       const SizedBox(height: 4),
-                      AppText("4 years experience • CA", fontSize: 12),
-                      AppText("Pricing: \$50/hr", fontSize: 12),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Wrap(
-                          spacing: 5,
-                          runSpacing: 5,
-                          children: ["CPA", "Accounting", "Tax Preparation"]
-                              .map((tag) {
-                                return Container(
-                                  padding: const EdgeInsets.all(4),
-                                  decoration: BoxDecoration(
-                                    color: scheme.primary.withValues(
-                                      alpha: 0.1,
-                                    ),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: scheme.primary),
-                                  ),
-                                  child: Text(
-                                    tag,
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: scheme.primary,
-                                    ),
-                                  ),
-                                );
-                              })
-                              .toList(),
-                        ),
+                      AppText(
+                        "${cpa.getExperienceInYears} years experience",
+                        fontSize: 12,
                       ),
+                      AppText(
+                        "Pricing: \$${cpa.hourlyRate.toStringAsFixed(0)}/hr",
+                        fontSize: 12,
+                      ),
+                      const SizedBox(height: 8),
+                      if (cpa.specialties.isNotEmpty)
+                        SizedBox(
+                          width: double.infinity,
+                          child: Wrap(
+                            spacing: 5,
+                            runSpacing: 5,
+                            children: cpa.specialties.take(3).map((tag) {
+                              return Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: scheme.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: scheme.primary),
+                                ),
+                                child: Text(
+                                  tag,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: scheme.primary,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
                     ],
                   ),
                 ),
                 IconButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    goToChatScreen(cpa.data, shouldCloseBefore: false);
+                  },
                   icon: Icon(Icons.chat_bubble_outline),
                 ),
               ],

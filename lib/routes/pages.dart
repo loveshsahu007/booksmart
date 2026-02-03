@@ -5,13 +5,12 @@ import 'package:booksmart/modules/admin/ui/settings_screen.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
-import 'package:booksmart/modules/cpa/ui/chat_list_screen.dart';
+import 'package:booksmart/modules/common/ui/chat/chat_list_screen.dart';
 import 'package:booksmart/modules/cpa/ui/profile_screen.dart';
 import 'package:booksmart/modules/cpa/ui/profile_under_review_screen.dart';
 import 'package:booksmart/modules/cpa/ui/settings_screen.dart';
 import 'package:booksmart/modules/common/ui/authentication/login_screen.dart';
 import 'package:booksmart/modules/common/ui/authentication/signup_screen.dart';
-import 'package:booksmart/modules/user/ui/chat/chat_screen.dart';
 import 'package:booksmart/modules/user/ui/cpa/dashboard_screen.dart';
 import 'package:booksmart/modules/user/ui/home/template/web_template.dart';
 import 'package:booksmart/modules/user/ui/bulk_review/bulk_review_screen.dart';
@@ -111,13 +110,7 @@ class AppPages {
         UserRole.user,
       ),
     ),
-    GetPage(
-      name: Routes.aiChat,
-      page: () => getRequiredScreen(
-        kIsWeb ? WebTemplate(child: AIChatingScreen()) : AIChatingScreen(),
-        UserRole.user,
-      ),
-    ),
+
     GetPage(
       name: Routes.chat,
       page: () => getRequiredScreen(

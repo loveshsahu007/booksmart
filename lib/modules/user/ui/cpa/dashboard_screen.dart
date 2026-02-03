@@ -1,5 +1,7 @@
 import 'package:booksmart/modules/user/ui/cpa/cpa_list_screen.dart';
+import '../../../admin/controllers/cpa_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../../../widgets/app_text.dart';
 import 'components/cpa_card.dart';
@@ -42,7 +44,21 @@ class _CpaNetworkScreenState extends State<CpaNetworkScreen> {
               ],
             ),
             SizedBox(height: 10),
-            ...List.generate(3, (index) => CpaCard()),
+            GetBuilder<AdminCpaController>(
+              init: AdminCpaController(),
+              builder: (controller) {
+                if (controller.isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (controller.approvedCpas.isEmpty) {
+                  return const Center(child: Text("No CPAs available"));
+                }
+                final cpas = controller.approvedCpas.take(3).toList();
+                return Column(
+                  children: cpas.map((cpa) => CpaCard(cpa: cpa)).toList(),
+                );
+              },
+            ),
           ],
         ),
       ),

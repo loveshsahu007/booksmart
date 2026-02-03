@@ -3,7 +3,7 @@ import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:booksmart/models/user_base_model.dart';
-import '../controllers/chat_controller.dart';
+import '../../controllers/chat_controller.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 
 // Add this function to open chat as dialog on web
