@@ -45,7 +45,9 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    chatController.loadChat(widget.otherUser.id);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      chatController.loadChat(widget.otherUser.id);
+    });
   }
 
   void _sendMessage() {

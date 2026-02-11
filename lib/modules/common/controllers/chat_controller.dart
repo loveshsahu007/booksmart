@@ -147,6 +147,9 @@ class ChatController extends GetxController {
         },
         filters: {'id': currentChat.value!.id},
       );
+
+      // Refresh the chat list so the last message updates
+      await fetchMyChats();
     } catch (e) {
       log("Error sending message: $e");
     }
