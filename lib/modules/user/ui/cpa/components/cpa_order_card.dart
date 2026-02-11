@@ -1,18 +1,21 @@
+import 'package:booksmart/models/order_model.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../../widgets/app_text.dart';
 import '../order/detail_screen.dart';
 
 class OrderCard extends StatelessWidget {
-  const OrderCard({super.key});
+  final OrderModel order;
+  const OrderCard({super.key, required this.order});
 
-  Color getStatusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed':
+  Color getStatusColor(OrderStatus status) {
+    switch (status) {
+      case OrderStatus.completed:
         return Colors.green;
-      case 'pending':
+      case OrderStatus.pending:
         return Colors.orange;
-      case 'cancelled':
+      case OrderStatus.cancelled:
+      case OrderStatus.rejected:
         return Colors.red;
       default:
         return Colors.grey;
@@ -21,20 +24,13 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Dummy data
-    const orderId = "12345";
-    const clientName = "John Doe";
-    const clientEmail = "john.doe@example.com";
-
-    const status = "Completed";
-
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       margin: EdgeInsets.zero,
       child: InkWell(
         onTap: () {
-          goToCpaOrderDetailScreen();
+          goToCpaOrderDetailScreen(order: order);
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -48,7 +44,7 @@ class OrderCard extends StatelessWidget {
                   children: [
                     // Order ID and Status Row
                     Text(
-                      'Order #$orderId',
+                      'Order #${order.id}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -56,41 +52,55 @@ class OrderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
 
-                    // Client Info
+                    // Client Info - Show CPA name if user viewing, or User name if CPA viewing
+                    // For now assuming User Dashboard showing CPA
                     Row(
-                      children: const [
-                        Icon(Icons.person, size: 18),
-                        SizedBox(width: 6),
-                        AppText("$clientName • $clientEmail", fontSize: 14),
+                      children: [
+                        const Icon(Icons.person, size: 18),
+                        const SizedBox(width: 6),
+                        AppText(
+                          order.cpa != null
+                              ? "${order.cpa!.firstName} ${order.cpa!.lastName}"
+                              : "CPA",
+                          fontSize: 14,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 6),
 
                     // Dates
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 18),
-                        const SizedBox(width: 6),
-                        AppText(
-                          'Start: ${_formatDate(DateTime(2025, 10, 1))}',
-                          fontSize: 12,
-                        ),
-                        const SizedBox(width: 10),
-                        AppText(
-                          'End: ${_formatDate(DateTime(2025, 10, 5))}',
-                          fontSize: 12,
-                        ),
-                      ],
-                    ),
+                    if (order.startDate != null || order.dueDate != null)
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 18),
+                          const SizedBox(width: 6),
+                          if (order.startDate != null)
+                            AppText(
+                              'Start: ${_formatDate(order.startDate!)}',
+                              fontSize: 12,
+                            ),
+                          if (order.startDate != null && order.dueDate != null)
+                            const SizedBox(width: 10),
+                          if (order.dueDate != null)
+                            AppText(
+                              'Due: ${_formatDate(order.dueDate!)}',
+                              fontSize: 12,
+                            ),
+                        ],
+                      ),
                     const SizedBox(height: 6),
 
                     // Price
                     Row(
-                      children: const [
-                        Icon(Icons.attach_money, size: 18, color: Colors.grey),
-                        SizedBox(width: 6),
+                      children: [
+                        const Icon(
+                          Icons.attach_money,
+                          size: 18,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 6),
                         AppText(
-                          'Price: \$249.99',
+                          'Price: \$${order.amount}',
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
@@ -100,24 +110,33 @@ class OrderCard extends StatelessWidget {
                 ),
               ),
               Column(
-                spacing: 10,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,
                       vertical: 5,
                     ),
-                    width: 60,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: getStatusColor(status).withValues(alpha: 0.15),
+                      color: getStatusColor(
+                        order.status,
+                      ).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: FittedText(status, style: TextStyle(fontSize: 8)),
+                    child: Text(
+                      order.status.name.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: getStatusColor(order.status),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
+                  const SizedBox(height: 20),
                   IconButton(
-                    onPressed: () {},
-                    icon: Icon(Icons.chat_bubble_outline),
+                    onPressed: () {}, // Open chat maybe?
+                    icon: const Icon(Icons.chat_bubble_outline),
                   ),
                 ],
               ),

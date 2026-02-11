@@ -2,31 +2,43 @@ import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:booksmart/models/order_model.dart';
+import 'package:booksmart/modules/user/controllers/order_controller.dart';
 
-void goToCpaOrderDetailScreen({bool shouldCloseBefore = false}) {
+void goToCpaOrderDetailScreen({
+  bool shouldCloseBefore = false,
+  required OrderModel order,
+}) {
   if (kIsWeb) {
     if (shouldCloseBefore) {
       Get.back(); // close previous dialog
     }
     customDialog(
-      child: const CpaOrderDetailScreen(),
+      child: CpaOrderDetailScreen(order: order),
       title: 'Order Details',
       barrierDismissible: true,
     );
   } else {
     if (shouldCloseBefore) {
-      Get.off(() => const CpaOrderDetailScreen());
+      Get.off(() => CpaOrderDetailScreen(order: order));
     } else {
-      Get.to(() => const CpaOrderDetailScreen());
+      Get.to(() => CpaOrderDetailScreen(order: order));
     }
   }
 }
 
 class CpaOrderDetailScreen extends StatelessWidget {
-  const CpaOrderDetailScreen({super.key});
+  final OrderModel order;
+  const CpaOrderDetailScreen({super.key, required this.order});
 
   @override
   Widget build(BuildContext context) {
+    // Ensure controller is found (it should be initialized in dashboard or upstream)
+    // If not, put it. safe check.
+    if (!Get.isRegistered<OrderController>()) {
+      Get.put(OrderController());
+    }
+
     return Scaffold(
       appBar: kIsWeb ? null : AppBar(title: const Text("Order Details")),
       body: SingleChildScrollView(
@@ -37,24 +49,33 @@ class CpaOrderDetailScreen extends StatelessWidget {
             // Order Header with Status
             _buildOrderHeader(context),
             const SizedBox(height: 24),
-            ListTile(
-              leading: CircleAvatar(backgroundColor: Colors.grey),
-              title: Text("John Smith"),
-              subtitle: Text("Senior Analyst"),
-              trailing: IconButton(
-                onPressed: () {},
-                icon: Icon(Icons.chat_bubble_outline),
+            // CPA Info
+            if (order.cpa != null)
+              ListTile(
+                leading: const CircleAvatar(
+                  backgroundColor: Colors.grey,
+                  child: Icon(Icons.person, color: Colors.white),
+                ),
+                title: Text("${order.cpa!.firstName} ${order.cpa!.lastName}"),
+                subtitle: Text(order.cpa!.email),
+                trailing: IconButton(
+                  onPressed: () {
+                    // Open chat logic could be added here if we have context
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline),
+                ),
               ),
-            ),
             const SizedBox(height: 24),
             // Order Information
             _buildOrderInfoSection(context),
             const SizedBox(height: 24),
-            // Deliverables Section
-            _buildDeliverablesSection(context),
+            // Description Section (was Deliverables, but Description is more generic for now)
+            if (order.description != null && order.description!.isNotEmpty)
+              _buildDescriptionSection(context),
             const SizedBox(height: 24),
             // Action Buttons
-            _buildActionButtons(context),
+            if (order.status == OrderStatus.pending)
+              _buildActionButtons(context),
             const SizedBox(height: 20),
           ],
         ),
@@ -64,6 +85,12 @@ class CpaOrderDetailScreen extends StatelessWidget {
 
   Widget _buildOrderHeader(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    Color statusColor = Colors.grey;
+    if (order.status == OrderStatus.completed) statusColor = Colors.green;
+    if (order.status == OrderStatus.pending) statusColor = Colors.orange;
+    if (order.status == OrderStatus.rejected ||
+        order.status == OrderStatus.cancelled)
+      statusColor = Colors.red;
 
     return Card(
       child: Container(
@@ -73,7 +100,7 @@ class CpaOrderDetailScreen extends StatelessWidget {
         child: Column(
           children: [
             AppText(
-              "Order #ORD-2024-001",
+              "Order #${order.id}",
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
@@ -81,23 +108,24 @@ class CpaOrderDetailScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 0.1),
+                color: statusColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.green),
+                border: Border.all(color: statusColor),
               ),
               child: AppText(
-                "On-going",
+                order.status.name.toUpperCase(),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.green,
+                color: statusColor,
               ),
             ),
             const SizedBox(height: 8),
             AppText(
-              "Tax Preparation Services - Individual",
-              fontSize: 14,
-              color: colorScheme.onSurface.withValues(alpha: 0.8),
+              order.title,
+              fontSize: 16,
+              color: colorScheme.onSurface,
               textAlign: TextAlign.center,
+              fontWeight: FontWeight.bold,
             ),
           ],
         ),
@@ -122,10 +150,11 @@ class CpaOrderDetailScreen extends StatelessWidget {
 
             child: Column(
               children: [
-                _buildInfoRow("Start Date", "December 15, 2024"),
-                _buildInfoRow("Due Date", "April 15, 2025"),
-                _buildInfoRow("Service Type", "Tax Preparation"),
-                _buildInfoRow("Cost", "\$1,000"),
+                if (order.startDate != null)
+                  _buildInfoRow("Start Date", _formatDate(order.startDate!)),
+                if (order.dueDate != null)
+                  _buildInfoRow("Due Date", _formatDate(order.dueDate!)),
+                _buildInfoRow("Cost", "\$${order.amount}"),
               ],
             ),
           ),
@@ -134,21 +163,17 @@ class CpaOrderDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDeliverablesSection(BuildContext context) {
+  Widget _buildDescriptionSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppText("  Deliverables", fontSize: 14),
-        const SizedBox(height: 16),
-        Column(
-          children: [
-            _buildDeliverableItem("W-2 Forms", "All W-2 forms for 2024"),
-            _buildDeliverableItem("1099 Forms", "1099-INT, 1099-DIV, etc."),
-            _buildDeliverableItem(
-              "Expense Receipts",
-              "Business expense documentation",
-            ),
-          ],
+        AppText("  Description", fontSize: 14, fontWeight: FontWeight.bold),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(order.description!),
+          ),
         ),
       ],
     );
@@ -156,6 +181,7 @@ class CpaOrderDetailScreen extends StatelessWidget {
 
   Widget _buildActionButtons(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final controller = Get.find<OrderController>();
 
     return Column(
       children: [
@@ -165,7 +191,7 @@ class CpaOrderDetailScreen extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: () {
                   // Decline order
-                  showDeclineReasonDialog(context);
+                  _showDeclineReasonDialog(context, controller);
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: colorScheme.error,
@@ -176,6 +202,30 @@ class CpaOrderDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () async {
+                  await controller.updateOrderStatus(
+                    order.id,
+                    OrderStatus.accepted,
+                  );
+                  if (kIsWeb)
+                    Get.back();
+                  else
+                    Get.back();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const AppText(
+                  "Accept Order",
+                  fontSize: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ],
         ),
       ],
@@ -200,71 +250,56 @@ class CpaOrderDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDeliverableItem(String title, String description) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        title: Text(title),
-        subtitle: Text(description),
-        dense: true,
+  String _formatDate(DateTime date) {
+    return "${date.day}/${date.month}/${date.year}";
+  }
+
+  void _showDeclineReasonDialog(
+    BuildContext context,
+    OrderController controller,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AppText("Decline Order", fontSize: 18, fontWeight: FontWeight.bold),
+            const SizedBox(height: 16),
+            const Text("Are you sure you want to decline this order?"),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Get.back(),
+                    child: const AppText("Cancel", fontSize: 14),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppButton(
+                    buttonText: "Decline",
+                    buttonColor: Colors.red,
+                    textColor: Colors.white,
+                    onTapFunction: () async {
+                      await controller.updateOrderStatus(
+                        order.id,
+                        OrderStatus.rejected,
+                      );
+                      Get.back(); // Close sheet
+                      Get.back(); // Close screen
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
       ),
     );
   }
-}
-
-void showDeclineReasonDialog(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    builder: (context) => Container(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AppText(
-            "Reason for Declining",
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            maxLines: 4,
-            decoration: InputDecoration(
-              hintText: "Please provide a reason for declining this order...",
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Get.back(),
-                  child: const AppText("Cancel", fontSize: 14),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppButton(
-                  buttonText: "Submit",
-                  onTapFunction: () {
-                    Get.back();
-                    Get.back();
-                    Get.snackbar(
-                      "Order Declined",
-                      "Client has been notified",
-                      snackPosition: SnackPosition.BOTTOM,
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-        ],
-      ),
-    ),
-  );
 }

@@ -1,4 +1,5 @@
 import 'package:booksmart/modules/user/ui/cpa/cpa_list_screen.dart';
+import 'package:booksmart/modules/user/controllers/order_controller.dart';
 import '../../../admin/controllers/cpa_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -26,9 +27,32 @@ class _CpaNetworkScreenState extends State<CpaNetworkScreen> {
             AppText("Active Orders", fontSize: 14, fontWeight: FontWeight.bold),
             SizedBox(height: 10),
 
-            ...List.generate(
-              2,
-              (index) => Column(children: [OrderCard(), SizedBox(height: 15)]),
+            GetX<OrderController>(
+              init: OrderController(),
+              initState: (_) {
+                Get.find<OrderController>().fetchActiveOrders();
+              },
+              builder: (controller) {
+                if (controller.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (controller.activeOrders.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(child: Text("No active orders")),
+                  );
+                }
+                return Column(
+                  children: controller.activeOrders
+                      .map(
+                        (order) => Padding(
+                          padding: const EdgeInsets.only(bottom: 15),
+                          child: OrderCard(order: order),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
             ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

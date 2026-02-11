@@ -1,6 +1,7 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
+import 'package:booksmart/modules/user/ui/cpa/order/create_order_screen.dart';
 import 'package:get/get.dart';
 import 'package:booksmart/models/user_base_model.dart';
 import '../../controllers/chat_controller.dart';
@@ -88,6 +89,46 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
       body: Column(
         children: [
+          Obx(() {
+            if (chatController.currentUserRole == UserRole.cpa) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8.0),
+                color: Colors.grey[100],
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // Open Create Order Screen
+                    if (kIsWeb) {
+                      customDialog(
+                        child: CreateOrderScreen(
+                          userId: widget.otherUser.id,
+                          userName:
+                              "${widget.otherUser.firstName} ${widget.otherUser.lastName}",
+                        ),
+                        title: 'Create Order',
+                        barrierDismissible: true,
+                      );
+                    } else {
+                      Get.to(
+                        () => CreateOrderScreen(
+                          userId: widget.otherUser.id,
+                          userName:
+                              "${widget.otherUser.firstName} ${widget.otherUser.lastName}",
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.add_task),
+                  label: const Text("Send Order Request"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                  ),
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
           Expanded(
             child: Obx(() {
               if (chatController.isLoading.value) {

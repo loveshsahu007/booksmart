@@ -171,7 +171,7 @@ class OrderDetailScreenCPA extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: () {
                   // Decline order
-                  showDeclineReasonDialog(context);
+                  //  showDeclineReasonDialog(context);
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: colorScheme.error,
