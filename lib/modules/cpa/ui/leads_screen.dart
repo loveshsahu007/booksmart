@@ -1,8 +1,8 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/modules/cpa/ui/leads_detail_screen.dart';
+import 'package:booksmart/modules/user/controllers/order_controller.dart';
+import 'package:booksmart/modules/user/ui/cpa/components/cpa_order_card.dart';
 import 'package:get/get.dart';
-
-import 'order/order_card.dart';
 
 class LeadsScreenCPA extends StatefulWidget {
   const LeadsScreenCPA({super.key});
@@ -99,7 +99,6 @@ class _LeadsScreenCPAState extends State<LeadsScreenCPA>
               // show order cards on both on-going and pendings screen
               // on clicking show order detail screen
               Tab(text: 'Orders'), // Orders
-              Tab(text: 'Pending'), // Order Requests sent
             ],
           ),
           const SizedBox(height: 20),
@@ -108,11 +107,7 @@ class _LeadsScreenCPAState extends State<LeadsScreenCPA>
           Expanded(
             child: TabBarView(
               controller: _tabController,
-              children: [
-                _buildLeadsTab(),
-                _buildOngoingOrderTab(),
-                _buildPendingOrdersTab(),
-              ],
+              children: [_buildLeadsTab(), _buildOrderTab()],
             ),
           ),
         ],
@@ -206,24 +201,37 @@ class _LeadsScreenCPAState extends State<LeadsScreenCPA>
     );
   }
 
-  // ---------------- ACCEPTED LEADS TAB -----------------
-  Widget _buildOngoingOrderTab() {
-    return ListView.separated(
-      itemCount: acceptedLeads.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        return OrderCardCPA();
-      },
-    );
-  }
-
-  Widget _buildPendingOrdersTab() {
-    return ListView.separated(
-      itemCount: acceptedLeads.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        return OrderCardCPA();
-      },
+  // ----------------orders -----------------
+  Widget _buildOrderTab() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8),
+      child: GetX<OrderController>(
+        init: OrderController(),
+        initState: (_) {
+          Get.find<OrderController>().fetchActiveOrders();
+        },
+        builder: (controller) {
+          if (controller.isLoading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (controller.activeOrders.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: Text("No orders")),
+            );
+          }
+          return Column(
+            children: controller.activeOrders
+                .map(
+                  (order) => Padding(
+                    padding: const EdgeInsets.only(bottom: 15),
+                    child: OrderCard(order: order),
+                  ),
+                )
+                .toList(),
+          );
+        },
+      ),
     );
   }
 

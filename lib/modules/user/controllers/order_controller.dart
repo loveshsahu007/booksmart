@@ -9,6 +9,8 @@ import 'package:get/get.dart';
 import '../../../models/order_model.dart';
 import '../../common/controllers/chat_controller.dart';
 
+import 'package:booksmart/models/user_base_model.dart';
+
 class OrderController extends GetxController {
   final isLoading = false.obs;
 
@@ -107,24 +109,29 @@ class OrderController extends GetxController {
   Future<void> fetchActiveOrders() async {
     try {
       isLoading.value = true;
-      final userId = Get.find<AuthController>().person?.id;
-      if (userId == null) return;
+      final person = Get.find<AuthController>().person;
+      if (person == null) return;
+
+      final isCpa = person.role == UserRole.cpa;
+      final userId = person.id;
 
       // Ensure we select the related cpa/user data
-      // We need to know if the current user is CPA or regular user
-      // But for dashboard (User side), we filter where user_id == currentUserId
+      // If CPA, we want to see the User details (user:user_id(*))
+      // If User, we want to see the CPA details (cpa:cpa_id(*))
 
-      // Assumption: This is for User Dashboard (Receiver)
-      final result = await supabase
+      var query = supabase
           .from(SupabaseTable.orders)
-          .select('*, cpa:cpa_id(*)') // Join Cpa details
-          .eq('user_id', userId)
+          .select(isCpa ? '*, user:user_id(*)' : '*, cpa:cpa_id(*)')
           .neq('status', OrderStatus.cancelled.name)
-          .neq(
-            'status',
-            OrderStatus.completed.name,
-          ) // or whatever logic for "active"
-          .order('created_at', ascending: false);
+          .neq('status', OrderStatus.completed.name);
+
+      if (isCpa) {
+        query = query.eq('cpa_id', userId);
+      } else {
+        query = query.eq('user_id', userId);
+      }
+
+      final result = await query.order('created_at', ascending: false);
 
       activeOrders.value = (result as List)
           .map((e) => OrderModel.fromJson(e))

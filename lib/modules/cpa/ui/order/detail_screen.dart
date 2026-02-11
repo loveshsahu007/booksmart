@@ -1,6 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/modules/cpa/ui/order/delivery_screen.dart';
-import 'package:booksmart/modules/user/ui/cpa/order/detail_screen.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';

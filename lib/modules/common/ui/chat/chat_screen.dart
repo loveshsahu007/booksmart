@@ -89,46 +89,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
       body: Column(
         children: [
-          Obx(() {
-            if (chatController.currentUserRole == UserRole.cpa) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8.0),
-                color: Colors.grey[100],
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Open Create Order Screen
-                    if (kIsWeb) {
-                      customDialog(
-                        child: CreateOrderScreen(
-                          userId: widget.otherUser.id,
-                          userName:
-                              "${widget.otherUser.firstName} ${widget.otherUser.lastName}",
-                        ),
-                        title: 'Create Order',
-                        barrierDismissible: true,
-                      );
-                    } else {
-                      Get.to(
-                        () => CreateOrderScreen(
-                          userId: widget.otherUser.id,
-                          userName:
-                              "${widget.otherUser.firstName} ${widget.otherUser.lastName}",
-                        ),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.add_task),
-                  label: const Text("Send Order Request"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                  ),
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          }),
           Expanded(
             child: Obx(() {
               if (chatController.isLoading.value) {
@@ -224,6 +184,46 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             ),
           ),
+          Obx(() {
+            if (chatController.currentUserRole == UserRole.cpa) {
+              return Container(
+                width: double.infinity,
+                padding: EdgeInsets.only(bottom: 8, left: 8, right: 8),
+                // color: Colors.grey[100],
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // Open Create Order Screen
+                    if (kIsWeb) {
+                      customDialog(
+                        child: CreateOrderScreen(
+                          userId: widget.otherUser.id,
+                          userName:
+                              "${widget.otherUser.firstName} ${widget.otherUser.lastName}",
+                        ),
+                        title: 'Create Order',
+                        barrierDismissible: true,
+                      );
+                    } else {
+                      Get.to(
+                        () => CreateOrderScreen(
+                          userId: widget.otherUser.id,
+                          userName:
+                              "${widget.otherUser.firstName} ${widget.otherUser.lastName}",
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.add_task),
+                  label: const Text("Send Order Request"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                  ),
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          }),
         ],
       ),
     );

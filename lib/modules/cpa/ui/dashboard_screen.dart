@@ -1,8 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:fl_chart/fl_chart.dart';
 
-import 'order/detail_screen.dart';
-
 class DashboardScreenCPA extends StatefulWidget {
   const DashboardScreenCPA({super.key});
 
@@ -106,24 +104,23 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
               },
             ),
 
-            const SizedBox(height: 24),
+            // const SizedBox(height: 24),
 
-            Wrap(
-              spacing: 10,
-              children: [
-                ElevatedButton(
-                  onPressed: () {
-                    goToOrderDetailScreenCPA();
-                  },
-                  child: const AppText(
-                    "Order Detail Screen (Temp)",
-                    fontSize: 14,
-                    color: Colors.black,
-                  ),
-                ),
-              ],
-            ),
-
+            // Wrap(
+            //   spacing: 10,
+            //   children: [
+            //     ElevatedButton(
+            //       onPressed: () {
+            //         goToOrderDetailScreenCPA();
+            //       },
+            //       child: const AppText(
+            //         "Order Detail Screen (Temp)",
+            //         fontSize: 14,
+            //         color: Colors.black,
+            //       ),
+            //     ),
+            //   ],
+            // ),
             const SizedBox(height: 24),
 
             // ==== LEADS MANAGEMENT CHART ====

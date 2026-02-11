@@ -1,4 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/models/user_base_model.dart';
+import 'package:booksmart/modules/common/controllers/chat_controller.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -182,52 +184,57 @@ class CpaOrderDetailScreen extends StatelessWidget {
   Widget _buildActionButtons(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final controller = Get.find<OrderController>();
-
+    final ChatController chatController = Get.put(ChatController());
     return Column(
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () {
-                  // Decline order
-                  _showDeclineReasonDialog(context, controller);
-                },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: colorScheme.error,
-                  side: BorderSide(color: colorScheme.error),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+        Obx(() {
+          if (chatController.currentUserRole != UserRole.cpa) {
+            return Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      // Decline order
+                      _showDeclineReasonDialog(context, controller);
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colorScheme.error,
+                      side: BorderSide(color: colorScheme.error),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const AppText("Decline Order", fontSize: 14),
+                  ),
                 ),
-                child: const AppText("Decline Order", fontSize: 14),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () async {
-                  await controller.updateOrderStatus(
-                    order.id,
-                    OrderStatus.accepted,
-                  );
-                  if (kIsWeb)
-                    Get.back();
-                  else
-                    Get.back();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await controller.updateOrderStatus(
+                        order.id,
+                        OrderStatus.accepted,
+                      );
+                      if (kIsWeb)
+                        Get.back();
+                      else
+                        Get.back();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const AppText(
+                      "Accept Order",
+                      fontSize: 14,
+                      color: Colors.white,
+                    ),
+                  ),
                 ),
-                child: const AppText(
-                  "Accept Order",
-                  fontSize: 14,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ),
+              ],
+            );
+          }
+          return const SizedBox.shrink();
+        }),
       ],
     );
   }

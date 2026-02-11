@@ -1,5 +1,8 @@
 import 'package:booksmart/models/order_model.dart';
+import 'package:booksmart/models/user_base_model.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../../../../widgets/app_text.dart';
 import '../order/detail_screen.dart';
@@ -24,6 +27,11 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authController = Get.find<AuthController>();
+    final isCpa = authController.person?.role == UserRole.cpa;
+    final target = isCpa ? order.user : order.cpa;
+    final defaultLabel = isCpa ? "User" : "CPA";
+
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -53,15 +61,14 @@ class OrderCard extends StatelessWidget {
                     const SizedBox(height: 8),
 
                     // Client Info - Show CPA name if user viewing, or User name if CPA viewing
-                    // For now assuming User Dashboard showing CPA
                     Row(
                       children: [
                         const Icon(Icons.person, size: 18),
                         const SizedBox(width: 6),
                         AppText(
-                          order.cpa != null
-                              ? "${order.cpa!.firstName} ${order.cpa!.lastName}"
-                              : "CPA",
+                          target != null
+                              ? "${target.firstName} ${target.lastName}"
+                              : defaultLabel,
                           fontSize: 14,
                         ),
                       ],
@@ -133,11 +140,11 @@ class OrderCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  IconButton(
-                    onPressed: () {}, // Open chat maybe?
-                    icon: const Icon(Icons.chat_bubble_outline),
-                  ),
+                  // const SizedBox(height: 20),
+                  // IconButton(
+                  //   onPressed: () {}, // Open chat maybe?
+                  //   icon: const Icon(Icons.chat_bubble_outline),
+                  // ),
                 ],
               ),
             ],

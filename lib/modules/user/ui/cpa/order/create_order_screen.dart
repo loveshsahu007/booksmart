@@ -1,6 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/modules/user/controllers/order_controller.dart';
-import 'package:booksmart/widgets/app_text_field.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
@@ -128,9 +127,6 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 date != null
                     ? "${date.month}/${date.day}/${date.year}"
                     : "Select $label",
-                style: TextStyle(
-                  color: date != null ? Colors.black : Colors.grey[600],
-                ),
               ),
               const Icon(Icons.calendar_today, size: 18, color: Colors.grey),
             ],
