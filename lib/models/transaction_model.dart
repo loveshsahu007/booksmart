@@ -13,6 +13,13 @@ class TransactionModel {
   final String? filePath; // Optional attachment
   final int userId;
   final int orgId;
+
+  /// {
+  ///   "primary": "GENERAL_MERCHANDISE",
+  ///   "detailed": "GENERAL_MERCHANDISE_SUPERSTORES",
+  ///   "confidence_level": "VERY_HIGH"
+  /// }
+  ///
   final Map<String, dynamic>? plaidCategory;
   final int? bankId;
   final String? bankAccountId;

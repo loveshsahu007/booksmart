@@ -3,6 +3,31 @@ import 'package:booksmart/modules/user/controllers/order_controller.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../../../../widgets/custom_dialog.dart';
+
+void goToCreateOrderCPAScreen({
+  required int userId,
+  required String userName,
+  bool shouldCloseBefore = false,
+}) {
+  if (kIsWeb) {
+    if (shouldCloseBefore) {
+      Get.back(); // close previous dialog
+    }
+    customDialog(
+      child: CreateOrderScreen(userId: userId, userName: userName),
+      title: 'Create Order',
+      barrierDismissible: true,
+    );
+  } else {
+    if (shouldCloseBefore) {
+      Get.off(() => CreateOrderScreen(userId: userId, userName: userName));
+    } else {
+      Get.to(() => CreateOrderScreen(userId: userId, userName: userName));
+    }
+  }
+}
+
 class CreateOrderScreen extends StatefulWidget {
   final int userId;
   final String userName;

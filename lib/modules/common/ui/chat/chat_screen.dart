@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:booksmart/modules/user/ui/cpa/order/create_order_screen.dart';
 import 'package:get/get.dart';
 import 'package:booksmart/models/user_base_model.dart';
+import 'package:jiffy/jiffy.dart';
 import '../../controllers/chat_controller.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 
@@ -56,13 +57,6 @@ class _ChatScreenState extends State<ChatScreen> {
     chatController.sendMessage(_controller.text);
     _controller.clear();
     // Scroll to bottom is handled by list reverse normally, but if needed we can animate
-  }
-
-  String _formatTime(DateTime time) {
-    final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;
-    final minute = time.minute.toString().padLeft(2, '0');
-    final period = time.hour < 12 ? 'AM' : 'PM';
-    return '$hour:$minute $period';
   }
 
   // Calculate isMe helper
@@ -153,7 +147,9 @@ class _ChatScreenState extends State<ChatScreen> {
                             ),
                             const SizedBox(height: 4),
                             AppText(
-                              _formatTime(msg.createdAt.toLocal()),
+                              Jiffy.parseFromDateTime(
+                                msg.createdAt.toLocal(),
+                              ).jm,
                               fontSize: 10,
                               //color: isMe ? Colors.black : Colors.black,
                             ),
@@ -179,51 +175,35 @@ class _ChatScreenState extends State<ChatScreen> {
                     onPressed: _sendMessage,
                     icon: Icon(Icons.send, color: colorScheme.primary),
                   ),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmit: (value) {
+                    _sendMessage();
+                  },
                 ),
                 const SizedBox(height: 10),
               ],
             ),
           ),
-          Obx(() {
-            if (chatController.currentUserRole == UserRole.cpa) {
-              return Container(
-                width: double.infinity,
-                padding: EdgeInsets.only(bottom: 8, left: 8, right: 8),
-                // color: Colors.grey[100],
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Open Create Order Screen
-                    if (kIsWeb) {
-                      customDialog(
-                        child: CreateOrderScreen(
-                          userId: widget.otherUser.id,
-                          userName:
-                              "${widget.otherUser.firstName} ${widget.otherUser.lastName}",
-                        ),
-                        title: 'Create Order',
-                        barrierDismissible: true,
-                      );
-                    } else {
-                      Get.to(
-                        () => CreateOrderScreen(
-                          userId: widget.otherUser.id,
-                          userName:
-                              "${widget.otherUser.firstName} ${widget.otherUser.lastName}",
-                        ),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.add_task),
-                  label: const Text("Send Order Request"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                  ),
+          if (authPerson?.role == UserRole.cpa)
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(bottom: 8, left: 8, right: 8),
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  goToCreateOrderCPAScreen(
+                    userId: widget.otherUser.id,
+                    userName:
+                        "${widget.otherUser.firstName} ${widget.otherUser.lastName}",
+                  );
+                },
+                icon: const Icon(Icons.add_task),
+                label: Text("Send Order Request"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
                 ),
-              );
-            }
-            return const SizedBox.shrink();
-          }),
+              ),
+            ),
         ],
       ),
     );

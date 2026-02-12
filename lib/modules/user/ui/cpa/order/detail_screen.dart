@@ -1,11 +1,12 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/models/user_base_model.dart';
-import 'package:booksmart/modules/common/controllers/chat_controller.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:booksmart/models/order_model.dart';
 import 'package:booksmart/modules/user/controllers/order_controller.dart';
+
+import '../../../../common/controllers/auth_controller.dart';
 
 void goToCpaOrderDetailScreen({
   bool shouldCloseBefore = false,
@@ -91,8 +92,9 @@ class CpaOrderDetailScreen extends StatelessWidget {
     if (order.status == OrderStatus.completed) statusColor = Colors.green;
     if (order.status == OrderStatus.pending) statusColor = Colors.orange;
     if (order.status == OrderStatus.rejected ||
-        order.status == OrderStatus.cancelled)
+        order.status == OrderStatus.cancelled) {
       statusColor = Colors.red;
+    }
 
     return Card(
       child: Container(
@@ -184,11 +186,10 @@ class CpaOrderDetailScreen extends StatelessWidget {
   Widget _buildActionButtons(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final controller = Get.find<OrderController>();
-    final ChatController chatController = Get.put(ChatController());
     return Column(
       children: [
         Obx(() {
-          if (chatController.currentUserRole != UserRole.cpa) {
+          if (authUser?.role != UserRole.cpa) {
             return Row(
               children: [
                 Expanded(
@@ -213,10 +214,11 @@ class CpaOrderDetailScreen extends StatelessWidget {
                         order.id,
                         OrderStatus.accepted,
                       );
-                      if (kIsWeb)
+                      if (kIsWeb) {
                         Get.back();
-                      else
+                      } else {
                         Get.back();
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,

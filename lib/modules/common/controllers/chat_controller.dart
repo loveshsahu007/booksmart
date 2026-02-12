@@ -7,7 +7,6 @@ import 'package:get/get.dart';
 
 import '../../../models/chat_model.dart';
 import '../../../models/message_model.dart';
-import '../../../models/user_base_model.dart';
 import '../../../utils/supabase.dart';
 
 class ChatController extends GetxController {
@@ -17,8 +16,12 @@ class ChatController extends GetxController {
 
   // Get current user ID (int)
   int get currentUserId => Get.find<AuthController>().person?.id ?? -1;
-  UserRole get currentUserRole =>
-      Get.find<AuthController>().person?.role ?? UserRole.user;
+
+  @override
+  void onInit() {
+    fetchMyChats();
+    super.onInit();
+  }
 
   @override
   void onClose() {
@@ -44,6 +47,7 @@ class ChatController extends GetxController {
       log("Error loading chat: $e");
     } finally {
       isLoading.value = false;
+      update();
     }
   }
 
@@ -149,7 +153,7 @@ class ChatController extends GetxController {
       );
 
       // Refresh the chat list so the last message updates
-      await fetchMyChats();
+      await fetchMyChats(shouldRefresh: false);
     } catch (e) {
       log("Error sending message: $e");
     }
@@ -159,9 +163,11 @@ class ChatController extends GetxController {
 
   final myChats = <ChatModel>[].obs;
 
-  Future<void> fetchMyChats() async {
+  Future<void> fetchMyChats({bool shouldRefresh = true}) async {
     try {
-      isLoading.value = true;
+      if (shouldRefresh) {
+        isLoading.value = true;
+      }
       final result = await supabase
           .from(SupabaseTable.chats)
           .select('*, sender:sender_id(*), receiver:receiver_id(*)')
@@ -174,7 +180,10 @@ class ChatController extends GetxController {
     } catch (e) {
       log("Error fetching my chats: $e");
     } finally {
-      isLoading.value = false;
+      if (shouldRefresh) {
+        isLoading.value = false;
+        update();
+      }
     }
   }
 }

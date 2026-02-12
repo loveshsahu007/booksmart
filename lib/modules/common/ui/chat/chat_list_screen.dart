@@ -6,21 +6,35 @@ import 'package:get/get.dart';
 import 'package:booksmart/modules/common/controllers/chat_controller.dart';
 import 'package:booksmart/models/chat_model.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
+import 'package:jiffy/jiffy.dart';
 
-class ChatListScreen extends StatelessWidget {
+class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
+
+  @override
+  State<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends State<ChatListScreen> {
+  late ChatController chatController;
+
+  @override
+  void initState() {
+    if (Get.isRegistered<ChatController>()) {
+      chatController = Get.find<ChatController>();
+    } else {
+      chatController = Get.put(ChatController());
+    }
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final chatController = Get.put(ChatController());
+
     final currentUserId = Get.find<AuthController>().person?.id;
 
-    // Fetch chats on init
-    chatController.fetchMyChats();
-
-    return GetX<ChatController>(
-      init: chatController,
+    return GetBuilder<ChatController>(
       builder: (controller) {
         if (controller.isLoading.value) {
           return const Scaffold(
@@ -32,7 +46,9 @@ class ChatListScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: kIsWeb ? null : AppBar(title: const Text('Chats')),
-          body: chats.isEmpty
+          body: controller.isLoading.value
+              ? Center(child: CircularProgressIndicator())
+              : chats.isEmpty
               ? const Center(child: Text("No recent chats"))
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(
@@ -42,13 +58,9 @@ class ChatListScreen extends StatelessWidget {
                   itemCount: chats.length,
                   itemBuilder: (context, index) {
                     final ChatModel chat = chats[index];
-
-                    // Determine the "other" user
                     final isSenderMe = chat.senderId == currentUserId;
                     final otherUser = isSenderMe ? chat.receiver : chat.sender;
-
                     if (otherUser == null) return const SizedBox();
-
                     return Card(
                       child: ListTile(
                         leading: CircleAvatar(
@@ -82,7 +94,10 @@ class ChatListScreen extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         trailing: AppText(
-                          _formatTime(chat.lastMessageTime),
+                          Jiffy.parseFromDateTime(
+                            chat.lastMessageTime,
+                          ).fromNow(),
+
                           fontSize: 11,
                           color: Colors.grey,
                         ),
@@ -96,18 +111,5 @@ class ChatListScreen extends StatelessWidget {
         );
       },
     );
-  }
-
-  String _formatTime(DateTime time) {
-    final now = DateTime.now();
-    final difference = now.difference(time);
-
-    if (difference.inDays == 0) {
-      return "${time.hour}:${time.minute.toString().padLeft(2, '0')}";
-    } else if (difference.inDays < 7) {
-      return "${difference.inDays}d ago";
-    } else {
-      return "${time.month}/${time.day}";
-    }
   }
 }
