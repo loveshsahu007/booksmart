@@ -7,6 +7,7 @@ import 'package:booksmart/models/user_base_model.dart';
 import 'package:jiffy/jiffy.dart';
 import '../../controllers/chat_controller.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
+import 'package:booksmart/models/message_model.dart';
 
 // Add this function to open chat as dialog on web
 void goToChatScreen(PersonModel otherUser, {bool shouldCloseBefore = false}) {
@@ -44,11 +45,23 @@ class _ChatScreenState extends State<ChatScreen> {
   // To handle scrolling
   final ScrollController _scrollController = ScrollController();
 
+  int _limit = 20;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       chatController.loadChat(widget.otherUser.id);
+    });
+
+    _scrollController.addListener(() {
+      // Check if scrolled to top (end of list because reverse: true)
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        setState(() {
+          _limit += 20;
+        });
+      }
     });
   }
 
@@ -59,7 +72,6 @@ class _ChatScreenState extends State<ChatScreen> {
     // Scroll to bottom is handled by list reverse normally, but if needed we can animate
   }
 
-  // Calculate isMe helper
   // Calculate isMe helper
   bool _isMe(int senderId) {
     return senderId == (Get.find<AuthController>().person?.id ?? -1);
@@ -85,78 +97,98 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           Expanded(
             child: Obx(() {
-              if (chatController.isLoading.value) {
+              // Wait for chat to be loaded
+              final chat = chatController.currentChat.value;
+              if (chat == null) {
                 return const Center(child: CircularProgressIndicator());
               }
 
-              final messages = chatController.messages;
-              if (messages.isEmpty) {
-                return const Center(child: Text("Start the conversation now!"));
-              }
+              return StreamBuilder<List<Map<String, dynamic>>>(
+                stream: chatController.getMessagesStream(chat.id, _limit),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}'));
+                  }
 
-              return ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: messages.length,
-                reverse:
-                    true, // Show newest at bottom (requires sorted descending)
-                itemBuilder: (context, index) {
-                  final msg = messages[index];
-                  final isMe = _isMe(msg.senderId);
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                  return Align(
-                    alignment: isMe
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    child: Card(
-                      child: Container(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.75,
-                        ),
-                        margin: const EdgeInsets.symmetric(vertical: 6),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          // color: isMe
-                          //     ? colorScheme.primary.withValues(alpha: 0.9)
-                          //     : colorScheme.surfaceVariant.withValues(
-                          //         alpha: 0.2,
-                          //       ),
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(14),
-                            topRight: const Radius.circular(14),
-                            bottomLeft: isMe
-                                ? const Radius.circular(14)
-                                : const Radius.circular(0),
-                            bottomRight: isMe
-                                ? const Radius.circular(0)
-                                : const Radius.circular(14),
+                  final data = snapshot.data!;
+                  if (data.isEmpty) {
+                    return const Center(
+                      child: Text("Start the conversation now!"),
+                    );
+                  }
+
+                  final messages = data
+                      .map((e) => MessageModel.fromJson(e))
+                      .toList();
+
+                  // Note: Data is already sorted by created_at descending from the stream query.
+                  // We don't necessarily need to sort it again if the query is correct.
+                  // But we should ensure the ListView.builder uses it correctly with reverse: true.
+
+                  return ListView.builder(
+                    key: ValueKey(chat.id), // Ensure fresh list on chat switch
+                    padding: const EdgeInsets.all(16),
+                    itemCount: messages.length,
+                    reverse: true, // Show newest at bottom
+                    itemBuilder: (context, index) {
+                      final msg = messages[index];
+                      final isMe = _isMe(msg.senderId);
+
+                      return Align(
+                        alignment: isMe
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Card(
+                          child: Container(
+                            constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.of(context).size.width * 0.75,
+                            ),
+                            margin: const EdgeInsets.symmetric(vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(14),
+                                topRight: const Radius.circular(14),
+                                bottomLeft: isMe
+                                    ? const Radius.circular(14)
+                                    : const Radius.circular(0),
+                                bottomRight: isMe
+                                    ? const Radius.circular(0)
+                                    : const Radius.circular(14),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: isMe
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
+                              children: [
+                                AppText(
+                                  msg.content,
+                                  fontSize: 14,
+                                  //color: isMe ? Colors.black : null,
+                                ),
+                                const SizedBox(height: 4),
+                                AppText(
+                                  Jiffy.parseFromDateTime(
+                                    msg.createdAt.toLocal(),
+                                  ).jm,
+                                  fontSize: 10,
+                                  //color: isMe ? Colors.black : Colors.black,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                        child: Column(
-                          crossAxisAlignment: isMe
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
-                          children: [
-                            AppText(
-                              msg.content,
-                              fontSize: 14,
-                              //color: isMe ? Colors.black : null,
-                            ),
-                            const SizedBox(height: 4),
-                            AppText(
-                              Jiffy.parseFromDateTime(
-                                msg.createdAt.toLocal(),
-                              ).jm,
-                              fontSize: 10,
-                              //color: isMe ? Colors.black : Colors.black,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                      );
+                    },
                   );
                 },
               );

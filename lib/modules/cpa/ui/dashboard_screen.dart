@@ -1,5 +1,11 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:get/get.dart';
+import 'package:jiffy/jiffy.dart';
+import '../../common/controllers/chat_controller.dart';
+import '../../common/ui/chat/chat_screen.dart';
+import '../../../models/user_base_model.dart';
+import '../controllers/leads_controller.dart';
 
 class DashboardScreenCPA extends StatefulWidget {
   const DashboardScreenCPA({super.key});
@@ -9,39 +15,8 @@ class DashboardScreenCPA extends StatefulWidget {
 }
 
 class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
-  final List<Map<String, dynamic>> leads = [
-    {
-      'name': 'Sarah Johnson',
-      'job': 'Self-Employed (Rideshare)',
-      'details': 'Individual + Business Filing',
-      'image': '',
-      'action': 'Accept Intro',
-    },
-    {
-      'name': 'Mark Smith',
-      'job': 'Real Estate Investor',
-      'details': 'Individual + Business Filing',
-      'image': '',
-      'action': 'View Profile',
-    },
-    {
-      'name': 'Lisa Miller',
-      'job': 'E-Commerce',
-      'details': 'Individual + Business Filing',
-      'image': '',
-      'action': 'Chat',
-    },
-  ];
-
-  final List<Map<String, dynamic>> chartData = [
-    {'month': 'Apr', 'leads': 10.0, 'orders': 6.0},
-    {'month': 'May', 'leads': 14.0, 'orders': 8.0},
-    {'month': 'Jun', 'leads': 12.0, 'orders': 10.0},
-    {'month': 'Jul', 'leads': 15.0, 'orders': 12.0},
-    {'month': 'Aug', 'leads': 13.0, 'orders': 9.0},
-    {'month': 'Sep', 'leads': 16.0, 'orders': 13.0},
-    {'month': 'Oct', 'leads': 18.0, 'orders': 15.0},
-  ];
+  final chatController = Get.put(ChatController());
+  final leadsController = Get.put(LeadsController());
 
   @override
   Widget build(BuildContext context) {
@@ -75,11 +50,13 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
                   mainAxisSpacing: 1,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
-                    _buildStatCard(
-                      'Total Leads',
-                      '15',
-                      Colors.amber,
-                      Icons.leaderboard,
+                    Obx(
+                      () => _buildStatCard(
+                        'Total Leads',
+                        '${leadsController.leads.length}',
+                        Colors.amber,
+                        Icons.leaderboard,
+                      ),
                     ),
                     _buildStatCard(
                       'Pending Intros',
@@ -146,79 +123,88 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
                     fontWeight: FontWeight.bold,
                   ),
                   const SizedBox(height: 16),
-                  SizedBox(
-                    height: 220,
-                    child: BarChart(
-                      BarChartData(
-                        backgroundColor: Colors.transparent,
-                        gridData: FlGridData(show: false),
-                        borderData: FlBorderData(show: false),
-                        titlesData: FlTitlesData(
-                          leftTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          topTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          rightTitles: const AxisTitles(
-                            sideTitles: SideTitles(showTitles: false),
-                          ),
-                          bottomTitles: AxisTitles(
-                            sideTitles: SideTitles(
-                              showTitles: true,
-                              getTitlesWidget: (value, meta) {
-                                int index = value.toInt();
-                                if (index < 0 || index >= chartData.length) {
-                                  return const SizedBox();
-                                }
-                                return Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: AppText(
-                                    chartData[index]['month'],
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                );
-                              },
-                              reservedSize: 28,
+                  Obx(() {
+                    final data = leadsController.chartData;
+                    if (data.isEmpty)
+                      return const SizedBox(
+                        height: 220,
+                        child: Center(child: Text("No data")),
+                      );
+
+                    return SizedBox(
+                      height: 220,
+                      child: BarChart(
+                        BarChartData(
+                          backgroundColor: Colors.transparent,
+                          gridData: FlGridData(show: false),
+                          borderData: FlBorderData(show: false),
+                          titlesData: FlTitlesData(
+                            leftTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            topTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            rightTitles: const AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget: (value, meta) {
+                                  int index = value.toInt();
+                                  if (index < 0 || index >= data.length) {
+                                    return const SizedBox();
+                                  }
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: AppText(
+                                      data[index]['month'],
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  );
+                                },
+                                reservedSize: 28,
+                              ),
                             ),
                           ),
-                        ),
-                        barGroups: chartData.asMap().entries.map((entry) {
-                          int index = entry.key;
-                          double leads = entry.value['leads'];
-                          double orders = entry.value['orders'];
+                          barGroups: data.asMap().entries.map((entry) {
+                            int index = entry.key;
+                            double leads = entry.value['leads'];
+                            double orders = entry.value['orders'];
 
-                          return BarChartGroupData(
-                            x: index,
-                            barsSpace: 6,
-                            barRods: [
-                              BarChartRodData(
-                                toY: leads,
-                                gradient: const LinearGradient(
-                                  colors: [Colors.amberAccent, Colors.amber],
-                                  begin: Alignment.bottomCenter,
-                                  end: Alignment.topCenter,
+                            return BarChartGroupData(
+                              x: index,
+                              barsSpace: 6,
+                              barRods: [
+                                BarChartRodData(
+                                  toY: leads,
+                                  gradient: const LinearGradient(
+                                    colors: [Colors.amberAccent, Colors.amber],
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                  width: 12,
                                 ),
-                                borderRadius: BorderRadius.circular(6),
-                                width: 12,
-                              ),
-                              BarChartRodData(
-                                toY: orders,
-                                gradient: const LinearGradient(
-                                  colors: [Colors.blueAccent, Colors.blue],
-                                  begin: Alignment.bottomCenter,
-                                  end: Alignment.topCenter,
+                                BarChartRodData(
+                                  toY: orders,
+                                  gradient: const LinearGradient(
+                                    colors: [Colors.blueAccent, Colors.blue],
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                  ),
+                                  borderRadius: BorderRadius.circular(6),
+                                  width: 12,
                                 ),
-                                borderRadius: BorderRadius.circular(6),
-                                width: 12,
-                              ),
-                            ],
-                          );
-                        }).toList(),
+                              ],
+                            );
+                          }).toList(),
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                   const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -241,14 +227,100 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
               fontWeight: FontWeight.bold,
             ),
             const SizedBox(height: 12),
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: leads.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final lead = leads[index];
-                return _buildLeadTile(context, lead, scheme);
+            GetX<LeadsController>(
+              init: LeadsController(),
+              builder: (controller) {
+                if (controller.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (controller.leads.isEmpty) {
+                  return const Text("No recent leads");
+                }
+
+                // Show top 5 leads
+                final displayLeads = controller.leads.take(5).toList();
+
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: displayLeads.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final lead = displayLeads[index];
+                    final user = lead.userWrapper;
+                    final name = user != null
+                        ? "${user['first_name']} ${user['last_name']}"
+                        : "Unknown User";
+
+                    return Card(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 1.5,
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            CircleAvatar(
+                              radius: 26,
+                              backgroundColor: Colors.grey.shade300,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  AppText(
+                                    name,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                  AppText("Lead", fontSize: 12),
+                                  AppText(
+                                    'Received: ${Jiffy.parseFromDateTime(lead.createdAt.toLocal()).fromNow()}',
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            ElevatedButton(
+                              onPressed: () async {
+                                await chatController.loadChat(lead.userId);
+                                if (chatController.currentChat.value != null &&
+                                    lead.userWrapper != null) {
+                                  final otherUser = PersonModel.fromJson(
+                                    lead.userWrapper!,
+                                  );
+                                  goToChatScreen(otherUser);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.amberAccent,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              child: AppText(
+                                'Chat',
+                                color: Colors.black,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
               },
             ),
           ],
@@ -311,62 +383,6 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
         const SizedBox(width: 6),
         AppText(label, fontSize: 12, fontWeight: FontWeight.w500),
       ],
-    );
-  }
-
-  // ==== LEAD CARD ====
-  Widget _buildLeadTile(
-    BuildContext context,
-    Map<String, dynamic> lead,
-    ColorScheme scheme,
-  ) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 1.5,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            CircleAvatar(radius: 26, backgroundColor: Colors.grey.shade300),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppText(
-                    lead['name'],
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                  AppText(lead['job'], fontSize: 12),
-                  AppText(lead['details'], fontSize: 12, color: Colors.grey),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            ElevatedButton(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.amberAccent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-              ),
-              child: AppText(
-                lead['action'],
-                color: Colors.black,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

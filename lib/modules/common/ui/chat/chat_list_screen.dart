@@ -17,6 +17,7 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   late ChatController chatController;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -25,7 +26,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
     } else {
       chatController = Get.put(ChatController());
     }
+
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        chatController.fetchMyChats(isLoadMore: true);
+      }
+    });
+
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -42,72 +57,79 @@ class _ChatListScreenState extends State<ChatListScreen> {
           );
         }
 
-        final chats = controller.myChats;
-
         return Scaffold(
           appBar: kIsWeb ? null : AppBar(title: const Text('Chats')),
-          body: controller.isLoading.value
-              ? Center(child: CircularProgressIndicator())
-              : chats.isEmpty
-              ? const Center(child: Text("No recent chats"))
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  itemCount: chats.length,
-                  itemBuilder: (context, index) {
-                    final ChatModel chat = chats[index];
-                    final isSenderMe = chat.senderId == currentUserId;
-                    final otherUser = isSenderMe ? chat.receiver : chat.sender;
-                    if (otherUser == null) return const SizedBox();
-                    return Card(
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: colorScheme.primary.withValues(
-                            alpha: .2,
-                          ),
-                          backgroundImage: otherUser.imgUrl.isNotEmpty
-                              ? NetworkImage(otherUser.imgUrl)
-                              : null,
-                          child: otherUser.imgUrl.isEmpty
-                              ? AppText(
-                                  otherUser.firstName.isNotEmpty
-                                      ? otherUser.firstName[0]
-                                      : "?",
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                )
-                              : null,
-                        ),
-                        title: AppText(
-                          "${otherUser.firstName} ${otherUser.lastName}",
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        subtitle: AppText(
-                          chat.lastMessage.isNotEmpty
-                              ? chat.lastMessage
-                              : "Start chatting...",
-                          fontSize: 13,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: AppText(
-                          Jiffy.parseFromDateTime(
-                            chat.lastMessageTime,
-                          ).fromNow(),
+          body: Obx(() {
+            // Wrap with Obx for reactive list updates
+            final chats = controller.myChats;
 
-                          fontSize: 11,
-                          color: Colors.grey,
-                        ),
-                        onTap: () {
-                          goToChatScreen(otherUser, shouldCloseBefore: false);
-                        },
+            if (chats.isEmpty && !controller.isLoading.value) {
+              return const Center(child: Text("No recent chats"));
+            }
+
+            return ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              itemCount:
+                  chats.length + (controller.isChatsLoadingMore.value ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == chats.length) {
+                  return const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                final ChatModel chat = chats[index];
+                final isSenderMe = chat.senderId == currentUserId;
+                final otherUser = isSenderMe ? chat.receiver : chat.sender;
+                if (otherUser == null) return const SizedBox();
+                return Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: colorScheme.primary.withValues(
+                        alpha: .2,
                       ),
-                    );
-                  },
-                ),
+                      backgroundImage: otherUser.imgUrl.isNotEmpty
+                          ? NetworkImage(otherUser.imgUrl)
+                          : null,
+                      child: otherUser.imgUrl.isEmpty
+                          ? AppText(
+                              otherUser.firstName.isNotEmpty
+                                  ? otherUser.firstName[0]
+                                  : "?",
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            )
+                          : null,
+                    ),
+                    title: AppText(
+                      "${otherUser.firstName} ${otherUser.lastName}",
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    subtitle: AppText(
+                      chat.lastMessage.isNotEmpty
+                          ? chat.lastMessage
+                          : "Start chatting...",
+                      fontSize: 13,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: AppText(
+                      Jiffy.parseFromDateTime(chat.lastMessageTime).fromNow(),
+
+                      fontSize: 11,
+                      color: Colors.grey,
+                    ),
+                    onTap: () {
+                      goToChatScreen(otherUser, shouldCloseBefore: false);
+                    },
+                  ),
+                );
+              },
+            );
+          }),
         );
       },
     );
