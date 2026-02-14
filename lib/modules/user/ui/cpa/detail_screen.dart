@@ -1,5 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
+import 'package:booksmart/modules/cpa/controllers/service_controler.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
@@ -28,9 +29,25 @@ void goToCpaDetailScreen(CpaModel cpa, {bool shouldCloseBefore = false}) {
   }
 }
 
-class CpaDetailScreen extends StatelessWidget {
+class CpaDetailScreen extends StatefulWidget {
   final CpaModel cpa;
   const CpaDetailScreen({super.key, required this.cpa});
+
+  @override
+  State<CpaDetailScreen> createState() => _CpaDetailScreenState();
+}
+
+class _CpaDetailScreenState extends State<CpaDetailScreen> {
+  late ServiceController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(
+      ServiceController(cpaId: widget.cpa.id),
+      tag: widget.cpa.id.toString(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,9 +64,65 @@ class CpaDetailScreen extends StatelessWidget {
 
             // CPA Profile Card
             _buildCpaProfileCard(scheme),
+
+            const SizedBox(height: 20),
+
+            // Services Section
+            _buildServicesSection(scheme),
+
+            const SizedBox(height: 30),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildServicesSection(ColorScheme scheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.room_service, size: 20),
+            const SizedBox(width: 6),
+            AppText(
+              "Offered Services",
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Obx(() {
+          if (controller.isLoading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (controller.services.isEmpty) {
+            return AppText("No services listed yet.", color: Colors.grey);
+          }
+
+          return ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: controller.services.length,
+            itemBuilder: (context, index) {
+              final service = controller.services[index];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  title: AppText(service.title, fontWeight: FontWeight.bold),
+                  subtitle: AppText(service.description, fontSize: 12),
+                  trailing: AppText(
+                    "\$${service.price.toStringAsFixed(2)}",
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              );
+            },
+          );
+        }),
+      ],
     );
   }
 
@@ -71,10 +144,10 @@ class CpaDetailScreen extends StatelessWidget {
                   CircleAvatar(
                     radius: 40,
                     backgroundColor: scheme.primary.withValues(alpha: 0.1),
-                    backgroundImage: cpa.imgUrl.isNotEmpty
-                        ? NetworkImage(cpa.imgUrl)
+                    backgroundImage: widget.cpa.imgUrl.isNotEmpty
+                        ? NetworkImage(widget.cpa.imgUrl)
                         : null,
-                    child: cpa.imgUrl.isEmpty
+                    child: widget.cpa.imgUrl.isEmpty
                         ? Icon(
                             Icons.person_outline,
                             size: 30,
@@ -82,7 +155,8 @@ class CpaDetailScreen extends StatelessWidget {
                           )
                         : null,
                   ),
-                  if (cpa.verificationStatus == CpaVerificationStatus.approved)
+                  if (widget.cpa.verificationStatus ==
+                      CpaVerificationStatus.approved)
                     Positioned(
                       bottom: 0,
                       right: 0,
@@ -107,13 +181,13 @@ class CpaDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     AppText(
-                      "${cpa.firstName} ${cpa.lastName}",
+                      "${widget.cpa.firstName} ${widget.cpa.lastName}",
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
                     ),
                     const SizedBox(height: 4),
                     AppText(
-                      "${cpa.getExperienceInYears} years experience",
+                      "${widget.cpa.getExperienceInYears} years experience",
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -140,7 +214,7 @@ class CpaDetailScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: AppText(
-                        "Starting at \$${cpa.hourlyRate.toStringAsFixed(0)} for standard filing",
+                        "Starting at \$${widget.cpa.hourlyRate.toStringAsFixed(0)} for standard filing",
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -155,30 +229,34 @@ class CpaDetailScreen extends StatelessWidget {
 
           // Bio Section
           AppText(
-            cpa.professionalBio.isNotEmpty
-                ? cpa.professionalBio
+            widget.cpa.professionalBio.isNotEmpty
+                ? widget.cpa.professionalBio
                 : "No professional bio available.",
             fontSize: 13,
           ),
           const SizedBox(height: 20),
 
           // Expertise Sections
-          if (cpa.specialties.isNotEmpty) ...[
+          if (widget.cpa.specialties.isNotEmpty) ...[
             _buildSectionHeader("Specialties", Icons.receipt_long),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: cpa.specialties.map((e) => _buildTag(e)).toList(),
+              children: widget.cpa.specialties
+                  .map((e) => _buildTag(e))
+                  .toList(),
             ),
             const SizedBox(height: 20),
           ],
 
-          if (cpa.stateFocuses.isNotEmpty) ...[
+          if (widget.cpa.stateFocuses.isNotEmpty) ...[
             _buildSectionHeader("State Focuses", Icons.map),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: cpa.stateFocuses.map((e) => _buildTag(e)).toList(),
+              children: widget.cpa.stateFocuses
+                  .map((e) => _buildTag(e))
+                  .toList(),
             ),
             const SizedBox(height: 24),
           ],
@@ -194,10 +272,10 @@ class CpaDetailScreen extends StatelessWidget {
               showConfirmationDialog(
                 title: "Confirm Selection",
                 description:
-                    "Are you sure you'd like to connect with ${cpa.firstName} ${cpa.lastName}?",
+                    "Are you sure you'd like to connect with ${widget.cpa.firstName} ${widget.cpa.lastName}?",
                 onYes: () {
                   Get.back(); // close confirm dialog
-                  goToChatScreen(cpa.data, shouldCloseBefore: false);
+                  goToChatScreen(widget.cpa.data, shouldCloseBefore: false);
                 },
               );
             },

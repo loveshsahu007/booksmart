@@ -1,6 +1,7 @@
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
+import 'package:booksmart/modules/cpa/ui/cpa_services.dart';
 import 'package:booksmart/routes/routes.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -95,7 +96,15 @@ class _SettingsScreenCPAState extends State<SettingsScreenCPA> {
               ),
             );
           }),
+          const SizedBox(height: 10),
 
+          ListTile(
+            title: AppText("Services", fontSize: 14),
+            trailing: Icon(Icons.chevron_right, size: 14),
+            onTap: () {
+              goToCPAServicesScreen();
+            },
+          ),
           const SizedBox(height: 10),
 
           ListTile(
