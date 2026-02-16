@@ -39,6 +39,7 @@ abstract class Routes {
 
   static const String cpaHome = '/cpa/';
   static const String cpaLeads = '/cpa/leads';
+  static const String cpaOrders = '/cpa/orders';
   static const String cpaBilling = '/cpa/earnings';
   static const String cpaChat = '/cpa/chat';
   static const String cpaSettings = '/cpa/settings';

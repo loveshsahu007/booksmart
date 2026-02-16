@@ -63,6 +63,12 @@ class WebSideBarCPA extends StatelessWidget {
                         isShowName: isShowName,
                       ),
                       SideBarIcon(
+                        icon: Icons.shopping_bag,
+                        infoMessage: 'Orders',
+                        routeName: Routes.cpaOrders,
+                        isShowName: isShowName,
+                      ),
+                      SideBarIcon(
                         icon: Icons.file_copy_outlined,
                         infoMessage: 'Billing',
                         routeName: Routes.cpaBilling,

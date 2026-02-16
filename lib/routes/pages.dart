@@ -30,6 +30,7 @@ import '../modules/cpa/ui/earning_screen.dart';
 import '../modules/cpa/ui/home/home_screen.dart';
 import '../modules/cpa/ui/home/template/web_template.dart';
 import '../modules/cpa/ui/leads_screen.dart';
+import '../modules/cpa/ui/orders_screen.dart';
 import '../modules/user/ui/ai_strategy_screen.dart';
 import '../modules/common/ui/authentication/forgot.dart';
 import '../modules/user/ui/financial_statement/financial_statement.dart';
@@ -171,6 +172,15 @@ class AppPages {
       name: Routes.cpaLeads,
       page: () => getRequiredScreen(
         kIsWeb ? WebTemplateCPA(child: LeadsScreenCPA()) : LeadsScreenCPA(),
+        UserRole.cpa,
+      ),
+    ),
+    GetPage(
+      name: Routes.cpaOrders,
+      page: () => getRequiredScreen(
+        kIsWeb
+            ? WebTemplateCPA(child: const OrdersScreenCPA())
+            : const OrdersScreenCPA(),
         UserRole.cpa,
       ),
     ),

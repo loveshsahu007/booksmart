@@ -77,9 +77,11 @@ class CpaOrderDetailScreen extends StatelessWidget {
               _buildDescriptionSection(context),
             const SizedBox(height: 24),
             // Action Buttons
-            if (order.status == OrderStatus.pending)
-              _buildActionButtons(context),
-            const SizedBox(height: 20),
+            if (order.status == OrderStatus.pending) ...{
+              if (authPerson?.role != UserRole.cpa)
+                _buildActionButtons(context),
+              const SizedBox(height: 20),
+            },
           ],
         ),
       ),
