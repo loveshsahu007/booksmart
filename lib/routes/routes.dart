@@ -11,7 +11,7 @@ abstract class Routes {
   static const String tax = '/user/tax';
   static const String cpaNetwork = '/user/cpa-network';
   static const String tokens = '/user/token';
-  static const String report = '/user/report';
+  static const String report = '/user/reports';
   static const String aiChat = '/user/ai-chat';
   static const String chat = '/user/chat';
   static const String settings = '/user/settings';

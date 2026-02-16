@@ -38,6 +38,7 @@ class _DateRangePickerWidgetState extends State<DateRangePickerWidget> {
     }
   }
 
+  //TODO: Change the selction color to grey
   Future<void> _pickDateRange() async {
     final now = DateTime.now();
     final DateTimeRange? pickedRange = await showDateRangePicker(
@@ -48,8 +49,6 @@ class _DateRangePickerWidgetState extends State<DateRangePickerWidget> {
           ? DateTimeRange(start: _startDate!, end: _endDate!)
           : null,
       builder: (context, child) {
-        // final size = MediaQuery.of(context).size;
-
         return Center(
           child: Container(
             margin: EdgeInsets.all(20),

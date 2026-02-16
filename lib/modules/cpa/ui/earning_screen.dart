@@ -127,6 +127,7 @@ class _EarningScreenCPAState extends State<EarningScreenCPA> {
               onTap: () => _navigateToTransactionDetails(),
               child: Container(
                 padding: EdgeInsets.all(isDesktop ? 20 : (isTablet ? 18 : 16)),
+                // TODO: put seperation lines between the transactions
                 child: Column(
                   children: transactions.map((tx) {
                     return Padding(
@@ -185,15 +186,6 @@ class _EarningScreenCPAState extends State<EarningScreenCPA> {
               child: AppButton(
                 buttonText: "Add Funds",
                 onTapFunction: () => _navigateToAddFunds(),
-              ),
-            ),
-
-            SizedBox(height: 12),
-            const Center(
-              child: AppText(
-                'Auto-refill lead credits',
-                fontSize: 14,
-                color: Colors.grey,
               ),
             ),
           ],

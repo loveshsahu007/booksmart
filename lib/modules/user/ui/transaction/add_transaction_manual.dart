@@ -316,7 +316,6 @@ class _AddTransactionScreenManualState
               },
             ),
             0.02.verticalSpace,
-
             Material(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -354,12 +353,18 @@ class _AddTransactionScreenManualState
                         fit: BoxFit.cover,
                       ),
               ),
-            ElevatedButton.icon(
+            OutlinedButton.icon(
               onPressed: _attachReceipt,
-              icon: const Icon(Icons.camera_alt, color: primaryColor),
+              icon: const Icon(Icons.camera_alt, color: orangeBttonColor),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: orangeBttonColor),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
+                ),
+              ),
               label: const AppText(
                 "Attach Receipt",
-                color: primaryColor,
+                color: orangeBttonColor,
                 fontWeight: FontWeight.w500,
                 fontSize: 15,
               ),
@@ -368,10 +373,15 @@ class _AddTransactionScreenManualState
 
             ElevatedButton(
               onPressed: _saveTransaction,
+              style: OutlinedButton.styleFrom(
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
+                ),
+              ),
               child: AppText(
                 isUpdate ? "Update Transaction" : "Save Transaction",
                 color: primaryColor,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
                 fontSize: 16,
               ),
             ),

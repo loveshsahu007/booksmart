@@ -112,7 +112,11 @@ class SupabaseCrudService {
   static Future<dynamic> delete({
     required String table,
     required Map<String, dynamic> filters,
+    bool isShowLoading = false,
   }) async {
+    if (isShowLoading) {
+      showLoading();
+    }
     try {
       var query = supabase.from(table).delete();
 
@@ -124,6 +128,10 @@ class SupabaseCrudService {
       return res;
     } catch (e) {
       throw Exception("Delete failed: $e");
+    } finally {
+      if (isShowLoading) {
+        dismissLoadingWidget();
+      }
     }
   }
 }

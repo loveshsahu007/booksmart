@@ -66,6 +66,12 @@ class WebSideBar extends StatelessWidget {
                         isShowName: isShowName,
                       ),
                       SideBarIcon(
+                        icon: Icons.discount_outlined,
+                        infoMessage: 'AI Strategy',
+                        routeName: Routes.aiStrategy,
+                        isShowName: isShowName,
+                      ),
+                      SideBarIcon(
                         icon: Icons.file_copy_outlined,
                         infoMessage: 'Financial Reports',
                         routeName: Routes.report,
@@ -83,12 +89,7 @@ class WebSideBar extends StatelessWidget {
                         routeName: Routes.cpaNetwork,
                         isShowName: isShowName,
                       ),
-                      SideBarIcon(
-                        icon: Icons.discount_outlined,
-                        infoMessage: 'AI Strategy',
-                        routeName: Routes.aiStrategy,
-                        isShowName: isShowName,
-                      ),
+
                       SideBarIcon(
                         icon: Icons.token_outlined,
                         infoMessage: 'Tokens',

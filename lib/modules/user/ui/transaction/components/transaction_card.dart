@@ -29,10 +29,8 @@ class TransactionCard extends StatelessWidget {
     final categoryController = Get.find<CategoryAdminController>();
     // Determine if income or expense
     final bool isPositive = transaction.amount >= 0;
-    final Color statusColor = isPositive
-        ? Colors.green.shade600
-        : Colors.red.shade600;
-    final String amountPrefix = isPositive ? "+" : "";
+    final Color statusColor = isPositive ? Colors.green.shade600 : Colors.grey;
+    final String amountPrefix = isPositive ? "" : "-";
 
     return Card(
       margin: EdgeInsets.zero,
@@ -78,7 +76,7 @@ class TransactionCard extends StatelessWidget {
                           Text(
                             "$amountPrefix\$${transaction.amount.abs().toStringAsFixed(2)}",
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: statusColor,
                             ),

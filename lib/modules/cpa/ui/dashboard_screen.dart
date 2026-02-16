@@ -59,10 +59,10 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
                       ),
                     ),
                     _buildStatCard(
-                      'Pending Intros',
-                      '5',
-                      Colors.orangeAccent,
-                      Icons.pending_actions,
+                      'Orders',
+                      '4',
+                      Colors.teal,
+                      Icons.shopping_cart,
                     ),
                     _buildStatCard(
                       'Accepted Clients',
@@ -70,6 +70,7 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
                       Colors.green,
                       Icons.verified_user,
                     ),
+                    // orders/leads ratio
                     _buildStatCard(
                       'Conversion Rate',
                       '53%',

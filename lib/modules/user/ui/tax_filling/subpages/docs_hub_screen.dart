@@ -39,7 +39,7 @@ class _TaxDocsHubScreenState extends State<TaxDocsHubScreen> {
             spacing: 10,
             children: [
               Expanded(
-                flex: 3,
+                flex: 4,
                 child: AppTextField(
                   hintText: "Search documents...",
                   keyboardType: TextInputType.text,
@@ -50,10 +50,10 @@ class _TaxDocsHubScreenState extends State<TaxDocsHubScreen> {
               Expanded(
                 child: AppButton(
                   radius: 8,
-                  buttonText: "Upload Tax\nDocuments",
-                  fontSize: 12,
+                  buttonText: "Upload",
+                  fontSize: 16,
                   padding: const EdgeInsets.symmetric(
-                    vertical: 6,
+                    vertical: 18,
                     horizontal: 6,
                   ),
                   onTapFunction: showUploadTaxDocumentDialog,

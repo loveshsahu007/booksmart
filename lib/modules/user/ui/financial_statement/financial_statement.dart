@@ -9,6 +9,8 @@ import 'package:get/get.dart';
 
 import 'package:flutter/material.dart';
 
+import 'subpages/financial_dashboard_tab.dart';
+
 class FinincialTabController extends GetxController
     with GetTickerProviderStateMixin {
   late TabController tabController;
@@ -18,7 +20,7 @@ class FinincialTabController extends GetxController
   @override
   void onInit() {
     super.onInit();
-    tabController = TabController(length: 4, vsync: this);
+    tabController = TabController(length: 5, vsync: this);
 
     tabController.addListener(() {
       if (!tabController.indexIsChanging) {
@@ -71,6 +73,7 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
               fontSize: 12,
             ),
             tabs: const [
+              Tab(text: 'Dashboard'),
               Tab(text: 'Transactions'),
               Tab(text: 'Profit & Loss'),
               Tab(text: 'Balance Sheet'),
@@ -82,6 +85,7 @@ class _FinancialReportPageState extends State<FinancialReportPage> {
             child: TabBarView(
               controller: finincialTabController.tabController,
               children: [
+                FinancialDashboardTab(),
                 TransactionListScreen(),
                 ProfitLossScreen(),
                 BalanceSheetTab(),

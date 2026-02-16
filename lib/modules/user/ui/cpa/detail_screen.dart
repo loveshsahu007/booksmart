@@ -39,14 +39,22 @@ class CpaDetailScreen extends StatefulWidget {
 
 class _CpaDetailScreenState extends State<CpaDetailScreen> {
   late ServiceController controller;
+  late String controllerTag;
 
   @override
   void initState() {
     super.initState();
-    controller = Get.put(
-      ServiceController(cpaId: widget.cpa.id),
-      tag: widget.cpa.id.toString(),
-    );
+    controllerTag = widget.cpa.id.toString();
+
+    if (Get.isRegistered<ServiceController>(tag: controllerTag)) {
+      controller = Get.find<ServiceController>(tag: controllerTag);
+    } else {
+      controller = Get.put(
+        ServiceController(cpaId: widget.cpa.id),
+        tag: controllerTag,
+        permanent: true,
+      );
+    }
   }
 
   @override

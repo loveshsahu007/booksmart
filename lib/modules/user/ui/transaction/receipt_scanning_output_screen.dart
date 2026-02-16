@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+// TODO: reduce the width of dialog
 Future<Map<String, dynamic>?> openReceiptScanner() async {
   if (kIsWeb) {
     return await Get.dialog(const ReceiptFilePickerDialog());

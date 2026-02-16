@@ -9,8 +9,8 @@ class ServiceController extends GetxController {
   final int cpaId;
   ServiceController({required this.cpaId});
 
-  var services = <ServiceModel>[].obs;
-  var isLoading = true.obs;
+  RxList<ServiceModel> services = <ServiceModel>[].obs;
+  RxBool isLoading = true.obs;
 
   @override
   void onInit() {
@@ -85,19 +85,17 @@ class ServiceController extends GetxController {
   }
 
   Future<bool> deleteService(int serviceId) async {
-    showLoading();
     try {
       await SupabaseCrudService.delete(
         table: SupabaseTable.cpaServices,
         filters: {"id": serviceId},
+        isShowLoading: true,
       );
-      await fetchServices();
+      services.removeWhere((e) => e.id == serviceId);
       return true;
     } catch (e) {
       Get.snackbar("Error", "Failed to delete service");
       return false;
-    } finally {
-      dismissLoadingWidget();
     }
   }
 }

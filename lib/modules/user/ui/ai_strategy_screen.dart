@@ -117,6 +117,24 @@ class _AiStrategyScreenState extends State<AiStrategyScreen> {
               buttonLabel: "Ask BookSmart AI",
               color: greenColor,
             ),
+            const SizedBox(height: 15),
+            _buildStrategyTile(
+              context,
+              amount: "\$400",
+              description:
+                  "Contribute to a retirement account to increase your deductions",
+              buttonLabel: "Ask BookSmart AI",
+              color: greenColor,
+            ),
+            const SizedBox(height: 15),
+            _buildStrategyTile(
+              context,
+              amount: "\$8,500",
+              description:
+                  "Utilize accelerated depreciation to lower your taxable income",
+              buttonLabel: "Ask BookSmart AI",
+              color: greenColor,
+            ),
           ],
         ),
       ),
