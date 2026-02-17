@@ -1,6 +1,9 @@
-import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/modules/user/ui/token/buy_tokens_screen.dart';
-import 'package:booksmart/modules/user/ui/token/streak_unlocked_screen.dart';
+import 'package:flutter/material.dart';
+import 'widgets/strategy_card.dart';
+import 'widgets/boost_card.dart';
+import 'widgets/buy_tokens_panel.dart';
+import 'widgets/token_history_panel.dart';
+import 'widgets/section_header.dart';
 
 class EarnTokensScreen extends StatelessWidget {
   const EarnTokensScreen({super.key});
@@ -8,114 +11,88 @@ class EarnTokensScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
-      // appBar: AppBar(
-      //   leading: IconButton(
-      //     icon: const Icon(Icons.arrow_back),
-      //     onPressed: () {
-      //       if (Get.previousRoute.isNotEmpty) {
-      //         Get.back();
-      //       } else if (Navigator.canPop(context)) {
-      //         Navigator.pop(context);
-      //       } else {
-      //         Get.offAllNamed(Routes.home);
-      //       }
-      //     },
-      //   ),
-      //   title: AppText(
-      //      "Earn Tokens",
-      //     fontSize: 20,
-      //     fontWeight: FontWeight.bold,
-      //     color: colorScheme.onSurface,
-      //   ),
-      //   centerTitle: true,
-      //   backgroundColor: theme.scaffoldBackgroundColor,
-      //   elevation: 0,
-      // ),
+      backgroundColor: isDark ? const Color(0xFF0F1219) : colorScheme.surface,
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final isTablet = constraints.maxWidth > 600;
-          final isDesktop = constraints.maxWidth > 1024;
-
-          final padding = EdgeInsets.all(isDesktop ? 40 : 20);
+          final bool isWide = constraints.maxWidth > 1100;
+          final bool isMedium =
+              constraints.maxWidth > 700 && constraints.maxWidth <= 1100;
 
           return SingleChildScrollView(
-            padding: padding,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                AppText(
-                  "Earn Free Tokens",
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Icon(
-                  Icons.monetization_on,
-                  color: colorScheme.secondary,
-                  size: isDesktop ? 120 : 80,
-                ),
-                const SizedBox(height: 8),
-                AppText(
-                  "Watch short ads and get rewarded instantly.",
-                  fontSize: 16,
-                  textAlign: TextAlign.center,
-                  color: isDark
-                      ? AppColorsDark.textSecondary
-                      : AppColorsLight.textSecondary,
-                ),
-                const SizedBox(height: 30),
+                _buildTopNav(context),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Main Content
+                      Expanded(
+                        flex: 3,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildWalletHeader(context),
+                            const SizedBox(height: 32),
+                            const SectionHeader(
+                              title: "Premium Strategy Store",
+                            ),
+                            _buildStrategyGrid(isWide, isMedium),
+                            const SizedBox(height: 32),
+                            const SectionHeader(
+                              title: "Premium Strategy Store",
+                            ), // Second store in UI
+                            _buildStrategyGrid(
+                              isWide,
+                              isMedium,
+                              secondRow: true,
+                            ),
+                            const SizedBox(height: 32),
+                            const SectionHeader(title: "Power Boosts"),
+                            _buildBoostsGrid(isWide, isMedium),
+                            const SizedBox(height: 32),
+                            const SectionHeader(
+                              title: "Exclusive Level Unlocks",
+                            ),
+                            _buildExclusiveUnlocks(isWide, isMedium),
 
-                // Reward Tiles
-                _rewardTile(
-                  context,
-                  "Watch 1 Ad",
-                  "+50 Tokens",
-                  isTablet,
-                  isDesktop,
-                ),
-                const SizedBox(height: 12),
-                _rewardTile(
-                  context,
-                  "Watch 3 Ads",
-                  "+200 Tokens (Bonus!)",
-                  isTablet,
-                  isDesktop,
-                ),
-                const SizedBox(height: 12),
-                _rewardTile(
-                  context,
-                  "Daily Streak",
-                  "2 / 3 ads completed today",
-                  isTablet,
-                  isDesktop,
-                ),
-                const SizedBox(height: 30),
+                            // Move Sidebar to bottom if not Wide
+                            if (!isWide) ...[
+                              const SizedBox(height: 32),
+                              const BuyTokensPanel(),
+                              const SizedBox(height: 24),
+                              const TokenHistoryPanel(),
+                            ],
+                          ],
+                        ),
+                      ),
 
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: AppButton(
-                        buttonText: "Buy Tokens",
-                        radius: 8,
-                        onTapFunction: () =>
-                            goToBuyTokensScreen(shouldCloseBefore: false),
-                      ),
-                    ),
-                    SizedBox(width: 10),
-                    Expanded(
-                      child: AppButton(
-                        buttonText: "Use Tokens Now",
-                        radius: 8,
-                        onTapFunction: () {},
-                      ),
-                    ),
-                  ],
+                      // Sidebar for Desktop
+                      if (isWide) ...[
+                        const SizedBox(width: 32),
+                        const Expanded(
+                          flex: 1,
+                          child: Column(
+                            children: [
+                              BuyTokensPanel(),
+                              SizedBox(height: 24),
+                              TokenHistoryPanel(),
+                              SizedBox(height: 24),
+                              TokenHistoryPanel(), // Second one in UI
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -125,55 +102,350 @@ class EarnTokensScreen extends StatelessWidget {
     );
   }
 
-  Widget _rewardTile(
-    BuildContext context,
-    String title,
-    String subtitle,
-    bool isTablet,
-    bool isDesktop,
-  ) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+  Widget _buildTopNav(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.5)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppText(title, fontSize: 14, fontWeight: FontWeight.w600),
-              const SizedBox(height: 4),
-              AppText(subtitle, fontSize: 14),
-            ],
+          Icon(
+            Icons.home_outlined,
+            color: colorScheme.onSurface.withOpacity(0.7),
+            size: 18,
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.secondary,
-              foregroundColor: Colors.black,
-              padding: EdgeInsets.symmetric(
-                horizontal: isDesktop ? 28 : 20,
-                vertical: isDesktop ? 16 : 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+          const SizedBox(width: 8),
+          Text(
+            "Home / Token Wallet",
+            style: TextStyle(
+              color: colorScheme.onSurface.withOpacity(0.7),
+              fontSize: 13,
             ),
-            onPressed: () => goToStreakUnlockedScreen(shouldCloseBefore: false),
-            child: const AppText(
-              "PLAY",
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
+          ),
+          const Spacer(),
+          _topNavCounter(context, Icons.monetization_on, "240", Colors.amber),
+          const SizedBox(width: 16),
+          _topNavCounter(
+            context,
+            Icons.security,
+            "6,420",
+            Colors.greenAccent,
+            extra: "5 Days",
+          ),
+          const SizedBox(width: 16),
+          Badge(
+            label: const Text("1"),
+            child: Icon(
+              Icons.notifications_outlined,
+              color: colorScheme.onSurface.withOpacity(0.7),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _topNavCounter(
+    BuildContext context,
+    IconData icon,
+    String value,
+    Color color, {
+    String? extra,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF1A1F2C)
+            : colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.onSurface.withOpacity(0.05)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (extra != null) ...[
+            const SizedBox(width: 8),
+            Icon(
+              Icons.local_fire_department,
+              color: Colors.orange[400],
+              size: 16,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              extra,
+              style: TextStyle(
+                color: colorScheme.onSurface.withOpacity(0.7),
+                fontSize: 12,
+              ),
+            ),
+          ],
+          Icon(
+            Icons.arrow_drop_down,
+            color: colorScheme.onSurface.withOpacity(0.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWalletHeader(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      height: 130,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        image: const DecorationImage(
+          image: NetworkImage(
+            "https://images.unsplash.com/photo-1506318137071-a8e063b4b451?q=80&w=2070&auto=format&fit=crop",
+          ),
+          fit: BoxFit.cover,
+          opacity: 0.6,
+        ),
+        gradient: LinearGradient(
+          colors: [
+            Colors.black.withOpacity(0.8),
+            Colors.black.withOpacity(0.2),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        border: Border.all(color: colorScheme.onSurface.withOpacity(0.1)),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: RadialGradient(
+                  center: Alignment.topLeft,
+                  radius: 1.5,
+                  colors: [
+                    colorScheme.primary.withOpacity(0.1),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.primary.withOpacity(0.2),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.monetization_on,
+                    color: colorScheme.primary,
+                    size: 48,
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "Token Wallet",
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onPrimary,
+                      ),
+                    ),
+                    // const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.local_fire_department,
+                          color: Colors.orange[400],
+                          size: 18,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "240",
+                          style: TextStyle(
+                            color: colorScheme.onPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Tokens",
+                          style: TextStyle(
+                            color: colorScheme.onPrimary.withOpacity(0.6),
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStrategyGrid(
+    bool isWide,
+    bool isMedium, {
+    bool secondRow = false,
+  }) {
+    int crossAxisCount = isWide ? 2 : 1;
+    if (isMedium) crossAxisCount = 2;
+
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: crossAxisCount,
+      mainAxisSpacing: 20,
+      crossAxisSpacing: 20,
+      childAspectRatio: isWide ? 2.3 : (isMedium ? 2.0 : 2.5),
+      children: secondRow
+          ? const [
+              StrategyCard(
+                title: "AI Tax Strategy Deep Dive",
+                subtitle: "Personalized 3 scenario tax optimization model",
+                price: "150 Tokens",
+                buttonText: "Unlock Strategy",
+                icon: Icons.description_outlined,
+                bonus: "+150 Tokens",
+              ),
+              StrategyCard(
+                title: "Loan Readiness Simulation",
+                subtitle: "See approval odds before applying",
+                price: "200 Tokens",
+                buttonText: "Run Simulation",
+                icon: Icons.account_balance_outlined,
+              ),
+              StrategyCard(
+                title: "CPA Quick Review",
+                subtitle: "AI pre review of books before CPA meeting",
+                price: "180 Tokens",
+                buttonText: "Generate Review",
+                icon: Icons.article_outlined,
+                bonus: "+180 Tokens",
+              ),
+              StrategyCard(
+                title: "Revenue Growth Forecast",
+                subtitle: "12 month revenue projection model",
+                price: "220 Tokens",
+                buttonText: "Scan Now",
+                icon: Icons.trending_up,
+              ),
+            ]
+          : const [
+              StrategyCard(
+                title: "AI Tax Strategy Deep Dive",
+                subtitle: "Personalized 3 scenario tax optimization model",
+                price: "150 Tokens",
+                buttonText: "Unlock Strategy",
+                icon: Icons.description_outlined,
+              ),
+              StrategyCard(
+                title: "Credit Score Boost",
+                subtitle: "Step-by-step utilization restructuring plan",
+                price: "120 Tokens",
+                buttonText: "Activate Plan",
+                icon: Icons.speed_rounded,
+              ),
+            ],
+    );
+  }
+
+  Widget _buildBoostsGrid(bool isWide, bool isMedium) {
+    int crossAxisCount = isWide ? 2 : 1;
+    if (isMedium) crossAxisCount = 2;
+
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: crossAxisCount,
+      mainAxisSpacing: 20,
+      crossAxisSpacing: 20,
+      childAspectRatio: isWide ? 3.0 : (isMedium ? 2.5 : 3.5),
+      children: const [
+        BoostCard(
+          title: "Double XP Boost",
+          subtitle: "Double XP on missions for 24 hours.",
+          price: "80 Tokens",
+          reward: "+ 80 Tokens",
+          icon: Icons.bolt,
+        ),
+        BoostCard(
+          title: "7 Day Streak Shield",
+          subtitle: "Protect streak if you miss one day.",
+          price: "60 Tokens",
+          reward: "+ 60 Tokens",
+          icon: Icons.shield_outlined,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildExclusiveUnlocks(bool isWide, bool isMedium) {
+    return Builder(
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF1A1F2C)
+                : colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colorScheme.onSurface.withOpacity(0.05)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.lock_outline,
+                color: colorScheme.onSurface.withOpacity(0.3),
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                "Reach Level 10 to unlock exclusive strategies",
+                style: TextStyle(
+                  color: colorScheme.onSurface.withOpacity(0.5),
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

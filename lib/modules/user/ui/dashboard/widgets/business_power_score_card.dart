@@ -8,6 +8,8 @@ class BusinessPowerScoreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Card(
       elevation: 0,
@@ -17,10 +19,11 @@ class BusinessPowerScoreCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const AppText(
+            AppText(
               'Business Power Score (BPS)',
               fontSize: 18,
               fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
             ),
             const SizedBox(height: 20),
             Row(
@@ -43,26 +46,32 @@ class BusinessPowerScoreCard extends StatelessWidget {
                               showLastLabel: true,
                               labelFormat: '{value}',
                               axisLabelStyle: GaugeTextStyle(
-                                color: Colors.white70,
+                                color: colorScheme.onSurfaceVariant,
                                 fontSize: 10,
                                 fontFamily:
                                     theme.textTheme.bodyMedium?.fontFamily,
                               ),
-                              majorTickStyle: const MajorTickStyle(
+                              majorTickStyle: MajorTickStyle(
                                 length: 0.1,
                                 thickness: 1.5,
-                                color: Colors.white54,
+                                color: colorScheme.onSurface.withValues(
+                                  alpha: 0.5,
+                                ),
                               ),
-                              minorTickStyle: const MinorTickStyle(
+                              minorTickStyle: MinorTickStyle(
                                 length: 0.05,
                                 thickness: 1,
-                                color: Colors.white24,
+                                color: colorScheme.onSurface.withValues(
+                                  alpha: 0.2,
+                                ),
                               ),
-                              axisLineStyle: const AxisLineStyle(
+                              axisLineStyle: AxisLineStyle(
                                 thickness: 0.12,
                                 thicknessUnit: GaugeSizeUnit.factor,
                                 cornerStyle: CornerStyle.bothCurve,
-                                color: Colors.black12,
+                                color: isDark
+                                    ? Colors.black12
+                                    : colorScheme.surfaceContainerHighest,
                               ),
                               pointers: const <GaugePointer>[
                                 RangePointer(
@@ -96,15 +105,16 @@ class BusinessPowerScoreCard extends StatelessWidget {
                                   widget: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      const AppText(
+                                      AppText(
                                         '80',
                                         fontSize: 42,
                                         fontWeight: FontWeight.bold,
+                                        color: colorScheme.onSurface,
                                       ),
                                       AppText(
                                         'Good',
                                         fontSize: 16,
-                                        color: Colors.grey[400],
+                                        color: colorScheme.onSurfaceVariant,
                                       ),
                                     ],
                                   ),
@@ -115,7 +125,9 @@ class BusinessPowerScoreCard extends StatelessWidget {
                                   widget: AppText(
                                     '\$ 4725.0004',
                                     fontSize: 12,
-                                    color: Colors.white30,
+                                    color: colorScheme.onSurface.withValues(
+                                      alpha: 0.3,
+                                    ),
                                     fontFamily: 'monospace',
                                   ),
                                 ),
@@ -136,16 +148,17 @@ class BusinessPowerScoreCard extends StatelessWidget {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          const AppText(
+                          AppText(
                             'Level 8',
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
                           ),
                           const SizedBox(width: 8),
                           AppText(
                             'Entrepreneur',
                             fontSize: 14,
-                            color: Colors.grey[400],
+                            color: colorScheme.onSurfaceVariant,
                           ),
                           const Spacer(),
                           const Icon(Icons.star, color: Colors.amber, size: 18),
@@ -156,17 +169,19 @@ class BusinessPowerScoreCard extends StatelessWidget {
                             size: 18,
                           ),
                           const SizedBox(width: 4),
-                          const AppText(
+                          AppText(
                             'Eforei',
                             fontSize: 10,
-                            color: Colors.white70,
+                            color: colorScheme.onSurface.withValues(alpha: 0.7),
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
                       LinearProgressIndicator(
                         value: 0.75,
-                        backgroundColor: Colors.white10,
+                        backgroundColor: colorScheme.onSurface.withValues(
+                          alpha: 0.1,
+                        ),
                         valueColor: const AlwaysStoppedAnimation<Color>(
                           Colors.orangeAccent,
                         ),
@@ -174,15 +189,18 @@ class BusinessPowerScoreCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(3),
                       ),
                       const SizedBox(height: 20),
-                      const AppText(
+                      AppText(
                         'Cashflow Builder',
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
                       ),
                       const SizedBox(height: 12),
                       LinearProgressIndicator(
                         value: 0.6,
-                        backgroundColor: Colors.white10,
+                        backgroundColor: colorScheme.onSurface.withValues(
+                          alpha: 0.1,
+                        ),
                         valueColor: const AlwaysStoppedAnimation<Color>(
                           Colors.amber,
                         ),
@@ -196,12 +214,16 @@ class BusinessPowerScoreCard extends StatelessWidget {
                           AppText(
                             'Next rank: Profit Machine',
                             fontSize: 11,
-                            color: Colors.white54,
+                            color: colorScheme.onSurface.withValues(
+                              alpha: 0.54,
+                            ),
                           ),
                           AppText(
                             'Streak: 3.500',
                             fontSize: 11,
-                            color: Colors.white54,
+                            color: colorScheme.onSurface.withValues(
+                              alpha: 0.54,
+                            ),
                           ),
                         ],
                       ),
@@ -214,9 +236,13 @@ class BusinessPowerScoreCard extends StatelessWidget {
                             vertical: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white12,
+                            color: colorScheme.onSurface.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white10),
+                            border: Border.all(
+                              color: colorScheme.onSurface.withValues(
+                                alpha: 0.1,
+                              ),
+                            ),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -224,10 +250,12 @@ class BusinessPowerScoreCard extends StatelessWidget {
                               AppText(
                                 'Todays XP Potential:',
                                 fontSize: 12,
-                                color: Colors.white70,
+                                color: colorScheme.onSurface.withValues(
+                                  alpha: 0.7,
+                                ),
                               ),
                               const SizedBox(width: 6),
-                              AppText(
+                              const AppText(
                                 '+340 XP',
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
