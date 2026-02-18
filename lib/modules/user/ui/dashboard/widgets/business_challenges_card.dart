@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import '../../../../../widgets/app_text.dart';
 
 class BusinessChallengesCard extends StatelessWidget {
@@ -8,7 +9,8 @@ class BusinessChallengesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: EdgeInsets.zero,
-      child: Padding(
+      child: Container(
+        height: 300,
         padding: const EdgeInsets.all(15),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -18,9 +20,9 @@ class BusinessChallengesCard extends StatelessWidget {
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 20),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 25),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16),
@@ -34,6 +36,7 @@ class BusinessChallengesCard extends StatelessWidget {
                       const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
+                          spacing: 10,
                           children: [
                             AppText(
                               'Cashflow Warrior Challenge',
@@ -48,14 +51,14 @@ class BusinessChallengesCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const Icon(
+                      Icon(
                         Icons.emoji_events,
-                        color: Colors.amber,
+                        color: Get.theme.primaryColor,
                         size: 40,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 25),
                   const Row(
                     children: [
                       _ChallengeStat(label: 'Progress', value: '5/10 Tasks'),
@@ -70,7 +73,7 @@ class BusinessChallengesCard extends StatelessWidget {
                         child: ElevatedButton(
                           onPressed: () {},
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.amber,
+                            backgroundColor: Get.theme.primaryColor,
                             foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -115,6 +118,7 @@ class _ChallengeStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: 5,
       children: [
         AppText(label, fontSize: 10, color: Colors.grey),
         AppText(value, fontSize: 12, fontWeight: FontWeight.bold),

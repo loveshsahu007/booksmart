@@ -20,13 +20,12 @@ class _CpaNetworkScreenState extends State<CpaNetworkScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 15),
+        padding: EdgeInsets.symmetric(horizontal: 15, vertical: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             AppText("Active Orders", fontSize: 14, fontWeight: FontWeight.bold),
             SizedBox(height: 10),
-
             GetX<OrderController>(
               init: OrderController(),
               initState: (_) {

@@ -10,6 +10,7 @@ class AchievementsGrid extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: Container(
         padding: const EdgeInsets.all(15),
+        height: 300,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

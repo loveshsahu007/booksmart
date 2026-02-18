@@ -104,7 +104,11 @@ class AiStrategyInsightList extends StatelessWidget {
                   Row(
                     children: [
                       const SizedBox(width: 15),
-                      const Icon(Icons.stars, color: Colors.amber, size: 14),
+                      Icon(
+                        Icons.stars,
+                        color: Get.theme.primaryColor,
+                        size: 14,
+                      ),
                       const SizedBox(width: 4),
                       AppText(subtitle, fontSize: 11, color: Colors.grey),
                     ],

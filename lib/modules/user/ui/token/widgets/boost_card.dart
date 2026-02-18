@@ -28,12 +28,15 @@ class BoostCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.1)
+              ? Colors.white.withValues(alpha: 0.1)
               : colorScheme.outlineVariant,
         ),
         gradient: LinearGradient(
           colors: isDark
-              ? [colorScheme.surface, colorScheme.surface.withOpacity(0.8)]
+              ? [
+                  colorScheme.surface,
+                  colorScheme.surface.withValues(alpha: 0.8),
+                ]
               : [colorScheme.surface, colorScheme.surfaceContainerHighest],
         ),
       ),
@@ -42,7 +45,7 @@ class BoostCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: colorScheme.primary.withOpacity(0.1),
+              color: colorScheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: colorScheme.primary, size: 24),

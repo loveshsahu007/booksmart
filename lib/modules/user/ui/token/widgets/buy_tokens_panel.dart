@@ -7,59 +7,48 @@ class BuyTokensPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF1A1F2C)
-            : colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.05)
-              : colorScheme.outlineVariant,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "Buy More Tokens",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 20),
-          _priceRow(context, "100 Tokens", "\$ 9", "+ 20 Tokens", 0.3),
-          _priceRow(context, "300 Tokens", "\$ 24", "+ 75 Tokens", 0.6),
-          _priceRow(context, "750 Tokens", "\$ 55", "+ 200 Tokens", 0.8),
-          _priceRow(context, "1,500 Tokens", "\$ 89", "+ 500 Tokens", 0.95),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.orange[800]!, Colors.orange[400]!],
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Buy More Tokens",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
               ),
-              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Center(
-              child: Text(
-                "Buy Tokens",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+            const SizedBox(height: 20),
+            _priceRow(context, "100 Tokens", "\$ 9", "+ 20 Tokens", 0.3),
+            _priceRow(context, "300 Tokens", "\$ 24", "+ 75 Tokens", 0.6),
+            _priceRow(context, "750 Tokens", "\$ 55", "+ 200 Tokens", 0.8),
+            _priceRow(context, "1,500 Tokens", "\$ 89", "+ 500 Tokens", 0.95),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Text(
+                  "Buy Tokens",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

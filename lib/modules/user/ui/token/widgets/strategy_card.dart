@@ -1,4 +1,6 @@
+import 'package:booksmart/widgets/app_text.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 class StrategyCard extends StatelessWidget {
   final String title, subtitle, price, buttonText;
@@ -27,19 +29,22 @@ class StrategyCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark
-              ? Colors.white.withOpacity(0.1)
+              ? Colors.white.withValues(alpha: 0.1)
               : colorScheme.outlineVariant,
         ),
         gradient: LinearGradient(
           colors: isDark
-              ? [colorScheme.surface, colorScheme.surface.withOpacity(0.7)]
-              : [colorScheme.surface, colorScheme.surfaceContainerHighest],
+              ? [
+                  colorScheme.surface,
+                  colorScheme.surface.withValues(alpha: 0.7),
+                ]
+              : [colorScheme.surfaceContainerHighest, colorScheme.surface],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -55,8 +60,8 @@ class StrategyCard extends StatelessWidget {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: isDark
-                      ? Colors.white.withOpacity(0.05)
-                      : colorScheme.primary.withOpacity(0.05),
+                      ? Colors.white.withValues(alpha: 0.05)
+                      : colorScheme.primary.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -73,23 +78,27 @@ class StrategyCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: colorScheme.onSurface,
+                        Flexible(
+                          child: FittedText(
+                            title,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: colorScheme.onSurface,
+                            ),
                           ),
                         ),
                         if (bonus != null)
-                          Text(
-                            bonus!,
-                            style: TextStyle(
-                              color: isDark
-                                  ? Colors.amber[400]
-                                  : Colors.orange[800],
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                          Flexible(
+                            child: FittedText(
+                              bonus!,
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.amber[400]
+                                    : Colors.orange[800],
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                       ],
@@ -130,8 +139,8 @@ class StrategyCard extends StatelessWidget {
               ElevatedButton(
                 onPressed: () {},
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.amber[600],
-                  foregroundColor: Colors.black,
+                  backgroundColor: Get.theme.colorScheme.primary,
+                  foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),

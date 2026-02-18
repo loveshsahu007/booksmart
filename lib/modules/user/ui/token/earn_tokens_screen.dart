@@ -10,12 +10,7 @@ class EarnTokensScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0F1219) : colorScheme.surface,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final bool isWide = constraints.maxWidth > 1100;
@@ -133,163 +128,123 @@ class EarnTokensScreen extends StatelessWidget {
     String? extra,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF1A1F2C)
-            : colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.onSurface.withOpacity(0.05)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          if (extra != null) ...[
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      margin: EdgeInsets.zero,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 18),
             const SizedBox(width: 8),
-            Icon(
-              Icons.local_fire_department,
-              color: Colors.orange[400],
-              size: 16,
-            ),
-            const SizedBox(width: 4),
             Text(
-              extra,
+              value,
               style: TextStyle(
-                color: colorScheme.onSurface.withOpacity(0.7),
-                fontSize: 12,
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.bold,
               ),
             ),
+            if (extra != null) ...[
+              const SizedBox(width: 8),
+              Icon(
+                Icons.local_fire_department,
+                color: Colors.orange[400],
+                size: 16,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                extra,
+                style: TextStyle(
+                  color: colorScheme.onSurface.withValues(alpha: 0.7),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+            Icon(
+              Icons.arrow_drop_down,
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
           ],
-          Icon(
-            Icons.arrow_drop_down,
-            color: colorScheme.onSurface.withOpacity(0.5),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildWalletHeader(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      height: 130,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        image: const DecorationImage(
-          image: NetworkImage(
-            "https://images.unsplash.com/photo-1506318137071-a8e063b4b451?q=80&w=2070&auto=format&fit=crop",
-          ),
-          fit: BoxFit.cover,
-          opacity: 0.6,
-        ),
-        gradient: LinearGradient(
-          colors: [
-            Colors.black.withOpacity(0.8),
-            Colors.black.withOpacity(0.2),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        border: Border.all(color: colorScheme.onSurface.withOpacity(0.1)),
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Container(
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Container(
+        height: 130,
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: RadialGradient(
-                  center: Alignment.topLeft,
-                  radius: 1.5,
-                  colors: [
-                    colorScheme.primary.withOpacity(0.1),
-                    Colors.transparent,
-                  ],
-                ),
+                color: colorScheme.primary.withValues(alpha: .1),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: colorScheme.primary.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.monetization_on,
+                color: colorScheme.primary,
+                size: 48,
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Row(
+            const SizedBox(width: 24),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.primary.withOpacity(0.2),
-                        blurRadius: 20,
-                        spreadRadius: 5,
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    Icons.monetization_on,
-                    color: colorScheme.primary,
-                    size: 48,
+                Text(
+                  "Token Wallet",
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onPrimary,
                   ),
                 ),
-                const SizedBox(width: 24),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                // const SizedBox(height: 8),
+                Row(
                   children: [
+                    Icon(
+                      Icons.local_fire_department,
+                      color: Colors.orange[400],
+                      size: 18,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
-                      "Token Wallet",
+                      "240",
                       style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
                         color: colorScheme.onPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
                     ),
-                    // const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.local_fire_department,
-                          color: Colors.orange[400],
-                          size: 18,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          "240",
-                          style: TextStyle(
-                            color: colorScheme.onPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          "Tokens",
-                          style: TextStyle(
-                            color: colorScheme.onPrimary.withOpacity(0.6),
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
+                    const SizedBox(width: 8),
+                    Text(
+                      "Tokens",
+                      style: TextStyle(
+                        color: colorScheme.onPrimary.withValues(alpha: 0.6),
+                        fontSize: 16,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -395,34 +350,30 @@ class EarnTokensScreen extends StatelessWidget {
     return Builder(
       builder: (context) {
         final colorScheme = Theme.of(context).colorScheme;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
 
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF1A1F2C)
-                : colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: colorScheme.onSurface.withOpacity(0.05)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.lock_outline,
-                color: colorScheme.onSurface.withOpacity(0.3),
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                "Reach Level 10 to unlock exclusive strategies",
-                style: TextStyle(
-                  color: colorScheme.onSurface.withOpacity(0.5),
-                  fontSize: 14,
+        return Card(
+          margin: EdgeInsets.zero,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.lock_outline,
+                  color: colorScheme.onSurface.withValues(alpha: 0.3),
+                  size: 24,
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Text(
+                  "Reach Level 10 to unlock exclusive strategies",
+                  style: TextStyle(
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       },
