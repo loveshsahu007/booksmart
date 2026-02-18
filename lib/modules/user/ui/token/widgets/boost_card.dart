@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../../widgets/app_text.dart';
+
 class BoostCard extends StatelessWidget {
   final String title, subtitle, price, reward;
   final IconData icon;
@@ -51,27 +53,34 @@ class BoostCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: colorScheme.onSurface,
-                      ),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(
+                          text: title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        TextSpan(
+                          text: " $reward",
+                          style: TextStyle(
+                            color: isDark
+                                ? Colors.amber[400]
+                                : Colors.orange[800],
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                    Text(
-                      reward,
-                      style: TextStyle(
-                        color: isDark ? Colors.amber[400] : Colors.orange[800],
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
+
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
@@ -84,28 +93,21 @@ class BoostCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  minimumSize: const Size(80, 36),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  price,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
+          ElevatedButton(
+            onPressed: () {},
+            style: ElevatedButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              fixedSize: const Size(80, 32),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
               ),
-            ],
+              padding: EdgeInsets.zero,
+            ),
+            child: FittedText(
+              price,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+            ),
           ),
         ],
       ),

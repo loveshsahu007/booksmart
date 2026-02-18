@@ -1,7 +1,7 @@
 import 'package:booksmart/modules/user/ui/dashboard/widgets/business_challenges_card.dart';
 import 'package:booksmart/modules/user/ui/dashboard/widgets/business_power_score_card.dart';
 import 'package:booksmart/modules/user/ui/dashboard/widgets/missions_list.dart';
-import 'package:booksmart/modules/user/ui/dashboard/widgets/next_best_actions_list.dart';
+import 'package:booksmart/modules/user/ui/dashboard/widgets/ai_strategy_insight_list.dart';
 import 'package:booksmart/modules/user/ui/dashboard/widgets/stats_header.dart';
 import 'package:booksmart/modules/user/ui/dashboard/widgets/achievements_grid.dart';
 import 'package:booksmart/modules/user/ui/dashboard/widgets/secondary_stats_cards.dart';
@@ -48,7 +48,7 @@ class DashboardScreen extends StatelessWidget {
                       children: [
                         const Expanded(child: MissionsList()),
                         const SizedBox(width: 24),
-                        const Expanded(child: NextBestActionsList()),
+                        const Expanded(child: AiStrategyInsightList()),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -97,7 +97,7 @@ class DashboardScreen extends StatelessWidget {
               const Expanded(
                 child: Column(
                   children: [
-                    NextBestActionsList(),
+                    AiStrategyInsightList(),
                     SizedBox(height: 20),
                     BusinessChallengesCard(),
                   ],
@@ -123,7 +123,7 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 16),
           const MissionsList(),
           const SizedBox(height: 16),
-          const NextBestActionsList(),
+          const AiStrategyInsightList(),
           const SizedBox(height: 16),
           const AchievementsGrid(),
           const SizedBox(height: 16),

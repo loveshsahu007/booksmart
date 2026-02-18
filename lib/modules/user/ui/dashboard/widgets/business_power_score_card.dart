@@ -12,10 +12,9 @@ class BusinessPowerScoreCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Card(
-      elevation: 0,
-      color: Colors.transparent,
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(15),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -148,19 +147,27 @@ class BusinessPowerScoreCard extends StatelessWidget {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          AppText(
-                            'Level 8',
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
+                          Flexible(
+                            child: FittedText(
+                              'Level 8',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 8),
-                          AppText(
-                            'Entrepreneur',
-                            fontSize: 14,
-                            color: colorScheme.onSurfaceVariant,
+                          Flexible(
+                            child: FittedText(
+                              'Entrepreneur',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
                           ),
-                          const Spacer(),
+                          // const Spacer(),
                           const Icon(Icons.star, color: Colors.amber, size: 18),
                           const SizedBox(width: 4),
                           const Icon(
@@ -169,10 +176,16 @@ class BusinessPowerScoreCard extends StatelessWidget {
                             size: 18,
                           ),
                           const SizedBox(width: 4),
-                          AppText(
-                            'Eforei',
-                            fontSize: 10,
-                            color: colorScheme.onSurface.withValues(alpha: 0.7),
+                          Flexible(
+                            child: FittedText(
+                              'Eforei',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: colorScheme.onSurface.withValues(
+                                  alpha: 0.7,
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),

@@ -7,16 +7,22 @@ class SecondaryStatsCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _buildDunAndBradstreetCard(),
-        const SizedBox(height: 12),
-        _buildFundingCard(),
-        const SizedBox(height: 12),
-        _buildBusinessCreditCard(),
-        const SizedBox(height: 12),
-        _buildTokenWalletCard(),
-      ],
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          children: [
+            _buildDunAndBradstreetCard(),
+            const SizedBox(height: 12),
+            _buildFundingCard(),
+            const SizedBox(height: 12),
+            _buildBusinessCreditCard(),
+            const SizedBox(height: 12),
+            _buildTokenWalletCard(),
+          ],
+        ),
+      ),
     );
   }
 

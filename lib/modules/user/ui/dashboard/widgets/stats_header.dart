@@ -17,7 +17,7 @@ class StatsHeader extends StatelessWidget {
         const SizedBox(width: 16),
         _buildStatItem(
           icon: Icons.star_border,
-          iconColor: Colors.greenAccent,
+          iconColor: Colors.green,
           label: '340 XP',
         ),
       ],
@@ -31,9 +31,9 @@ class StatsHeader extends StatelessWidget {
   }) {
     return Row(
       children: [
-        Icon(icon, color: iconColor, size: 20),
+        Icon(icon, color: iconColor, size: 22),
         const SizedBox(width: 4),
-        AppText(label, fontSize: 12, fontWeight: FontWeight.w500),
+        AppText(label, fontSize: 14, fontWeight: FontWeight.w600),
       ],
     );
   }

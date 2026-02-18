@@ -1,4 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/helpers/map_indexed_extension.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:get/get.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
@@ -151,10 +152,9 @@ class FinancialDashboardTab extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: textPrimary,
                   ),
-                  ...[
-                    Strings.insight1,
-                    Strings.insight2,
-                  ].map((e) => _insightText(e, textSecondary)),
+                  ...[Strings.insight1, Strings.insight2].mapIndexed(
+                    (e, index) => _insightText(e, textSecondary, index + 1),
+                  ),
                 ],
               ),
             ),
@@ -174,12 +174,53 @@ class FinancialDashboardTab extends StatelessWidget {
   // Components and Widgets
   // =======================
 
-  Widget _insightText(String text, Color color) => AppText(
-    text,
-    fontSize: 15,
-    color: color,
-    fontWeight: FontWeight.w400,
-    textAlign: TextAlign.left,
+  Widget _insightText(String title, Color color, int index) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedText('$index.', style: TextStyle(fontSize: 13)),
+                  SizedBox(width: 5),
+                  Expanded(
+                    child: AppText(
+                      title,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.all(5),
+          width: 70,
+          decoration: BoxDecoration(
+            color: Get.theme.primaryColor,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          alignment: Alignment.center,
+          child: AppText(
+            "Action",
+            fontSize: 11,
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    ),
   );
 
   Widget _optionsGrid(Color cardColor, Color textColor) {

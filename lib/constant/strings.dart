@@ -20,9 +20,9 @@ class Strings {
       'Loans & Lines\nInsurance & Home Loans';
 
   // Quick insights
-  static const String insight1 = '• You saved \$3,200 in deductions this month';
+  static const String insight1 = 'You saved \$3,200 in deductions this month';
   static const String insight2 =
-      '• Estimated Tax Due: \$4,580 - Want to reduce it?';
+      'Estimated Tax Due: \$4,580 - Want to reduce it?';
 
   // strings.dart - Add these to your existing Strings class
   static const String profitLoss = 'Profit & Loss';

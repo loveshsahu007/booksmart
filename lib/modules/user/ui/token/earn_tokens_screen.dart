@@ -25,7 +25,10 @@ class EarnTokensScreen extends StatelessWidget {
           return SingleChildScrollView(
             child: Column(
               children: [
-                _buildTopNav(context),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _buildTopNav(context),
+                ),
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
@@ -103,26 +106,11 @@ class EarnTokensScreen extends StatelessWidget {
   }
 
   Widget _buildTopNav(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.home_outlined,
-            color: colorScheme.onSurface.withOpacity(0.7),
-            size: 18,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            "Home / Token Wallet",
-            style: TextStyle(
-              color: colorScheme.onSurface.withOpacity(0.7),
-              fontSize: 13,
-            ),
-          ),
-          const Spacer(),
           _topNavCounter(context, Icons.monetization_on, "240", Colors.amber),
           const SizedBox(width: 16),
           _topNavCounter(
@@ -131,14 +119,6 @@ class EarnTokensScreen extends StatelessWidget {
             "6,420",
             Colors.greenAccent,
             extra: "5 Days",
-          ),
-          const SizedBox(width: 16),
-          Badge(
-            label: const Text("1"),
-            child: Icon(
-              Icons.notifications_outlined,
-              color: colorScheme.onSurface.withOpacity(0.7),
-            ),
           ),
         ],
       ),

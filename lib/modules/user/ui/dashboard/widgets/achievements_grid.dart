@@ -6,34 +6,45 @@ class AchievementsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const AppText(
-          'Achievements Unlocked',
-          fontSize: 16,
-          fontWeight: FontWeight.bold,
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const AppText(
+              'Achievements Unlocked',
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+            const SizedBox(height: 15),
+            Column(
+              spacing: 15,
+              children: [
+                _buildAchievementItem(
+                  icon: Icons.monetization_on,
+                  iconColor: Colors.amber,
+                  title: 'First \$10K Month',
+                  xp: '30. At Least Mong', // Dummy text from image
+                ),
+                _buildAchievementItem(
+                  icon: Icons.local_fire_department,
+                  iconColor: Colors.orange,
+                  title: '30-Day Profit Streak',
+                  xp: '32. 0u XP', // Dummy text from image
+                ),
+                _buildAchievementItem(
+                  icon: Icons.shield,
+                  iconColor: Colors.blueAccent,
+                  title: 'Debt Slayer',
+                  xp: '20. At Least 100 XP', // Dummy text from image
+                ),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(height: 15),
-        _buildAchievementItem(
-          icon: Icons.monetization_on,
-          iconColor: Colors.amber,
-          title: 'First \$10K Month',
-          xp: '30. At Least Mong', // Dummy text from image
-        ),
-        _buildAchievementItem(
-          icon: Icons.local_fire_department,
-          iconColor: Colors.orange,
-          title: '30-Day Profit Streak',
-          xp: '32. 0u XP', // Dummy text from image
-        ),
-        _buildAchievementItem(
-          icon: Icons.shield,
-          iconColor: Colors.blueAccent,
-          title: 'Debt Slayer',
-          xp: '20. At Least 100 XP', // Dummy text from image
-        ),
-      ],
+      ),
     );
   }
 
@@ -44,7 +55,6 @@ class AchievementsGrid extends StatelessWidget {
     required String xp,
   }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
@@ -52,14 +62,13 @@ class AchievementsGrid extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Leading placeholder/icon
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
               color: iconColor.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, color: iconColor, size: 24),
+            child: Icon(icon, color: iconColor, size: 20),
           ),
           const SizedBox(width: 15),
           // Text content

@@ -248,7 +248,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Expanded(
           child: GetBuilder<BankController>(
             tag: getCurrentOrganization!.id.toString(),
@@ -320,9 +320,9 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
           ),
         ),
         // Bottom buttons
-        const SizedBox(height: 16),
+        const SizedBox(height: 10),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
+          padding: const EdgeInsets.fromLTRB(15, 5, 15, 15),
           child: Row(
             children: [
               Expanded(
