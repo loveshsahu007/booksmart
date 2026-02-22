@@ -1,3 +1,4 @@
+import 'package:booksmart/constant/app_colors.dart';
 import 'package:booksmart/modules/user/ui/dashboard/widgets/business_challenges_card.dart';
 import 'package:booksmart/modules/user/ui/dashboard/widgets/business_power_score_card.dart';
 import 'package:booksmart/modules/user/ui/dashboard/widgets/missions_list.dart';
@@ -6,6 +7,7 @@ import 'package:booksmart/modules/user/ui/dashboard/widgets/stats_header.dart';
 import 'package:booksmart/modules/user/ui/dashboard/widgets/achievements_grid.dart';
 import 'package:booksmart/modules/user/ui/dashboard/widgets/secondary_stats_cards.dart';
 import 'package:flutter/material.dart';
+import 'package:accordion/accordion.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -106,13 +108,25 @@ class DashboardScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 20),
-          SecondaryStatsCards(),
+          const SecondaryStatsCards(),
         ],
       ),
     );
   }
 
   Widget _buildMobileLayout(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final headerStyle = TextStyle(
+      color: colorScheme.onSurface,
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+    );
+    final isDark = theme.brightness == Brightness.dark;
+    final accordionColor = isDark
+        ? AppColorsDark.surface
+        : const Color.fromARGB(140, 220, 220, 220);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -121,15 +135,67 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 16),
           const BusinessPowerScoreCard(),
           const SizedBox(height: 16),
-          const MissionsList(),
+          buildDunAndBradstreetCard(),
           const SizedBox(height: 16),
-          const AiStrategyInsightList(),
-          const SizedBox(height: 16),
-          const AchievementsGrid(),
-          const SizedBox(height: 16),
-          const BusinessChallengesCard(),
-          const SizedBox(height: 16),
-          const SecondaryStatsCards(),
+
+          Accordion(
+            maxOpenSections: 2,
+            headerBackgroundColor: accordionColor,
+            headerBackgroundColorOpened: accordionColor,
+            contentBackgroundColor: accordionColor,
+            contentBorderColor: accordionColor,
+            contentBorderWidth: 0,
+            contentHorizontalPadding: 16,
+            contentVerticalPadding: 16,
+            headerPadding: const EdgeInsets.symmetric(
+              vertical: 12,
+              horizontal: 15,
+            ),
+            children: [
+              AccordionSection(
+                isOpen: true,
+                leftIcon: Icon(Icons.assignment_rounded),
+                header: Text('Missions', style: headerStyle),
+                content: const MissionsList(),
+              ),
+              AccordionSection(
+                isOpen: false,
+                leftIcon: Icon(
+                  Icons.psychology_rounded,
+                  color: colorScheme.secondary,
+                ),
+                header: Text('AI Strategy Insights', style: headerStyle),
+                content: const AiStrategyInsightList(),
+              ),
+              AccordionSection(
+                isOpen: false,
+                leftIcon: Icon(
+                  Icons.emoji_events_rounded,
+                  color: Colors.amber[700],
+                ),
+                header: Text('Achievements', style: headerStyle),
+                content: const AchievementsGrid(),
+              ),
+              AccordionSection(
+                isOpen: false,
+                leftIcon: Icon(
+                  Icons.business_center_rounded,
+                  color: colorScheme.tertiary,
+                ),
+                header: Text('Business Challenges', style: headerStyle),
+                content: const BusinessChallengesCard(),
+              ),
+              AccordionSection(
+                isOpen: false,
+                leftIcon: const Icon(
+                  Icons.bar_chart_rounded,
+                  color: Colors.blueAccent,
+                ),
+                header: Text('Secondary Stats', style: headerStyle),
+                content: const SecondaryStatsCards(),
+              ),
+            ],
+          ),
         ],
       ),
     );

@@ -15,12 +15,14 @@ class BusinessChallengesCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const AppText(
-              'Business Challenges',
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-            const SizedBox(height: 20),
+            if (MediaQuery.sizeOf(context).width > 800) ...{
+              const AppText(
+                'Business Challenges',
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              const SizedBox(height: 20),
+            },
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 25),
               decoration: BoxDecoration(

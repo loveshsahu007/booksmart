@@ -13,166 +13,15 @@ class SecondaryStatsCards extends StatelessWidget {
         padding: const EdgeInsets.all(15),
         child: Column(
           children: [
-            _buildDunAndBradstreetCard(),
-            const SizedBox(height: 12),
+            if (MediaQuery.sizeOf(context).width > 800) ...{
+              buildDunAndBradstreetCard(),
+              const SizedBox(height: 12),
+            },
             _buildFundingCard(),
             const SizedBox(height: 12),
             _buildBusinessCreditCard(),
             const SizedBox(height: 12),
             _buildTokenWalletCard(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDunAndBradstreetCard() {
-    return Card(
-      elevation: 0,
-      color: Colors.white.withValues(alpha: 0.05),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const AppText(
-                  'Dun & Bradstreet',
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                ),
-                AppText(
-                  'Verified Business',
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.4),
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            Row(
-              children: [
-                SizedBox(
-                  width: 60,
-                  height: 60,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      SfRadialGauge(
-                        axes: <RadialAxis>[
-                          RadialAxis(
-                            minimum: 0,
-                            maximum: 100,
-                            showLabels: false,
-                            showTicks: false,
-                            startAngle: 270,
-                            endAngle: 270,
-                            axisLineStyle: const AxisLineStyle(
-                              thickness: 0.15,
-                              thicknessUnit: GaugeSizeUnit.factor,
-                              color: Colors.black12,
-                            ),
-                            pointers: const <GaugePointer>[
-                              RangePointer(
-                                value: 78,
-                                width: 0.15,
-                                sizeUnit: GaugeSizeUnit.factor,
-                                gradient: SweepGradient(
-                                  colors: <Color>[
-                                    Colors.redAccent,
-                                    Colors.orangeAccent,
-                                    Colors.greenAccent,
-                                  ],
-                                  stops: <double>[0.0, 0.5, 1.0],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const AppText(
-                        '78',
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 15),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const AppText(
-                      'Good',
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.arrow_drop_down,
-                          color: Colors.white70,
-                          size: 20,
-                        ),
-                        AppText(
-                          'Good',
-                          fontSize: 13,
-                          color: Colors.white.withValues(alpha: 0.6),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                Icon(
-                  Icons.shield,
-                  color: Colors.amber.withValues(alpha: 0.7),
-                  size: 32,
-                ),
-              ],
-            ),
-            const SizedBox(height: 15),
-            Container(
-              height: 6,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(3),
-                gradient: const LinearGradient(
-                  colors: [Colors.greenAccent, Colors.orangeAccent],
-                ),
-              ),
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Container(
-                        width: 100, // Placeholder for the grayed out part
-                        color: Colors.black.withValues(alpha: 0.3),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                AppText(
-                  'Business age: 4 Years',
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.4),
-                ),
-                AppText(
-                  'Threshold: 60',
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.4),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -318,4 +167,157 @@ class SecondaryStatsCards extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget buildDunAndBradstreetCard() {
+  return Card(
+    elevation: 0,
+    // color: Colors.white.withValues(alpha: 0.05),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const AppText(
+                'Dun & Bradstreet',
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+              AppText(
+                'Verified Business',
+                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.4),
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Row(
+            children: [
+              SizedBox(
+                width: 60,
+                height: 60,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SfRadialGauge(
+                      axes: <RadialAxis>[
+                        RadialAxis(
+                          minimum: 0,
+                          maximum: 100,
+                          showLabels: false,
+                          showTicks: false,
+                          startAngle: 270,
+                          endAngle: 270,
+                          axisLineStyle: const AxisLineStyle(
+                            thickness: 0.15,
+                            thicknessUnit: GaugeSizeUnit.factor,
+                            color: Colors.black12,
+                          ),
+                          pointers: const <GaugePointer>[
+                            RangePointer(
+                              value: 78,
+                              width: 0.15,
+                              sizeUnit: GaugeSizeUnit.factor,
+                              gradient: SweepGradient(
+                                colors: <Color>[
+                                  Colors.redAccent,
+                                  Colors.orangeAccent,
+                                  Colors.greenAccent,
+                                ],
+                                stops: <double>[0.0, 0.5, 1.0],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const AppText(
+                      '78',
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 15),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const AppText(
+                    'Good',
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.white70,
+                        size: 20,
+                      ),
+                      AppText(
+                        'Good',
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.6),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Icon(
+                Icons.shield,
+                color: Colors.amber.withValues(alpha: 0.7),
+                size: 32,
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Container(
+            height: 6,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(3),
+              gradient: const LinearGradient(
+                colors: [Colors.greenAccent, Colors.orangeAccent],
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      width: 100, // Placeholder for the grayed out part
+                      color: Colors.black.withValues(alpha: 0.3),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              AppText(
+                'Business age: 4 Years',
+                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.4),
+              ),
+              AppText(
+                'Threshold: 60',
+                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.4),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
 }

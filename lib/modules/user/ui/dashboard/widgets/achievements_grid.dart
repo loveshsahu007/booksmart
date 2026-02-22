@@ -14,12 +14,14 @@ class AchievementsGrid extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const AppText(
-              'Achievements Unlocked',
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-            const SizedBox(height: 15),
+            if (MediaQuery.sizeOf(context).width > 800) ...{
+              const AppText(
+                'Achievements Unlocked',
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              const SizedBox(height: 15),
+            },
             Column(
               spacing: 15,
               children: [

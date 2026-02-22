@@ -16,28 +16,34 @@ class AiStrategyInsightList extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const AppText(
-                  'AI strategy Insights',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.star_border,
-                      color: Colors.greenAccent,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    const AppText('+975 XP', fontSize: 12, color: Colors.green),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+            if (MediaQuery.sizeOf(context).width > 800) ...{
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const AppText(
+                    'AI strategy Insights',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.star_border,
+                        color: Colors.greenAccent,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      const AppText(
+                        '+975 XP',
+                        fontSize: 12,
+                        color: Colors.green,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            },
             Column(
               spacing: 25,
               children: [
