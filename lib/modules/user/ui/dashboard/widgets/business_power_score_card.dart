@@ -258,21 +258,29 @@ class BusinessPowerScoreCard extends StatelessWidget {
                             ),
                           ),
                           child: Row(
+                            spacing: 5,
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              AppText(
-                                'Todays XP Potential:',
-                                fontSize: 12,
-                                color: colorScheme.onSurface.withValues(
-                                  alpha: 0.7,
+                              Expanded(
+                                child: FittedText(
+                                  'Todays XP Potential:',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: colorScheme.onSurface.withValues(
+                                      alpha: 0.7,
+                                    ),
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              const AppText(
-                                '+340 XP',
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.greenAccent,
+                              Flexible(
+                                child: const FittedText(
+                                  '+340 XP',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.greenAccent,
+                                  ),
+                                ),
                               ),
                             ],
                           ),

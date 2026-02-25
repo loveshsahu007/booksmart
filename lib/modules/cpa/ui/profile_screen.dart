@@ -599,6 +599,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                           controller: phoneCtrl,
                           keyboardType: TextInputType.phone,
                         ),
+                        const SizedBox(height: 15),
                       ],
                     ),
                   ),
@@ -666,6 +667,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 5),
                               child: AppTextField(
+                                labelText: "Years of Experience *",
                                 hintText: "Years of Experience *",
                                 controller: carrerStartDateController,
                                 fieldValidator: (v) =>
@@ -730,6 +732,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                             setState(() => selectedStates = newList);
                           },
                         ),
+                        const SizedBox(height: 15),
                       ],
                     ),
                   ),

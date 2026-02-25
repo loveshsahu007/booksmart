@@ -151,6 +151,7 @@ class DashboardScreen extends StatelessWidget {
               vertical: 12,
               horizontal: 15,
             ),
+            disableScrolling: true,
             children: [
               AccordionSection(
                 isOpen: true,
