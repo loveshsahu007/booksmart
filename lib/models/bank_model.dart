@@ -18,6 +18,8 @@ class BankModel {
   final DateTime createdAt;
   final DateTime? lastSyncAt;
 
+  final bool requiresReauth;
+
   BankModel({
     required this.id,
     required this.userId,
@@ -29,6 +31,7 @@ class BankModel {
     this.transactionsCursor,
     required this.createdAt,
     required this.lastSyncAt,
+    required this.requiresReauth,
   });
 
   factory BankModel.fromJson(Map<String, dynamic> json) {
@@ -45,6 +48,7 @@ class BankModel {
       transactionsCursor: json['transactions_cursor'],
       createdAt: DateTime.parse(json['created_at']),
       lastSyncAt: DateTime.tryParse(json['last_synced_at'] ?? "")?.toLocal(),
+      requiresReauth: json['requires_reauth'] ?? false,
     );
   }
 
@@ -60,6 +64,7 @@ class BankModel {
       'transactions_cursor': transactionsCursor,
       'created_at': createdAt.toIso8601String(),
       'last_synced_at': lastSyncAt?.toUtc().toIso8601String(),
+      'requires_reauth': requiresReauth,
     };
   }
 }

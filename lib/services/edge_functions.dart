@@ -1,22 +1,29 @@
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:get/get.dart';
 
 import '../utils/supabase.dart';
 
-Future getPlaidToken() async {
+/// provide bank_id to refresh token
+Future getPlaidToken({int? bankId}) async {
   return GetConnect()
-      .get(
+      .post(
         'https://pvppwmkswnluidlwnnck.supabase.co/functions/v1/get_plad_token',
+        bankId == null ? {} : {'bank_id': bankId},
         headers: {
           'Authorization':
               'Bearer ${supabase.auth.currentSession?.accessToken}',
           'Content-Type': 'application/json',
         },
       )
-      .then((value) {
-        String? linkToken = value.body['link_token'];
-        return linkToken;
+      .then((response) {
+        log(jsonEncode(response.bodyString));
+        if (response.isOk) {
+          String? linkToken = response.body['link_token'];
+          return linkToken;
+        }
+        return null;
       })
       .onError((e, x) {
         log(e.toString());
@@ -38,6 +45,34 @@ Future<bool> connectPlaidBank(Map<String, dynamic> body) async {
       )
       .then((value) {
         return true;
+      })
+      .onError((e, x) {
+        log(e.toString());
+        log(x.toString());
+        return false;
+      });
+}
+
+Future<bool> refreshPlaidAccessToken({
+  required int bankId,
+  required String publicToken,
+}) async {
+  return GetConnect()
+      .post(
+        'https://pvppwmkswnluidlwnnck.supabase.co/functions/v1/plaid_refresh_access_token',
+        {'bank_id': bankId, 'public_token': publicToken},
+        headers: {
+          'Authorization':
+              'Bearer ${supabase.auth.currentSession?.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      )
+      .then((response) {
+        log(jsonEncode(response.bodyString));
+        if (response.isOk) {
+          return true;
+        }
+        return false;
       })
       .onError((e, x) {
         log(e.toString());
@@ -72,8 +107,12 @@ Future<Map<String, dynamic>?> syncBankTransactions(int bankId) async {
           'Content-Type': 'application/json',
         },
       )
-      .then((value) {
-        return value.body as Map<String, dynamic>?;
+      .then((response) {
+        log(jsonEncode(response.bodyString));
+        if (response.isOk) {
+          return response.body as Map<String, dynamic>?;
+        }
+        return null;
       })
       .onError((e, x) {
         log(e.toString());

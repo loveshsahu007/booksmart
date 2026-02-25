@@ -10,14 +10,14 @@ import 'package:plaid_flutter/plaid_flutter.dart';
 import '../../common/controllers/auth_controller.dart';
 import '../controllers/organization_controller.dart';
 
-Future<void> hanldePlaidBankConnection() async {
+Future<void> hanldePlaidBankConnection({int? bankId}) async {
   if (authUser == null || getCurrentOrganization == null) {
     showSnackBar("User or Organization not found", isError: true);
     return;
   }
   showLoading();
 
-  String? linkToken = await getPlaidToken();
+  String? linkToken = await getPlaidToken(bankId: bankId);
 
   if (linkToken == null) {
     dismissLoadingWidget();
@@ -35,23 +35,42 @@ Future<void> hanldePlaidBankConnection() async {
     Map<String, dynamic> data = success.toJson();
     log("Success: ${jsonEncode(data)}");
 
-    try {
-      await connectPlaidBank(
-        _getPlaidBody(
+    if (bankId == null) {
+      try {
+        await connectPlaidBank(
+          _getPlaidBody(
+            publicToken: success.publicToken,
+            metadata: success.metadata,
+            userId: authUser!.id.toString(),
+            orgId: getCurrentOrganization!.id.toString(),
+          ),
+        );
+        dismissLoadingWidget();
+        showSnackBar("Bank connected successfully");
+      } catch (e, s) {
+        log(e.toString());
+        log(s.toString());
+        dismissLoadingWidget();
+        showSnackBar("Bank connection failed", isError: true);
+      } finally {
+        bankControllerInstance.loadBanks();
+      }
+    } else {
+      try {
+        await refreshPlaidAccessToken(
+          bankId: bankId,
           publicToken: success.publicToken,
-          metadata: success.metadata,
-          userId: authUser!.id.toString(),
-          orgId: getCurrentOrganization!.id.toString(),
-        ),
-      );
-      bankControllerInstance.loadBanks();
-      dismissLoadingWidget();
-      showSnackBar("Bank connected successfully");
-    } catch (e, s) {
-      log(e.toString());
-      log(s.toString());
-      dismissLoadingWidget();
-      showSnackBar("Bank connection failed", isError: true);
+        );
+        dismissLoadingWidget();
+        showSnackBar("Bank refreshed successfully");
+      } catch (e, s) {
+        log(e.toString());
+        log(s.toString());
+        dismissLoadingWidget();
+        showSnackBar("Bank refresh failed", isError: true);
+      } finally {
+        bankControllerInstance.loadBanks();
+      }
     }
   });
 
@@ -86,12 +105,13 @@ Future<void> handleSyncBankTransactions({required int bankId}) async {
 
   await syncBankTransactions(bankId)
       .then((Map<String, dynamic>? responseJson) {
+        dismissLoadingWidget();
+
+        bankControllerInstance.loadBanks();
         if (responseJson == null) {
-          dismissLoadingWidget();
           showSnackBar("Sync failed", isError: true);
           return;
         }
-        log(responseJson.toString());
         final stats = responseJson['stats'] as Map<String, dynamic>;
         List<String> parts = [];
         if (stats['added'] > 0) {
@@ -105,8 +125,6 @@ Future<void> handleSyncBankTransactions({required int bankId}) async {
         }
 
         String message = parts.isEmpty ? "No changes found" : parts.join(', ');
-        dismissLoadingWidget();
-        bankControllerInstance.loadBanks();
         showSnackBar(message, title: "Sync complete");
       })
       .onError((e, x) {

@@ -1,4 +1,5 @@
 import 'package:booksmart/models/bank_model.dart';
+import 'package:booksmart/widgets/snackbar.dart';
 import 'package:flutter/material.dart';
 import 'package:jiffy/jiffy.dart';
 
@@ -143,40 +144,84 @@ class BankCard extends StatelessWidget {
                     ),
                   ),
 
-                  Align(
-                    alignment: Alignment.bottomRight,
-                    child: Material(
-                      color: Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                      child: InkWell(
-                        onTap: () {
-                          handleSyncBankTransactions(bankId: bankModel.id);
-                        },
+                  Row(
+                    mainAxisAlignment: bankModel.requiresReauth
+                        ? MainAxisAlignment.spaceBetween
+                        : MainAxisAlignment.end,
+                    children: [
+                      if (bankModel.requiresReauth)
+                        Material(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                          child: InkWell(
+                            onTap: () {
+                              hanldePlaidBankConnection(bankId: bankModel.id);
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Padding(
+                              padding: const EdgeInsets.all(5),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                spacing: 10,
+                                children: [
+                                  Icon(
+                                    Icons.sync_disabled,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  Text(
+                                    "Re-authenticate",
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      Material(
+                        color: Colors.transparent,
                         borderRadius: BorderRadius.circular(10),
-                        child: Padding(
-                          padding: const EdgeInsets.all(5),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            spacing: 10,
-                            children: [
-                              Icon(
-                                Icons.refresh,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              Text(
-                                "Last Sync: ${bankModel.lastSyncAt == null ? "Never" : Jiffy.parseFromDateTime(bankModel.lastSyncAt!).fromNow()}",
-                                style: const TextStyle(
+                        child: InkWell(
+                          onTap: () {
+                            if (bankModel.requiresReauth) {
+                              showSnackBar(
+                                "For security purposes, please re-authenticate your bank account connection. This measure is required to ensure continued secure access to your financial data.",
+                                isError: true,
+                              );
+                              return;
+                            }
+                            handleSyncBankTransactions(bankId: bankModel.id);
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.all(5),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              spacing: 10,
+                              children: [
+                                Icon(
+                                  Icons.refresh,
                                   color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                                  size: 20,
                                 ),
-                              ),
-                            ],
+                                Text(
+                                  "Last Sync: ${bankModel.lastSyncAt == null ? "Never" : Jiffy.parseFromDateTime(bankModel.lastSyncAt!).fromNow()}",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ],
               ),
