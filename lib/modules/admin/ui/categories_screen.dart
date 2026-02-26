@@ -1,6 +1,5 @@
 import 'package:booksmart/modules/admin/ui/widgets/category_dialogs.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
-import 'package:booksmart/widgets/app_button.dart';
 import 'package:booksmart/widgets/app_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -57,30 +56,23 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
                           category: cat,
                         ),
                       ),
-
-                      AppButton(
-                        buttonText: cat.isDeleted ? "Deleted" : "Live",
-                        buttonColor: cat.isDeleted ? Colors.red : Colors.green,
-                        onTapFunction: () => showConfirmDeleteDialog(
+                      IconButton(
+                        tooltip: cat.isDeleted ? "Inactive" : "Active",
+                        icon: Icon(
+                          cat.isDeleted
+                              ? Icons.cancel_rounded
+                              : Icons.check_circle_rounded,
+                          color: cat.isDeleted ? Colors.red : Colors.green,
+                        ),
+                        onPressed: () => showConfirmDeleteDialog(
                           title: cat.isDeleted
-                              ? 'Restore Sub-Category?'
-                              : 'Mark Sub-Category as Deleted?',
+                              ? 'Restore Category'
+                              : 'Delete Category',
+                          description:
+                              "Are you sure you want to ${cat.isDeleted ? 'restore' : 'delete'} this category?",
                           onConfirm: () => controller.toggleCategoryStatus(cat),
                         ),
                       ),
-                      // IconButton(
-                      //   icon: Icon(
-                      //     Icons.circle,
-                      //     color: cat.isDeleted ? Colors.red : Colors.green,
-                      //   ),
-                      //   tooltip: cat.isDeleted ? 'Deleted' : 'Live',
-                      //   onPressed: () => showConfirmDeleteDialog(
-                      //     title: cat.isDeleted
-                      //         ? 'Restore Category?'
-                      //         : 'Mark Category as Deleted?',
-                      //     onConfirm: () => controller.toggleCategoryStatus(cat),
-                      //   ),
-                      // ),
                     ],
                   ),
                 ),

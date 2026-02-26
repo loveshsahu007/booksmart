@@ -1,18 +1,16 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
-import 'package:get/get.dart';
 
 void showCpaDetailsDialog(CpaModel user) {
-  final String fullName =
-      '${user.firstName} ${user.lastName}'.trim().isEmpty
-          ? 'Unnamed CPA'
-          : '${user.firstName} ${user.lastName}';
+  final String fullName = '${user.firstName} ${user.lastName}'.trim().isEmpty
+      ? 'Unnamed CPA'
+      : '${user.firstName} ${user.lastName}';
 
   customDialog(
     title: 'CPA Details',
     child: SingleChildScrollView(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(15),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -24,10 +22,7 @@ void showCpaDetailsDialog(CpaModel user) {
             user.verificationStatus.name.toUpperCase(),
             valueColor: _statusColor(user.verificationStatus),
           ),
-          _infoRow(
-            'Experience',
-            '${user.getExperienceInYears} years',
-          ),
+          _infoRow('Experience', '${user.getExperienceInYears} years'),
           _infoRow('License #', user.licenseNumber),
 
           0.04.verticalSpace,
@@ -38,53 +33,27 @@ void showCpaDetailsDialog(CpaModel user) {
 
           if (user.professionalBio.isNotEmpty) ...[
             0.04.verticalSpace,
-            const AppText(
-              'Professional Bio',
-              fontWeight: FontWeight.w600,
-            ),
+            const AppText('Professional Bio', fontWeight: FontWeight.w600),
             0.01.verticalSpace,
-            AppText(
-              user.professionalBio,
-              fontSize: 13,
-              color: Colors.grey,
-            ),
+            AppText(user.professionalBio, fontSize: 13, color: Colors.grey),
           ],
 
           0.04.verticalSpace,
 
-          _infoRow(
-            'Terms Agreed',
-            user.termsAgreed ? 'Yes' : 'No',
-          ),
+          _infoRow('Terms Agreed', user.termsAgreed ? 'Yes' : 'No'),
 
           if (user.certificationProofUrl.isNotEmpty)
             _infoRow('Certification Proof', 'Uploaded'),
 
           if (user.licenseCopyUrl.isNotEmpty)
             _infoRow('License Copy', 'Uploaded'),
-
-          0.06.verticalSpace,
-
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: Get.back,
-                  child: const Text('Close'),
-                ),
-              ),
-            ],
-          ),
         ],
       ),
     ),
   );
 }
-Widget _infoRow(
-  String label,
-  String value, {
-  Color? valueColor,
-}) {
+
+Widget _infoRow(String label, String value, {Color? valueColor}) {
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(
@@ -92,11 +61,7 @@ Widget _infoRow(
       children: [
         SizedBox(
           width: 120,
-          child: AppText(
-            '$label:',
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
+          child: AppText('$label:', fontWeight: FontWeight.w600, fontSize: 13),
         ),
         Expanded(
           child: AppText(
@@ -124,10 +89,7 @@ Widget _listSection(String title, List<String> items) {
         runSpacing: 6,
         children: items
             .map(
-              (e) => Chip(
-                label: Text(e),
-                visualDensity: VisualDensity.compact,
-              ),
+              (e) => Chip(label: Text(e), visualDensity: VisualDensity.compact),
             )
             .toList(),
       ),

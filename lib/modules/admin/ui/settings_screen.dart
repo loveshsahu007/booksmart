@@ -94,14 +94,6 @@ class _SettingsScreenAdminState extends State<SettingsScreenAdmin> {
 
           const SizedBox(height: 10),
 
-          ListTile(
-            title: AppText("Notifications", fontSize: 14),
-            trailing: Icon(Icons.chevron_right, size: 14),
-            onTap: () {},
-          ),
-
-          const SizedBox(height: 10),
-
           SwitchListTile.adaptive(
             title: AppText("Dark Mode", fontSize: 14),
             value: _isDarkMode,
@@ -112,9 +104,6 @@ class _SettingsScreenAdminState extends State<SettingsScreenAdmin> {
             activeThumbColor: colorScheme.primary,
           ),
 
-          const SizedBox(height: 10),
-
-          buildTile("Delete Account", () {}, isDestructive: true),
           const SizedBox(height: 10),
 
           buildTile("Logout", () {

@@ -62,11 +62,7 @@ class _UserListScreenState extends State<UserListScreen> {
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppText(user.email, fontSize: 12),
-                      const SizedBox(height: 4),
-                      AppText('Role: ${_roleText(user)}', fontSize: 12),
-                    ],
+                    children: [AppText(user.email, fontSize: 12)],
                   ),
                   trailing: _buildRoleChip(user),
                 ),
@@ -76,12 +72,6 @@ class _UserListScreenState extends State<UserListScreen> {
         },
       ),
     );
-  }
-
-  // ================= ROLE TEXT =================
-
-  String _roleText(PersonModel user) {
-    return user.role.name.toUpperCase();
   }
 
   // ================= ROLE CHIP =================

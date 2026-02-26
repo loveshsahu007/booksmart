@@ -12,6 +12,7 @@ void showSaveCategoryDialog({
 
   customDialog(
     title: category == null ? 'Add Category' : 'Edit Category',
+    maxWidth: 350,
     child: Padding(
       padding: const EdgeInsets.all(8),
       child: Column(
@@ -46,6 +47,7 @@ void showSubCategoryListDialog(
 ) {
   customDialog(
     title: categoryName,
+    maxWidth: 450,
     child: GetBuilder<CategoryAdminController>(
       builder: (_) {
         final subCategories = controller.getSubCategoriesByCategory(categoryId);
@@ -70,13 +72,14 @@ void showSubCategoryListDialog(
           );
         }
 
-        return Padding(
-          padding: const EdgeInsets.all(8),
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(15),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ...subCategories.map(
                 (sub) => ListTile(
+                  onTap: () {},
                   title: AppText(sub.name),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -90,30 +93,25 @@ void showSubCategoryListDialog(
                         ),
                       ),
 
-                      AppButton(
-                        buttonText: sub.isDeleted ? "Deleted" : "Live",
-                        buttonColor: sub.isDeleted ? Colors.red : Colors.green,
-                        onTapFunction: () => showConfirmDeleteDialog(
+                      IconButton(
+                        icon: Icon(
+                          sub.isDeleted
+                              ? Icons.cancel_rounded
+                              : Icons.check_circle_rounded,
+                          color: sub.isDeleted ? Colors.red : Colors.green,
+                        ),
+                        tooltip: sub.isDeleted ? "Inactive" : "Active",
+                        onPressed: () => showConfirmDeleteDialog(
                           title: sub.isDeleted
-                              ? 'Restore Sub-Category?'
-                              : 'Mark Sub-Category as Deleted?',
+                              ? 'Restore Sub-Category'
+                              : 'Delete Sub-Category',
+                          description: sub.isDeleted
+                              ? 'Are you sure you want to restore this sub-category?'
+                              : 'Are you sure you want to delete this sub-category?',
                           onConfirm: () =>
                               controller.toggleSubCategoryStatus(sub),
                         ),
                       ),
-                      // IconButton(
-                      //   icon: Icon(
-                      //     Icons.circle,
-                      //     color: sub.isDeleted ? Colors.red : Colors.green,
-                      //   ),
-                      //   onPressed: () => showConfirmDeleteDialog(
-                      //     title: sub.isDeleted
-                      //         ? 'Restore Sub-Category?'
-                      //         : 'Mark Sub-Category as Deleted?',
-                      //     onConfirm: () =>
-                      //         controller.toggleSubCategoryStatus(sub),
-                      //   ),
-                      // ),
                     ],
                   ),
                 ),
@@ -143,6 +141,7 @@ void showSaveSubCategoryDialog({
 
   customDialog(
     title: subCategory == null ? 'Add Sub-Category' : 'Edit Sub-Category',
+    maxWidth: 350,
     child: Padding(
       padding: const EdgeInsets.all(8),
       child: Column(
@@ -176,16 +175,24 @@ void showSaveSubCategoryDialog({
 
 void showConfirmDeleteDialog({
   required String title,
+  String? description,
   required VoidCallback onConfirm,
+  double cardWidth = 300,
 }) {
   customDialog(
     title: title,
-    child: Container(
+    maxWidth: cardWidth,
+    child: SingleChildScrollView(
       padding: EdgeInsets.all(6),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (description != null) ...[
+            AppText(description, textAlign: TextAlign.center),
+            0.03.verticalSpace,
+          ],
           Row(
+            spacing: 10,
             children: [
               Expanded(
                 child: OutlinedButton(
@@ -193,7 +200,6 @@ void showConfirmDeleteDialog({
                   child: const Text('Cancel'),
                 ),
               ),
-              0.03.horizontalSpace,
               Expanded(
                 child: AppButton(
                   buttonText: title.contains("Restore") ? "Restore" : 'Delete',

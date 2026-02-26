@@ -62,14 +62,10 @@ class _CpaListScreenAdminState extends State<CpaListScreenAdmin> {
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppText(user.email, fontSize: 12),
-                      const SizedBox(height: 4),
-                      AppText('Role: ${_roleText(user)}', fontSize: 12),
-                    ],
+                    children: [AppText(user.email, fontSize: 12)],
                   ),
                   trailing: _buildRoleChip(user),
-                    onTap: () => showCpaDetailsDialog(user),
+                  onTap: () => showCpaDetailsDialog(user),
                 ),
               );
             },
@@ -77,10 +73,6 @@ class _CpaListScreenAdminState extends State<CpaListScreenAdmin> {
         },
       ),
     );
-  } // ================= ROLE TEXT =================
-
-  String _roleText(CpaModel user) {
-    return user.role.name.toUpperCase();
   }
 
   // ================= ROLE CHIP =================
