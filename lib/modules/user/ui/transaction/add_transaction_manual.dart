@@ -316,17 +316,20 @@ class _AddTransactionScreenManualState
               },
             ),
             0.02.verticalSpace,
-            Material(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(color: Colors.grey, width: 0.2),
-              ),
+            // Material(
+            //   shape: RoundedRectangleBorder(
+            //     borderRadius: BorderRadius.circular(8),
+            //     side: const BorderSide(color: Colors.grey, width: 0.2),
+            //   ),
+            //   child:
+            Card(
               child: SwitchListTile(
                 title: const AppText("Deductible"),
                 value: deductible,
                 onChanged: (val) => setState(() => deductible = val),
               ),
             ),
+            // ),
             0.01.verticalSpace,
 
             AppText("Notes", fontSize: 14, fontWeight: FontWeight.w500),

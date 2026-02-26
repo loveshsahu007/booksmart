@@ -475,7 +475,10 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                     const SizedBox(width: 10),
                     AppButton(
                       buttonText: (_currentStep == 2
-                          ? "Submit for Review"
+                          ? cpa!.verificationStatus ==
+                                    CpaVerificationStatus.approved
+                                ? "Save changes"
+                                : "Submit for Review"
                           : "Next Step"),
                       onTapFunction: details.onStepContinue!,
                       radius: 8,

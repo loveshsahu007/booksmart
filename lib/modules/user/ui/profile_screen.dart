@@ -7,8 +7,6 @@ import 'package:booksmart/services/storage_service.dart';
 import 'package:booksmart/supabase/buckets.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:flutter/foundation.dart';
-import 'package:get/get.dart';
-
 import '../../../models/user_base_model.dart';
 
 class UserProfileScreen extends StatefulWidget {
@@ -68,15 +66,48 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   /// Pick image from gallery and store bytes for preview.
   Future<void> _pickImage() async {
+    if (kIsWeb) {
+      _pickFromSource(ImageSource.gallery);
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text("Take Photo"),
+              onTap: () {
+                Navigator.pop(context);
+                _pickFromSource(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text("Choose from Gallery"),
+              onTap: () {
+                Navigator.pop(context);
+                _pickFromSource(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickFromSource(ImageSource source) async {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
+        source: source,
         imageQuality: 85,
+        preferredCameraDevice: CameraDevice.front,
       );
 
       if (pickedFile != null) {
         final bytes = await pickedFile.readAsBytes();
-
         setState(() {
           _profileImage = pickedFile;
           _profileImageBytes = bytes;
@@ -84,11 +115,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       }
     } catch (e) {
       debugPrint('Image picker error: $e');
-      Get.snackbar(
-        'Error',
-        'Failed to pick image',
-        snackPosition: SnackPosition.BOTTOM,
-      );
     }
   }
 
