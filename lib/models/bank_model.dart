@@ -42,7 +42,7 @@ class BankModel {
       itemId: json['item_id'],
       institutionId: json['institution_id'],
       institutionName: json['institution_name'],
-      accounts: (json['accounts'] as List)
+      accounts: (json['bank_accounts'] as List)
           .map((e) => BankAccountModel.fromJson(e))
           .toList(),
       transactionsCursor: json['transactions_cursor'],
@@ -70,42 +70,54 @@ class BankModel {
 }
 
 class BankAccountModel {
-  final String id;
+  final int id;
+  final int bankId;
+  final String plaidAccountId;
   final String? mask;
   final String name;
   final String type;
   final String? subtype;
   final String? officialName;
   final String? holderCategory;
+  final bool isActive;
 
   BankAccountModel({
     required this.id,
+    required this.bankId,
+    required this.plaidAccountId,
     required this.mask,
     required this.name,
     required this.type,
     required this.subtype,
     required this.officialName,
     required this.holderCategory,
+    required this.isActive,
   });
 
   factory BankAccountModel.fromJson(Map<String, dynamic> json) =>
       BankAccountModel(
         id: json["id"],
+        bankId: json["bank_id"],
+        plaidAccountId: json["plaid_account_id"],
         mask: json["mask"],
         name: json["name"],
         type: json["type"],
         subtype: json["subtype"],
         officialName: json["official_name"],
         holderCategory: json["holder_category"],
+        isActive: json["is_active"] ?? true,
       );
 
   Map<String, dynamic> toJson() => {
     "id": id,
+    "bank_id": bankId,
+    "plaid_account_id": plaidAccountId,
     "mask": mask,
     "name": name,
     "type": type,
     "subtype": subtype,
     "official_name": officialName,
     "holder_category": holderCategory,
+    "is_active": isActive,
   };
 }

@@ -7,14 +7,14 @@ import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:get/get.dart';
 
+import '../../../utils/supabase.dart';
+
 BankController bankControllerInstance = Get.find<BankController>(
   tag: getCurrentOrganization?.id.toString(),
 );
 
 /// TAG: currentOrganizationID
 class BankController extends GetxController {
-  final String table = SupabaseTable.bank;
-
   RxBool isLoading = false.obs;
   RxList<BankModel> banks = <BankModel>[].obs;
 
@@ -28,9 +28,11 @@ class BankController extends GetxController {
     try {
       isLoading.value = true;
 
-      final res = await SupabaseCrudService.read(
-        table: table,
-        filters: {'org_id': getCurrentOrganization!.id},
+      final res = await SupabaseCrudService.executeQuery(
+        query: supabase
+            .from(SupabaseTable.bank)
+            .select('*, ${SupabaseTable.bankAccounts}(*)')
+            .eq('org_id', getCurrentOrganization!.id),
       );
 
       banks.value = (res as List).map((e) => BankModel.fromJson(e)).toList();

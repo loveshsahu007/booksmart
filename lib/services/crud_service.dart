@@ -1,6 +1,7 @@
 import 'dart:developer';
 
 import 'package:booksmart/utils/supabase.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../widgets/loading.dart';
 
@@ -128,6 +129,30 @@ class SupabaseCrudService {
       return res;
     } catch (e) {
       throw Exception("Delete failed: $e");
+    } finally {
+      if (isShowLoading) {
+        dismissLoadingWidget();
+      }
+    }
+  }
+
+  static Future<dynamic> executeQuery({
+    required PostgrestFilterBuilder query,
+    bool single = false,
+    bool isShowLoading = false,
+  }) async {
+    if (isShowLoading) {
+      showLoading();
+    }
+    try {
+      final result = single ? await query.maybeSingle() : await query;
+
+      log("Query Result:\n$result");
+      return result;
+    } catch (e, st) {
+      log(e.toString());
+      log(st.toString());
+      return null;
     } finally {
       if (isShowLoading) {
         dismissLoadingWidget();

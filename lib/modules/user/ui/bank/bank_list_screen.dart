@@ -84,34 +84,39 @@ class _BanksListScreenState extends State<BanksListScreen> {
                     ],
                   ),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  itemCount: controller.banks.length,
-                  itemBuilder: (context, index) {
-                    final bank = controller.banks[index];
-                    return BankCard(
-                      bankModel: bank,
-                      // onEdit: () {},
-                      // onDelete: () {
-                      //   Get.defaultDialog(
-                      //     title: "Confirm Delete",
-                      //     middleText:
-                      //         "Are you sure you want to delete ${bank.institutionName}?",
-                      //     textConfirm: "Delete",
-                      //     textCancel: "Cancel",
-                      //     confirmTextColor: Colors.white,
-                      //     onConfirm: () async {
-                      //       Get.back();
-                      //       await controller.deleteBank(bank.id);
-                      //     },
-                      //     onCancel: () => Get.back(),
-                      //   );
-                      // },
-                    );
+              : RefreshIndicator.adaptive(
+                  onRefresh: () async {
+                    await controller.loadBanks();
                   },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    itemCount: controller.banks.length,
+                    itemBuilder: (context, index) {
+                      final bank = controller.banks[index];
+                      return BankCard(
+                        bankModel: bank,
+                        // onEdit: () {},
+                        // onDelete: () {
+                        //   Get.defaultDialog(
+                        //     title: "Confirm Delete",
+                        //     middleText:
+                        //         "Are you sure you want to delete ${bank.institutionName}?",
+                        //     textConfirm: "Delete",
+                        //     textCancel: "Cancel",
+                        //     confirmTextColor: Colors.white,
+                        //     onConfirm: () async {
+                        //       Get.back();
+                        //       await controller.deleteBank(bank.id);
+                        //     },
+                        //     onCancel: () => Get.back(),
+                        //   );
+                        // },
+                      );
+                    },
+                  ),
                 );
         },
       ),

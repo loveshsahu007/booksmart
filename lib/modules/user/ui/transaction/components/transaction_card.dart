@@ -15,7 +15,7 @@ String? getBankAccountName({
   return bankController.banks
       .firstWhereOrNull((bank) => bank.id == bankId)
       ?.accounts
-      .firstWhereOrNull((account) => account.id == bankAccountId)
+      .firstWhereOrNull((account) => account.plaidAccountId == bankAccountId)
       ?.name;
 }
 
