@@ -19,3 +19,8 @@
 
 ## TODO
 - confirm transaction TYPE again, and also adjust it in case of PLAID ... 
+
+
+Plaid Test username
+username: user_good
+password: pass_good

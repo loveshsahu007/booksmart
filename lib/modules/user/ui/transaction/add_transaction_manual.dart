@@ -12,6 +12,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:jiffy/jiffy.dart';
 
+import '../../../../constant/data.dart';
 import '../../../../utils/date_time_input.dart';
 import '../../../../widgets/custom_dialog.dart';
 import '../../../../widgets/custom_drop_down.dart';
@@ -87,7 +88,7 @@ class _AddTransactionScreenManualState
   int? _selectedSubcategory;
   bool deductible = false;
   XFile? _selectedFile;
-  String _selectedType = "Personal";
+  String _selectedType = personalTransactionType;
   Uint8List? _selectedFileBytes;
 
   final TextEditingController _titleController = TextEditingController();
@@ -123,7 +124,7 @@ class _AddTransactionScreenManualState
     _titleController.text = widget.transaction?.title ?? '';
     _amountController.text = widget.transaction?.amount.toString() ?? '';
     _descriptionController.text = widget.transaction?.description ?? '';
-    _selectedType = widget.transaction?.type ?? 'Personal';
+    _selectedType = widget.transaction?.type ?? personalTransactionType;
     deductible = widget.transaction?.deductible ?? false;
     _selectedCategory = widget.transaction?.category;
     _selectedSubcategory = widget.transaction?.subcategory;
@@ -307,11 +308,12 @@ class _AddTransactionScreenManualState
             CustomDropDownWidget<String>(
               dropDownKey: typeDropdownKey,
               hint: "Select Type",
-              items: ["Personal", "Business"],
+              items: transactionTypesList,
               selectedItem: _selectedType,
               onChanged: (value) {
+                if (value == null) return;
                 setState(() {
-                  _selectedType = value ?? "Personal";
+                  _selectedType = value;
                 });
               },
             ),

@@ -1,5 +1,5 @@
 // List of US states for dropdown
-final List<String> usStates = [
+const List<String> usStates = [
   'AL',
   'AK',
   'AZ',
@@ -53,7 +53,7 @@ final List<String> usStates = [
 ];
 
 // Certification options
-final List<String> cpaCertificationOptions = [
+const List<String> cpaCertificationOptions = [
   'CPA',
   'EA',
   'CFP',
@@ -66,7 +66,7 @@ final List<String> cpaCertificationOptions = [
 ];
 
 // Specialty options
-final List<String> cpaSpecialtyOptions = [
+const List<String> cpaSpecialtyOptions = [
   'Individual Income Tax',
   'Small Business Tax',
   'Corporate Tax',
@@ -85,4 +85,12 @@ final List<String> cpaSpecialtyOptions = [
   'Business Valuation',
   'IRS Representation',
   'Non-Profit Accounting',
+];
+
+const String personalTransactionType = "Personal";
+const String businessTransactionType = "Business";
+
+const List<String> transactionTypesList = [
+  personalTransactionType,
+  businessTransactionType,
 ];

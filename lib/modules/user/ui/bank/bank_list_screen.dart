@@ -97,6 +97,7 @@ class _BanksListScreenState extends State<BanksListScreen> {
                     itemBuilder: (context, index) {
                       final bank = controller.banks[index];
                       return BankCard(
+                        key: ValueKey(bank.id),
                         bankModel: bank,
                         // onEdit: () {},
                         // onDelete: () {

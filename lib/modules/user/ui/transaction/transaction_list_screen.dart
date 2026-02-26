@@ -1,3 +1,4 @@
+import 'package:booksmart/constant/data.dart';
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
@@ -79,7 +80,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
           // Type filter
           _buildFilterDropdown(
             label: "Type",
-            items: ['All', 'Personal', 'Business'],
+            items: ['All', personalTransactionType, businessTransactionType],
             dropDownKey: typeDropdownKey,
           ),
           const SizedBox(height: 16),

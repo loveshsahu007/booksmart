@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:booksmart/utils/supabase.dart';
@@ -147,7 +148,7 @@ class SupabaseCrudService {
     try {
       final result = single ? await query.maybeSingle() : await query;
 
-      log("Query Result:\n$result");
+      log("Query Result:\n${jsonEncode(result)}");
       return result;
     } catch (e, st) {
       log(e.toString());

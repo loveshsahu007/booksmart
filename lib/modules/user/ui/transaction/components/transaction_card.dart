@@ -1,3 +1,4 @@
+import 'package:booksmart/constant/data.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jiffy/jiffy.dart';
@@ -158,8 +159,8 @@ class TransactionCard extends StatelessWidget {
                             children: [
                               _buildBadge(
                                 transaction.type,
-                                transaction.type == "Business"
-                                    ? Colors.blue
+                                transaction.type == businessTransactionType
+                                    ? Colors.teal
                                     : Colors.orange,
                               ),
                               if (transaction.deductible) ...[
