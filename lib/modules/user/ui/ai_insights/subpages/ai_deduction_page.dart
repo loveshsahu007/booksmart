@@ -3,26 +3,14 @@ import 'package:booksmart/widgets/date_range_picker.dart';
 import 'package:pie_chart/pie_chart.dart';
 import 'package:booksmart/constant/exports.dart';
 
-/// upto 5000, deeuction is 30%
-/// upto 10000, deduction is 40%
-/// above 10000, deduction is 50%
-
-/// t1: 1000 -> 30%
-/// t2: 2000 -> 30
-/// t3: 4000 -> 30
-///
-///  7000 (30% on 5k + 40% on 2k)
-///
-///
-
-class AIDeductionScreen extends StatefulWidget {
-  const AIDeductionScreen({super.key});
+class AIDeductionPage extends StatefulWidget {
+  const AIDeductionPage({super.key});
 
   @override
-  State<AIDeductionScreen> createState() => _AIDeductionScreenState();
+  State<AIDeductionPage> createState() => _AIDeductionPageState();
 }
 
-class _AIDeductionScreenState extends State<AIDeductionScreen> {
+class _AIDeductionPageState extends State<AIDeductionPage> {
   final List<CategoryData> _categories = [];
   final Map<String, GlobalKey> _categoryKeys = {};
   final ScrollController _accordionScroll = ScrollController();

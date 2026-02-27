@@ -4,12 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../common/components/drawer_item_widget.dart';
-import '../ai_strategy_screen.dart';
+import '../ai_insights/ai_insights_screen.dart';
 import '../cpa/dashboard_screen.dart';
 import '../dashboard/dashboard_screen.dart';
 import '../financial_statement/financial_statement.dart';
 import '../organization/switch_organization_dialog.dart';
-import '../tax_filling/tax_filling.dart';
 import '../token/earn_tokens_screen.dart';
 
 class BottomNavController extends GetxController {
@@ -35,16 +34,15 @@ class _HomeScreenState extends State<HomeScreen> {
     {'icon': Icons.home, 'label': 'Home'},
     {'icon': Icons.lightbulb, 'label': 'AI Tax Strategies'},
     {'icon': Icons.assessment, 'label': 'Reports'},
-    {'icon': Icons.receipt, 'label': 'Tax Filing'},
+    // {'icon': Icons.receipt, 'label': 'Tax Filing'},
     {'icon': Icons.person_pin_circle, 'label': 'CPA Network'},
     {'icon': Icons.account_balance_wallet, 'label': 'Wallet'},
   ];
 
   final List<Widget> _pages = [
     DashboardScreen(),
-    AiStrategyScreen(),
-    FinancialReportPage(),
-    TexFillingSceen(),
+    AiInsightsScreen(),
+    FinancialReportScreen(),
     CpaNetworkScreen(),
     EarnTokensScreen(),
   ];
@@ -60,8 +58,6 @@ class _HomeScreenState extends State<HomeScreen> {
   FinincialTabController finincialTabController = Get.put(
     FinincialTabController(),
   );
-
-  TaxTabController taxTabController = Get.put(TaxTabController());
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +133,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                 showSwitchOrganizationDialog();
                               },
                               trallingIcon: Icons.swap_horiz_outlined,
+                            ),
+                            DrawerItemWidget(
+                              title: "Tax Filling",
+                              onTap: () {
+                                Get.toNamed(Routes.tax);
+                              },
                             ),
                             DrawerItemWidget(
                               title: "AI Chat",

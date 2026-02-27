@@ -14,6 +14,7 @@ import 'package:booksmart/modules/common/ui/authentication/signup_screen.dart';
 import 'package:booksmart/modules/user/ui/cpa/dashboard_screen.dart';
 import 'package:booksmart/modules/user/ui/home/template/web_template.dart';
 import 'package:booksmart/modules/user/ui/bulk_review/bulk_review_screen.dart';
+import 'package:booksmart/modules/user/ui/tax_filling/tax_filling.dart';
 import 'package:booksmart/modules/user/ui/token/streak_unlocked_screen.dart';
 import 'package:booksmart/utils/initial_utils.dart';
 import 'package:flutter/foundation.dart';
@@ -31,7 +32,7 @@ import '../modules/cpa/ui/home/home_screen.dart';
 import '../modules/cpa/ui/home/template/web_template.dart';
 import '../modules/cpa/ui/leads_screen.dart';
 import '../modules/cpa/ui/orders_screen.dart';
-import '../modules/user/ui/ai_strategy_screen.dart';
+import '../modules/user/ui/ai_insights/ai_insights_screen.dart';
 import '../modules/common/ui/authentication/forgot.dart';
 import '../modules/user/ui/financial_statement/financial_statement.dart';
 import '../modules/user/ui/home/home_screen.dart';
@@ -40,7 +41,6 @@ import '../modules/user/ui/profile_screen.dart';
 import '../modules/user/ui/rules_management/rules_management_screen.dart';
 import '../modules/user/ui/settings/settings_screen.dart';
 import '../modules/user/ui/subscription/subscription_screen.dart';
-import '../modules/user/ui/tax_filling/tax_filling.dart';
 import '../modules/user/ui/token/buy_tokens_screen.dart';
 import '../modules/user/ui/token/earn_tokens_screen.dart';
 
@@ -92,15 +92,15 @@ class AppPages {
       name: Routes.report,
       page: () => getRequiredScreen(
         kIsWeb
-            ? WebTemplate(child: FinancialReportPage())
-            : FinancialReportPage(),
+            ? WebTemplate(child: FinancialReportScreen())
+            : FinancialReportScreen(),
         UserRole.user,
       ),
     ),
     GetPage(
       name: Routes.tax,
       page: () => getRequiredScreen(
-        kIsWeb ? WebTemplate(child: TexFillingSceen()) : TexFillingSceen(),
+        kIsWeb ? WebTemplate(child: TaxFillingScreen()) : TaxFillingScreen(),
         UserRole.user,
       ),
     ),
@@ -136,7 +136,7 @@ class AppPages {
     GetPage(
       name: Routes.aiStrategy,
       page: () => getRequiredScreen(
-        kIsWeb ? WebTemplate(child: AiStrategyScreen()) : AiStrategyScreen(),
+        kIsWeb ? WebTemplate(child: AiInsightsScreen()) : AiInsightsScreen(),
         UserRole.user,
       ),
     ),

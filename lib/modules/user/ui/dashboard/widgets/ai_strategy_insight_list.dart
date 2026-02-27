@@ -21,7 +21,7 @@ class AiStrategyInsightList extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const AppText(
-                    'AI strategy Insights',
+                    'AI Insights',
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),

@@ -41,14 +41,14 @@ class FinincialTabController extends GetxController
   }
 }
 
-class FinancialReportPage extends StatefulWidget {
-  const FinancialReportPage({super.key});
+class FinancialReportScreen extends StatefulWidget {
+  const FinancialReportScreen({super.key});
 
   @override
-  State<FinancialReportPage> createState() => _FinancialReportPageState();
+  State<FinancialReportScreen> createState() => _FinancialReportScreenState();
 }
 
-class _FinancialReportPageState extends State<FinancialReportPage> {
+class _FinancialReportScreenState extends State<FinancialReportScreen> {
   FinincialTabController finincialTabController = Get.put(
     FinincialTabController(),
   );

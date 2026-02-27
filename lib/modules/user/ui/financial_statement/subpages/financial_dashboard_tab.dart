@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
 import 'package:booksmart/modules/user/ui/transaction/receipt_scanning_output_screen.dart';
 
-import '../../tax_filling/tax_filling.dart';
 import '../financial_statement.dart';
 
 class FinancialDashboardTab extends StatelessWidget {
@@ -115,9 +114,9 @@ class FinancialDashboardTab extends StatelessWidget {
                     iconColor: Colors.orange,
                     trendText: "Stable trend",
                     onTap: () {
-                      if (Get.isRegistered<TaxTabController>()) {
-                        Get.find<TaxTabController>().changeTab(1);
-                      }
+                      // if (Get.isRegistered<TaxTabController>()) {
+                      //   Get.find<TaxTabController>().changeTab(1);
+                      // }
                     },
                   ),
                   // strong - green
@@ -144,7 +143,7 @@ class FinancialDashboardTab extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 8,
+                spacing: 10,
                 children: [
                   AppText(
                     'Quick AI Insights',
@@ -175,7 +174,6 @@ class FinancialDashboardTab extends StatelessWidget {
   // =======================
 
   Widget _insightText(String title, Color color, int index) => Container(
-    margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
       color: Colors.white.withValues(alpha: 0.05),

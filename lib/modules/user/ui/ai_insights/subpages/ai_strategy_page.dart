@@ -1,14 +1,14 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 
-class AiStrategyScreen extends StatefulWidget {
-  const AiStrategyScreen({super.key});
+class AiStrategyPage extends StatefulWidget {
+  const AiStrategyPage({super.key});
 
   @override
-  State<AiStrategyScreen> createState() => _AiStrategyScreenState();
+  State<AiStrategyPage> createState() => _AiStrategyPageState();
 }
 
-class _AiStrategyScreenState extends State<AiStrategyScreen> {
+class _AiStrategyPageState extends State<AiStrategyPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(

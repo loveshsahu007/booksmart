@@ -170,6 +170,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> {
   }) {
     final isExpanded = expandedSections[title] ?? false;
     return Card(
+      margin: EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
         shape: RoundedRectangleBorder(),
         tilePadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -280,7 +281,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> {
               initialText: "Select Date Range",
             ),
             const SizedBox(height: 16),
-             
+
             CustomDropDownWidget<String>(
               selectedItem: selectedFilter,
               dropDownKey: accountTypeDropdownKey,

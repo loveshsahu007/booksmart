@@ -1,9 +1,11 @@
+import 'package:booksmart/routes/routes.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:booksmart/constant/app_colors.dart';
 import 'package:booksmart/widgets/app_text.dart';
 import 'package:booksmart/widgets/date_range_picker.dart';
 import 'package:booksmart/constant/strings.dart';
+import 'package:get/get.dart';
 
 class ProfitLossScreen extends StatefulWidget {
   const ProfitLossScreen({super.key});
@@ -73,8 +75,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                   _outlineButton(
                     "Upload P&L",
                     onPressed: () {
-                      // Navigate to document upload page
-                      // highlight P&L section
+                      Get.toNamed(Routes.tax);
                     },
                   ),
                 ],
@@ -251,6 +252,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
   Widget _collapsibleSection(String title, List<Widget> children) {
     //  final isExpanded = expandedSections[title] ?? false;
     return Card(
+      margin: EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
         shape: RoundedRectangleBorder(),
         tilePadding: const EdgeInsets.symmetric(horizontal: 12),
