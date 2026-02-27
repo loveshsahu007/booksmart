@@ -2,6 +2,7 @@ import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/admin/controllers/users_controller.dart';
 import 'package:booksmart/widgets/app_text.dart';
 import 'package:flutter/foundation.dart';
+import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -64,7 +65,19 @@ class _UserListScreenState extends State<UserListScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [AppText(user.email, fontSize: 12)],
                   ),
-                  trailing: _buildRoleChip(user),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.message, color: Colors.blue),
+                        onPressed: () {
+                          goToChatScreen(user, shouldCloseBefore: false);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      _buildRoleChip(user),
+                    ],
+                  ),
                 ),
               );
             },

@@ -262,6 +262,15 @@ class AppPages {
         UserRole.admin,
       ),
     ),
+    GetPage(
+      name: Routes.adminChat,
+      page: () => getRequiredScreen(
+        kIsWeb
+            ? WebTemplateAdmin(child: const ChatListScreen())
+            : const ChatListScreen(),
+        UserRole.admin,
+      ),
+    ),
   ];
 }
 

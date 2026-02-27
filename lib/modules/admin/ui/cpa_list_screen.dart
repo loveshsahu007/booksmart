@@ -30,7 +30,7 @@ class _CpaListScreenAdminState extends State<CpaListScreenAdmin> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Users"),
+        title: const Text("CPAs"),
         automaticallyImplyLeading: !kIsWeb,
       ),
       body: GetBuilder<AdminCpaController>(
@@ -40,7 +40,7 @@ class _CpaListScreenAdminState extends State<CpaListScreenAdmin> {
           }
 
           if (controller.cpas.isEmpty) {
-            return const Center(child: AppText('No users found'));
+            return const Center(child: AppText('No CPA found'));
           }
 
           return ListView.builder(
@@ -159,7 +159,7 @@ class _UpdateCpaStatusDialogState extends State<UpdateCpaStatusDialog> {
                   );
                   Get.back();
                 },
-          child: const Text('Update'),
+          child: const Text('Update', style: TextStyle(color: Colors.black)),
         ),
       ],
     );

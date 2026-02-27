@@ -1,6 +1,8 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
+import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
+import 'package:get/get.dart';
 
 void showCpaDetailsDialog(CpaModel user) {
   final String fullName = '${user.firstName} ${user.lastName}'.trim().isEmpty
@@ -47,6 +49,19 @@ void showCpaDetailsDialog(CpaModel user) {
 
           if (user.licenseCopyUrl.isNotEmpty)
             _infoRow('License Copy', 'Uploaded'),
+
+          0.04.verticalSpace,
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Get.back(); // close dialog
+                goToChatScreen(user.data, shouldCloseBefore: false);
+              },
+              icon: const Icon(Icons.message, color: Colors.black),
+              label: Text('Message CPA', style: TextStyle(color: Colors.black)),
+            ),
+          ),
         ],
       ),
     ),

@@ -74,6 +74,12 @@ class WebSideBarAdmin extends StatelessWidget {
                         routeName: Routes.adminCategories,
                         isShowName: isShowName,
                       ),
+                      SideBarIcon(
+                        icon: Icons.chat_bubble_outline,
+                        infoMessage: 'Chat',
+                        routeName: Routes.adminChat,
+                        isShowName: isShowName,
+                      ),
                     ],
                   ),
                 ),

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'template/web_template.dart';
+import 'package:booksmart/modules/common/ui/chat/chat_list_screen.dart';
 
 class BottomNavControllerAdmin extends GetxController {
   var currentIndex = 0.obs;
@@ -32,6 +33,7 @@ class _HomeScreenAdminState extends State<HomeScreenAdmin> {
     {'icon': Icons.assessment, 'label': 'Users'},
     {'icon': Icons.business_outlined, 'label': 'CPAs'},
     {'icon': Icons.category_outlined, 'label': 'Categories'},
+    {'icon': Icons.chat_bubble_outline, 'label': 'Chat'},
   ];
 
   final List<Widget> _pages = [
@@ -39,9 +41,10 @@ class _HomeScreenAdminState extends State<HomeScreenAdmin> {
     UserListScreen(),
     CpaListScreenAdmin(),
     AdminCategoriesScreen(),
+    const ChatListScreen(),
   ];
 
-  List<String?> pageTitles = [null, "Users", "CPAs", "Categories"];
+  List<String?> pageTitles = [null, "Users", "CPAs", "Categories", "Chats"];
 
   @override
   Widget build(BuildContext context) {

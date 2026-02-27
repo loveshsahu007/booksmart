@@ -116,11 +116,25 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    trailing: AppText(
-                      Jiffy.parseFromDateTime(chat.lastMessageTime).fromNow(),
-
-                      fontSize: 11,
-                      color: Colors.grey,
+                    trailing: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        AppText(
+                          otherUser.role.name.toUpperCase(),
+                          fontSize: 10,
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        const SizedBox(height: 4),
+                        AppText(
+                          Jiffy.parseFromDateTime(
+                            chat.lastMessageTime,
+                          ).fromNow(),
+                          fontSize: 11,
+                          color: Colors.grey,
+                        ),
+                      ],
                     ),
                     onTap: () {
                       goToChatScreen(otherUser, shouldCloseBefore: false);

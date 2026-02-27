@@ -17,7 +17,8 @@ void goToChatScreen(PersonModel otherUser, {bool shouldCloseBefore = false}) {
     }
     customDialog(
       child: ChatScreen(otherUser: otherUser),
-      title: 'Messaging',
+      title:
+          '${otherUser.firstName} ${otherUser.lastName} : ${otherUser.role.name.toUpperCase()}',
       barrierDismissible: true,
       maxWidth: 600, // Adjusted for better chat experience
     );
@@ -47,6 +48,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   int _limit = 20;
 
+  List<MessageModel> _cachedMessages = [];
+  int? _lastChatId;
+
   @override
   void initState() {
     super.initState();
@@ -65,11 +69,37 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     if (_controller.text.trim().isEmpty) return;
-    chatController.sendMessage(_controller.text);
+
+    final text = _controller.text;
     _controller.clear();
-    // Scroll to bottom is handled by list reverse normally, but if needed we can animate
+
+    final currentChat = chatController.currentChat.value;
+    if (currentChat != null) {
+      if (mounted) {
+        setState(() {
+          _cachedMessages.insert(
+            0,
+            MessageModel(
+              id: DateTime.now().millisecondsSinceEpoch,
+              chatId: currentChat.id,
+              senderId: chatController.currentUserId,
+              content: text,
+              type: MessageType.text,
+              isRead: false,
+              createdAt: DateTime.now(),
+            ),
+          );
+        });
+      }
+    }
+
+    await chatController.sendMessage(text);
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   // Calculate isMe helper
@@ -106,36 +136,36 @@ class _ChatScreenState extends State<ChatScreen> {
               return StreamBuilder<List<Map<String, dynamic>>>(
                 stream: chatController.getMessagesStream(chat.id, _limit),
                 builder: (context, snapshot) {
-                  if (snapshot.hasError) {
+                  if (_lastChatId != chat.id) {
+                    _cachedMessages.clear();
+                    _lastChatId = chat.id;
+                  }
+
+                  if (snapshot.hasData) {
+                    _cachedMessages = snapshot.data!
+                        .map((e) => MessageModel.fromJson(e))
+                        .toList();
+                  } else if (snapshot.hasError && _cachedMessages.isEmpty) {
                     return Center(child: Text('Error: ${snapshot.error}'));
                   }
 
-                  if (!snapshot.hasData) {
+                  if (_cachedMessages.isEmpty && !snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final data = snapshot.data!;
-                  if (data.isEmpty) {
+                  if (_cachedMessages.isEmpty) {
                     return const Center(
                       child: Text("Start the conversation now!"),
                     );
                   }
 
-                  final messages = data
-                      .map((e) => MessageModel.fromJson(e))
-                      .toList();
-
-                  // Note: Data is already sorted by created_at descending from the stream query.
-                  // We don't necessarily need to sort it again if the query is correct.
-                  // But we should ensure the ListView.builder uses it correctly with reverse: true.
-
                   return ListView.builder(
                     key: ValueKey(chat.id), // Ensure fresh list on chat switch
                     padding: const EdgeInsets.all(16),
-                    itemCount: messages.length,
+                    itemCount: _cachedMessages.length,
                     reverse: true, // Show newest at bottom
                     itemBuilder: (context, index) {
-                      final msg = messages[index];
+                      final msg = _cachedMessages[index];
                       final isMe = _isMe(msg.senderId);
 
                       return Align(
@@ -228,8 +258,11 @@ class _ChatScreenState extends State<ChatScreen> {
                         "${widget.otherUser.firstName} ${widget.otherUser.lastName}",
                   );
                 },
-                icon: const Icon(Icons.add_task),
-                label: Text("Send Order Request"),
+                icon: const Icon(Icons.add_task, color: Colors.black),
+                label: Text(
+                  "Send Order Request",
+                  style: TextStyle(color: Colors.black),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: colorScheme.primary,
                   foregroundColor: colorScheme.onPrimary,
