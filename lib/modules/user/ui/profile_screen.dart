@@ -124,8 +124,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     try {
       if (_profileImage != null) {
         final uploadedUrl = await uploadFileToSupabaseStorage(
-          _profileImage!,
-          SupabaseStorageBucket.userImages,
+          file: _profileImage!,
+          bucketName: SupabaseStorageBucket.userImages,
         );
 
         if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
@@ -171,7 +171,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       avatarImage = null;
     }
 
-    return Column(
+    return Stack(
+      alignment: Alignment.bottomRight,
       children: [
         GestureDetector(
           onTap: _pickImage,
@@ -184,28 +185,15 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 : null,
           ),
         ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(onPressed: _pickImage, icon: Icon(Icons.camera_alt)),
-            // TextButton(
-            //   onPressed: _pickImage,
-            //   child: const Text('Change Profile Picture'),
-            // ),
-            // if (avatarImage != null)
-            //   TextButton(
-            //     onPressed: () {
-            //       // remove selection & remote URL (if user wants to remove pic)
-            //       setState(() {
-            //         _profileImage = null;
-            //         _profileImageBytes = null;
-            //         _profileImageUrl = null;
-            //       });
-            //     },
-            //     child: const Text('Remove'),
-            //   ),
-          ],
+        SizedBox(
+          width: 30,
+          height: 30,
+          child: IconButton.filled(
+            onPressed: _pickImage,
+            icon: Icon(Icons.camera_alt),
+            padding: EdgeInsets.zero,
+            iconSize: 20,
+          ),
         ),
       ],
     );

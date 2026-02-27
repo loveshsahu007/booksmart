@@ -137,8 +137,6 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 16),
           buildDunAndBradstreetCard(),
           const SizedBox(height: 16),
-          const AiStrategyInsightList(),
-          const SizedBox(height: 16),
           Accordion(
             maxOpenSections: 2,
             headerBackgroundColor: accordionColor,
@@ -155,20 +153,21 @@ class DashboardScreen extends StatelessWidget {
             disableScrolling: true,
             children: [
               AccordionSection(
-                isOpen: true,
-                leftIcon: Icon(Icons.assignment_rounded),
+                isOpen: false,
+                leftIcon: Icon(
+                  Icons.psychology_rounded,
+                  color: colorScheme.secondary,
+                ),
+                header: Text('AI Insights', style: headerStyle),
+                content: const AiStrategyInsightList(),
+              ),
+              AccordionSection(
+                isOpen: false,
+                leftIcon: Icon(Icons.assignment_rounded, color: Colors.teal),
                 header: Text('Missions', style: headerStyle),
                 content: const MissionsList(),
               ),
-              // AccordionSection(
-              //   isOpen: false,
-              //   leftIcon: Icon(
-              //     Icons.psychology_rounded,
-              //     color: colorScheme.secondary,
-              //   ),
-              //   header: Text('AI Strategy Insights', style: headerStyle),
-              //   content: const AiStrategyInsightList(),
-              // ),
+
               AccordionSection(
                 isOpen: false,
                 leftIcon: Icon(

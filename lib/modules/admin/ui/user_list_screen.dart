@@ -57,13 +57,15 @@ class _UserListScreenState extends State<UserListScreen> {
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: AppText(
+                  title: FittedText(
                     fullName.isEmpty ? 'Unnamed User' : fullName,
-                    fontWeight: FontWeight.w600,
+                    style: TextStyle(fontWeight: FontWeight.w700),
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [AppText(user.email, fontSize: 12)],
+                    children: [
+                      FittedBox(child: AppText(user.email, fontSize: 12)),
+                    ],
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,

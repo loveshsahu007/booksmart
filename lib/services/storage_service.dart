@@ -1,6 +1,5 @@
 import 'dart:developer';
 
-import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,33 +7,39 @@ import 'package:uuid/uuid.dart';
 
 import '../utils/supabase.dart';
 
-Future<String?> uploadFileToSupabaseStorage(
-  XFile file,
-  String bucketName,
-) async {
-  if (!isUserLoggedIn) {
+Future<String?> uploadFileToSupabaseStorage({
+  required XFile file,
+  required String bucketName,
+  bool isPublic = true,
+}) async {
+  final user = supabase.auth.currentUser;
+  if (user == null) return null;
+
+  try {
+    final fileBytes = await file.readAsBytes();
+
+    final filePath = '${user.id}/${Uuid().v4()}_${path.basename(file.path)}';
+
+    await supabase.storage
+        .from(bucketName)
+        .uploadBinary(
+          filePath,
+          fileBytes,
+          fileOptions: FileOptions(upsert: false),
+        );
+
+    if (isPublic) {
+      return supabase.storage.from(bucketName).getPublicUrl(filePath);
+    } else {
+      return await supabase.storage
+          .from(bucketName)
+          .createSignedUrl(filePath, 60 * 60);
+    }
+  } catch (e, stack) {
+    log('Upload Error: $e');
+    log(stack.toString());
     return null;
   }
-
-  final fileBytes = await file.readAsBytes();
-
-  final fileName = '${Uuid().v4()}_${path.basename(file.path)}';
-
-  return supabase.storage
-      .from(bucketName)
-      .uploadBinary(fileName, fileBytes, fileOptions: FileOptions(upsert: true))
-      .then((_) {
-        if (1 > 2) {
-          // ignore
-          return null;
-        }
-        return supabase.storage.from(bucketName).getPublicUrl(fileName);
-      })
-      .onError((error, stackTrace) {
-        log(error.toString());
-        log(stackTrace.toString());
-        return null;
-      });
 }
 
 /// We are storing media path in our db, pass the same path,
@@ -58,4 +63,25 @@ Future<bool> deleteFileFromSupabase(String storedPath) async {
         log(stackTrace.toString());
         return false;
       });
+}
+
+Future<String?> getPrivateImageUrl({
+  required String bucketName,
+  required String filePath,
+  int expiresInSeconds = 3600, // default 1 hour
+}) async {
+  final user = supabase.auth.currentUser;
+  if (user == null) return null;
+
+  try {
+    final signedUrl = await supabase.storage
+        .from(bucketName)
+        .createSignedUrl(filePath, expiresInSeconds);
+
+    return signedUrl;
+  } catch (e, stack) {
+    log('Signed URL Error: $e');
+    log(stack.toString());
+    return null;
+  }
 }

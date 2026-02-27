@@ -7,26 +7,29 @@ class AiStrategyInsightList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      margin: EdgeInsets.zero,
       child: Container(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(15),
+        height: 315,
         decoration: BoxDecoration(borderRadius: BorderRadius.circular(16)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const AppText(
               'AI Insight',
-              fontSize: 24,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
-            const SizedBox(height: 8),
-            const AppText(
-              'Maximize Your Business Savings Potential!',
-              fontSize: 16,
-              color: Colors.white70,
+            const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: AppText(
+                'Maximize Your Business Savings Potential!',
+                fontSize: 16,
+                color: Colors.white70,
+              ),
             ),
-            const SizedBox(height: 24),
-
+            const SizedBox(height: 10),
             // Main Value Display
             const AppText(
               '\$6,470',
@@ -40,17 +43,18 @@ class AiStrategyInsightList extends StatelessWidget {
               color: Colors.white,
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 10),
             const AppText(
               'Unlock to view strategies on how to save your business up to \$6,470',
               textAlign: TextAlign.center,
               fontSize: 14,
               color: Colors.white60,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
 
             const SizedBox(height: 20),
 
-            // Unlock Button/Container
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(

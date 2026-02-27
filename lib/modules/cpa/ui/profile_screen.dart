@@ -187,8 +187,8 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
       // Upload files if they exist
       if (_profileImage != null) {
         final url = await uploadFileToSupabaseStorage(
-          _profileImage!,
-          SupabaseStorageBucket.userImages,
+          file: _profileImage!,
+          bucketName: SupabaseStorageBucket.userImages,
         );
         if (url != null && url.isNotEmpty) {
           _profileImageUrl = url;
@@ -198,8 +198,8 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
       }
       if (_certificationProofFile != null) {
         final url = await uploadFileToSupabaseStorage(
-          _certificationProofFile!,
-          SupabaseStorageBucket.documents,
+          file: _certificationProofFile!,
+          bucketName: SupabaseStorageBucket.documents,
         );
         if (url != null && url.isNotEmpty) {
           _certificationProofUrl = url;
@@ -208,8 +208,8 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
       }
       if (_licenseCopyFile != null) {
         _licenseCopyUrl = await uploadFileToSupabaseStorage(
-          _licenseCopyFile!,
-          SupabaseStorageBucket.documents,
+          file: _licenseCopyFile!,
+          bucketName: SupabaseStorageBucket.documents,
         );
       }
 
