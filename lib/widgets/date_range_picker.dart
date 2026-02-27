@@ -109,7 +109,7 @@ class _DateRangePickerWidgetState extends State<DateRangePickerWidget> {
 
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: colorScheme.surface,
+        backgroundColor: colorScheme.primary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
           side: BorderSide(color: colorScheme.secondary),
