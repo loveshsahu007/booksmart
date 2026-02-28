@@ -1,4 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:flutter/foundation.dart';
 import 'package:booksmart/modules/common/providers/user_profile_provider.dart';
 import 'package:booksmart/services/storage_service.dart';
 import 'package:booksmart/supabase/buckets.dart';
@@ -64,6 +65,9 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
   List<String> selectedCertifications = [];
   List<String> selectedSpecialties = [];
   List<String> selectedStates = [];
+
+  // Image picker
+  final _imagePicker = ImagePicker();
 
   // File uploads
   XFile? _profileImage; // keep for upload
@@ -147,35 +151,86 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
     return [];
   }
 
-  /// Picks images for profile or documents.
-  /// For profile images, also read bytes for preview (works on web + mobile).
-  Future<void> _pickImage(ImageSource source, {bool isProfile = true}) async {
+  /// Shows a bottom sheet on mobile (camera + gallery) or opens gallery
+  /// directly on web. Only used for the profile picture.
+  Future<void> _pickImage() async {
+    if (kIsWeb) {
+      _pickFromSource(ImageSource.gallery);
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take Photo'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickFromSource(ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () {
+                Navigator.pop(context);
+                _pickFromSource(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Picks a profile image from the given [source] and stores bytes for preview.
+  Future<void> _pickFromSource(ImageSource source) async {
     try {
-      final XFile? pickedFile = await ImagePicker().pickImage(source: source);
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+        preferredCameraDevice: CameraDevice.front,
+      );
       if (pickedFile != null) {
-        if (isProfile) {
-          final bytes = await pickedFile.readAsBytes();
-          setState(() {
-            _profileImage = pickedFile;
-            _profileImageBytes = bytes;
-          });
-        } else {
-          setState(() {
-            if (_certificationProofFile == null) {
-              _certificationProofFile = pickedFile;
-            } else if (_licenseCopyFile == null) {
-              _licenseCopyFile = pickedFile;
-            } else {
-              _certificationProofFile = pickedFile;
-            }
-          });
-        }
+        final bytes = await pickedFile.readAsBytes();
+        setState(() {
+          _profileImage = pickedFile;
+          _profileImageBytes = bytes;
+        });
       }
     } catch (e) {
       debugPrint('Image picker error: $e');
       Get.snackbar(
         'Error',
         'Failed to pick image',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  /// Picks a document file (certification proof / licence copy) from the gallery.
+  Future<void> _pickDocument({required bool isCertification}) async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+      );
+      if (pickedFile != null) {
+        setState(() {
+          if (isCertification) {
+            _certificationProofFile = pickedFile;
+          } else {
+            _licenseCopyFile = pickedFile;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Document picker error: $e');
+      Get.snackbar(
+        'Error',
+        'Failed to pick document',
         snackPosition: SnackPosition.BOTTOM,
       );
     }
@@ -248,10 +303,12 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
         if (_licenseCopyUrl != null && _licenseCopyUrl!.isNotEmpty)
           'license_copy_url': _licenseCopyUrl,
         'terms_agreed': _termsAgreed,
-        //TODO: change status to verification_status in db as well, and in profile_screen json
-        'verification_status': CpaVerificationStatus
-            .pending
-            .name, // Set to pending for admin review
+        'verification_status':
+            cpa!.verificationStatus == CpaVerificationStatus.approved
+            ? CpaVerificationStatus.approved.name
+            : CpaVerificationStatus
+                  .pending
+                  .name, // Set to pending for admin review
         'updated_at': DateTime.now().toIso8601String(),
       };
 
@@ -262,6 +319,8 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
         dismissLoadingWidget();
         if (authCpa!.verificationStatus != CpaVerificationStatus.approved) {
           Get.toNamed(Routes.cpaProfileUnderReview);
+        } else {
+          Get.toNamed(Routes.cpaHome);
         }
         showSnackBar('Profile saved successfully');
       });
@@ -323,38 +382,44 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
 
     return Column(
       children: [
-        GestureDetector(
-          onTap: () => _pickImage(ImageSource.gallery, isProfile: true),
-          child: CircleAvatar(
-            radius: 50,
-            backgroundColor: Colors.grey.shade300,
-            backgroundImage: avatarImage,
-            child: avatarImage == null
-                ? const Icon(Icons.camera_alt, size: 30)
-                : null,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisSize: MainAxisSize.min,
+        Stack(
+          alignment: Alignment.bottomRight,
           children: [
-            TextButton(
-              onPressed: () => _pickImage(ImageSource.gallery, isProfile: true),
-              child: const Text('Upload Profile Picture'),
-            ),
-            if (avatarImage != null)
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _profileImage = null;
-                    _profileImageBytes = null;
-                    _profileImageUrl = null;
-                  });
-                },
-                child: const Text('Remove'),
+            GestureDetector(
+              onTap: _pickImage,
+              child: CircleAvatar(
+                radius: 50,
+                backgroundColor: Colors.grey.shade300,
+                backgroundImage: avatarImage,
+                child: avatarImage == null
+                    ? const Icon(Icons.camera_alt, size: 30, color: Colors.grey)
+                    : null,
               ),
+            ),
+            SizedBox(
+              width: 30,
+              height: 30,
+              child: IconButton.filled(
+                onPressed: _pickImage,
+                icon: const Icon(Icons.camera_alt),
+                padding: EdgeInsets.zero,
+                iconSize: 20,
+              ),
+            ),
           ],
         ),
+        const SizedBox(height: 10),
+        if (avatarImage != null)
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _profileImage = null;
+                _profileImageBytes = null;
+                _profileImageUrl = null;
+              });
+            },
+            child: const Text('Remove Photo'),
+          ),
       ],
     );
   }
@@ -398,7 +463,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                     },
                   )
                 : null,
-            onTap: () => _pickImage(ImageSource.gallery, isProfile: false),
+            onTap: () => _pickDocument(isCertification: true),
           ),
         ),
 
@@ -425,7 +490,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
                     },
                   )
                 : null,
-            onTap: () => _pickImage(ImageSource.gallery, isProfile: false),
+            onTap: () => _pickDocument(isCertification: false),
           ),
         ),
       ],

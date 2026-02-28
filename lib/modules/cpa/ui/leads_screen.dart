@@ -1,4 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/widgets/custom_circle_avatar.dart';
 import 'package:get/get.dart';
 import 'package:jiffy/jiffy.dart';
 import '../../common/controllers/chat_controller.dart';
@@ -25,7 +26,7 @@ class LeadsScreenCPA extends StatelessWidget {
 
   // ---------------- LEADS TAB -----------------
   Widget _buildLeadsTab() {
-    ColorScheme colorScheme = Get.theme.colorScheme;
+    // ColorScheme colorScheme = Get.theme.colorScheme;
     return GetX<LeadsController>(
       init: LeadsController(),
       builder: (controller) {
@@ -44,10 +45,7 @@ class LeadsScreenCPA extends StatelessWidget {
           itemBuilder: (context, index) {
             final lead = controller.leads[index];
             final user = lead.userWrapper;
-            final initials = user != null
-                ? "${user['first_name']?[0] ?? ''}${user['last_name']?[0] ?? ''}"
-                      .toUpperCase()
-                : "?";
+
             final name = user != null
                 ? "${user['first_name']} ${user['last_name']}"
                 : "Unknown User";
@@ -62,16 +60,10 @@ class LeadsScreenCPA extends StatelessWidget {
                   padding: const EdgeInsets.all(14),
                   child: Row(
                     children: [
-                      CircleAvatar(
+                      CustomCircleAvatar(
                         radius: 25,
-                        backgroundColor: colorScheme.primary.withValues(
-                          alpha: 0.9,
-                        ),
-                        child: AppText(
-                          initials,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                        imgUrl: user!['img_url'],
+                        alternateText: user['first_name'],
                       ),
                       const SizedBox(width: 10),
                       Expanded(

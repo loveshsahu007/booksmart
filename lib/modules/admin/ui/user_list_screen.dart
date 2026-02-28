@@ -1,6 +1,7 @@
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/admin/controllers/users_controller.dart';
 import 'package:booksmart/widgets/app_text.dart';
+import 'package:booksmart/widgets/custom_circle_avatar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
 import 'package:flutter/material.dart';
@@ -56,7 +57,12 @@ class _UserListScreenState extends State<UserListScreen> {
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
                 child: ListTile(
-                  leading: const CircleAvatar(child: Icon(Icons.person)),
+                  leading: CustomCircleAvatar(
+                    imgUrl: user.imgUrl,
+                    alternateText: fullName,
+                    radius: 25,
+                  ),
+                  //  const CircleAvatar(child: Icon(Icons.person)),
                   title: FittedText(
                     fullName.isEmpty ? 'Unnamed User' : fullName,
                     style: TextStyle(fontWeight: FontWeight.w700),

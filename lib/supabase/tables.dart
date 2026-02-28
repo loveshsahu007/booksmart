@@ -12,4 +12,5 @@ class SupabaseTable {
   static String orders = 'orders';
   static String leads = 'leads';
   static String cpaServices = 'cpa_services';
+  static String userDocuments = 'user_documents';
 }

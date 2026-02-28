@@ -1,3 +1,4 @@
+import 'package:booksmart/widgets/custom_circle_avatar.dart';
 import 'package:get/get.dart';
 
 import 'package:booksmart/models/user_base_model.dart';
@@ -43,20 +44,13 @@ class CpaCard extends StatelessWidget {
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircleAvatar(
+                    CustomCircleAvatar(
+                      imgUrl: cpa.imgUrl,
+                      alternateText: cpa.firstName,
                       radius: 30,
                       backgroundColor: scheme.primary.withValues(alpha: 0.1),
-                      backgroundImage: cpa.imgUrl.isNotEmpty
-                          ? NetworkImage(cpa.imgUrl)
-                          : null,
-                      child: cpa.imgUrl.isEmpty
-                          ? Icon(
-                              Icons.person_outline,
-                              size: 30,
-                              color: scheme.primary,
-                            )
-                          : null,
                     ),
+
                     const SizedBox(height: 5),
                     FittedText("⭐⭐⭐⭐⭐ • 5.0", style: TextStyle(fontSize: 8)),
                     Row(),

@@ -4,11 +4,12 @@ import 'package:booksmart/modules/user/ui/bank/bank_list_screen.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/document_repository_screen.dart';
 import 'package:booksmart/modules/user/ui/organization/organization_list_screen.dart';
 import 'package:booksmart/modules/user/ui/sponsored_offers/sponsored_offers_screen.dart';
+import 'package:booksmart/widgets/custom_circle_avatar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../common/controllers/auth_controller.dart';
-import '../../../../helpers/name_initial_helper.dart';
+//import '../../../../helpers/name_initial_helper.dart';
 import '../../../../routes/routes.dart';
 import '../../../../widgets/app_text.dart';
 
@@ -68,15 +69,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   child: Row(
                     children: [
-                      CircleAvatar(
+                      CustomCircleAvatar(
+                        imgUrl: user!.imgUrl,
+                        alternateText: user!.firstName,
                         radius: 26,
-                        backgroundColor: colorScheme.primary,
-                        child: AppText(
-                          getNameInitials(user!.firstName, user!.lastName),
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
                       ),
+                      // CircleAvatar(
+                      //   radius: 26,
+                      //   backgroundColor: colorScheme.primary,
+                      //   child: AppText(
+                      //     getNameInitials(user!.firstName, user!.lastName),
+                      //     color: Colors.white,
+                      //     fontSize: 14,
+                      //   ),
+                      // ),
                       const SizedBox(width: 12),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

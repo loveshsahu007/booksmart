@@ -35,6 +35,8 @@ class TransactionController extends GetxController {
     String? amountRange,
     DateTime? startDate,
     DateTime? endDate,
+    String?
+    bankAccountId, // Plaid account ID from BankAccountModel.plaidAccountId
   }) async {
     try {
       if (isLoadMore) {
@@ -60,6 +62,11 @@ class TransactionController extends GetxController {
       // Category filter
       if (category != null && category != "All") {
         query = query.eq('category_id', category);
+      }
+
+      // Bank Account filter
+      if (bankAccountId != null && bankAccountId.isNotEmpty) {
+        query = query.eq('bank_account_id', bankAccountId);
       }
 
       // Type filter

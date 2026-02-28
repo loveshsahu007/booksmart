@@ -1,7 +1,10 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/models/user_document_model.dart';
+import 'package:booksmart/modules/user/controllers/tax_document_controller.dart';
 import 'package:booksmart/modules/user/ui/tax_filling/upload_tax_doc_dialog.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
 
 import '../../../../../widgets/custom_drop_down.dart';
 
@@ -28,32 +31,63 @@ Color getTaxDocStatusColor(String status, bool isDark) {
 class _TaxFillingScreenState extends State<TaxFillingScreen> {
   final yearDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final docTypeDropdownKey = GlobalKey<DropdownSearchState<String>>();
-  final statusDropdownKey = GlobalKey<DropdownSearchState<String>>();
+
+  late final TaxDocumentController _ctrl;
+
+  // Local search / filter state
+  String _search = '';
+  String? _selectedYear;
+  String? _selectedCategory;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = Get.isRegistered<TaxDocumentController>()
+        ? Get.find<TaxDocumentController>()
+        : Get.put(TaxDocumentController());
+  }
+
+  List<UserDocument> get _filtered {
+    var list = _ctrl.documents.toList();
+    if (_search.isNotEmpty) {
+      list = list
+          .where((d) => d.name.toLowerCase().contains(_search.toLowerCase()))
+          .toList();
+    }
+    if (_selectedYear != null) {
+      list = list.where((d) => d.taxYear == _selectedYear).toList();
+    }
+    if (_selectedCategory != null) {
+      list = list.where((d) => d.category == _selectedCategory).toList();
+    }
+    return list;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: kIsWeb ? null : AppBar(title: Text("Tax Filling")),
+      appBar: kIsWeb ? null : AppBar(title: const Text('Tax Filing')),
       body: Padding(
         padding: const EdgeInsets.all(10),
         child: Column(
           children: [
+            // ── Search + Upload ──────────────────────────────────────────
             Row(
               spacing: 10,
               children: [
                 Expanded(
                   flex: 4,
                   child: AppTextField(
-                    hintText: "Search documents...",
+                    hintText: 'Search documents…',
                     keyboardType: TextInputType.text,
-
-                    suffixWidget: Icon(Icons.search),
+                    suffixWidget: const Icon(Icons.search),
+                    onChanged: (v) => setState(() => _search = v),
                   ),
                 ),
                 Expanded(
                   child: AppButton(
                     radius: 8,
-                    buttonText: "Upload",
+                    buttonText: 'Upload',
                     fontSize: 16,
                     padding: const EdgeInsets.symmetric(
                       vertical: 18,
@@ -67,36 +101,73 @@ class _TaxFillingScreenState extends State<TaxFillingScreen> {
 
             const SizedBox(height: 10),
 
-            // 📅 Filters
+            // ── Filters ───────────────────────────────────────────────────
             Row(
               spacing: 5,
               children: [
                 _filterDropdown(
                   dropDownKey: yearDropdownKey,
-                  label: "Tax Year",
-                  items: ["2025", "2024", "2023"],
+                  label: 'Tax Year',
+                  items: const ['2025', '2024', '2023', '2022'],
+                  onChanged: (v) => setState(() => _selectedYear = v),
                 ),
                 _filterDropdown(
                   dropDownKey: docTypeDropdownKey,
-                  label: "Doc Type",
-                  items: ["All", "1040", "Schedule C"],
-                ),
-                _filterDropdown(
-                  dropDownKey: statusDropdownKey,
-                  label: "Status",
-                  items: ["All", "Ready", "Review", "Missing"],
+                  label: 'Category',
+                  items: const [
+                    'Income',
+                    'Expenses',
+                    'Forms',
+                    'Education',
+                    'Other',
+                  ],
+                  onChanged: (v) => setState(() => _selectedCategory = v),
                 ),
               ],
             ),
 
             const SizedBox(height: 10),
+
+            // ── Document list ─────────────────────────────────────────────
             Expanded(
-              child: ListView.builder(
-                itemCount: 10,
-                itemBuilder: (context, index) {
-                  return TaxDocumentCard();
-                },
-              ),
+              child: Obx(() {
+                if (_ctrl.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final docs = _filtered;
+
+                if (docs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.folder_open,
+                          size: 56,
+                          color: Colors.grey.shade400,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No documents found.\nTap Upload to add one.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey.shade500),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    return TaxDocumentCard(
+                      doc: docs[index],
+                      onDelete: () => _ctrl.deleteDocument(docs[index]),
+                    );
+                  },
+                );
+              }),
             ),
           ],
         ),
@@ -108,78 +179,65 @@ class _TaxFillingScreenState extends State<TaxFillingScreen> {
     required GlobalKey<DropdownSearchState<String>> dropDownKey,
     required String label,
     required List<String> items,
+    ValueChanged<String?>? onChanged,
   }) {
     return Expanded(
       child: CustomDropDownWidget<String>(
         dropDownKey: dropDownKey,
         label: label,
-        hint: "Select $label",
+        hint: 'Select $label',
         items: items,
+        onChanged: onChanged,
       ),
     );
   }
 }
 
+// ── Document card ────────────────────────────────────────────────────────────
+
 class TaxDocumentCard extends StatelessWidget {
-  const TaxDocumentCard({super.key});
+  const TaxDocumentCard({super.key, required this.doc, required this.onDelete});
+
+  final UserDocument doc;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final textColor = isDark ? Colors.white : Colors.black87;
     final subTextColor = isDark ? Colors.white60 : Colors.black54;
 
-    final color = getTaxDocStatusColor("Ready", isDark);
     return Padding(
-      padding: EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: Icon(Icons.insert_drive_file),
-        title: Text("1040.pdf", style: TextStyle(color: textColor)),
+        leading: Icon(TaxDocumentController.iconForMime(doc.mimeType)),
+        title: Text(doc.name, style: TextStyle(color: textColor)),
         subtitle: Text(
-          "2.34 MB",
+          [
+            if (doc.fileSizeLabel.isNotEmpty) doc.fileSizeLabel,
+            if (doc.category != null) doc.category!,
+          ].join(' · '),
           style: TextStyle(color: subTextColor, fontSize: 12),
         ),
         visualDensity: VisualDensity.compact,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 4,
-                    vertical: 1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    "Ready",
-                    style: TextStyle(color: color, fontWeight: FontWeight.w600),
-                  ),
+            if (doc.taxYear != null)
+              Text(
+                doc.taxYear!,
+                style: TextStyle(
+                  color: subTextColor,
+                  fontWeight: FontWeight.w500,
                 ),
-
-                const SizedBox(width: 12),
-                Text(
-                  "2024",
-                  style: TextStyle(
-                    color: subTextColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
+              ),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'Delete', child: Text('Delete')),
               ],
-            ),
-            PopupMenuButton(
-              icon: Icon(Icons.more_vert),
-              itemBuilder: (context) {
-                return [
-                  const PopupMenuItem(value: "Edit", child: Text("Edit")),
-                  const PopupMenuItem(value: "Share", child: Text("Share")),
-                  const PopupMenuItem(value: "Delete", child: Text("Delete")),
-                ];
+              onSelected: (val) {
+                if (val == 'Delete') onDelete();
               },
             ),
           ],

@@ -38,7 +38,6 @@ class _DateRangePickerWidgetState extends State<DateRangePickerWidget> {
     }
   }
 
-  //TODO: Change the selction color to grey
   Future<void> _pickDateRange() async {
     final now = DateTime.now();
     final DateTimeRange? pickedRange = await showDateRangePicker(
@@ -125,7 +124,7 @@ class _DateRangePickerWidgetState extends State<DateRangePickerWidget> {
           const SizedBox(width: 8),
           AppText(
             displayText,
-            color: colorScheme.secondary,
+            //  color: colorScheme.secondary,
             fontSize: 14,
             fontWeight: FontWeight.w500,
           ),

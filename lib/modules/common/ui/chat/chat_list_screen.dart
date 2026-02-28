@@ -1,5 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
+import 'package:booksmart/widgets/custom_circle_avatar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
@@ -86,22 +87,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 if (otherUser == null) return const SizedBox();
                 return Card(
                   child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: colorScheme.primary.withValues(
-                        alpha: .2,
-                      ),
-                      backgroundImage: otherUser.imgUrl.isNotEmpty
-                          ? NetworkImage(otherUser.imgUrl)
-                          : null,
-                      child: otherUser.imgUrl.isEmpty
-                          ? AppText(
-                              otherUser.firstName.isNotEmpty
-                                  ? otherUser.firstName[0]
-                                  : "?",
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            )
-                          : null,
+                    leading: CustomCircleAvatar(
+                      radius: 25,
+                      imgUrl: otherUser.imgUrl,
+                      alternateText: otherUser.firstName,
                     ),
                     title: AppText(
                       "${otherUser.firstName} ${otherUser.lastName}",

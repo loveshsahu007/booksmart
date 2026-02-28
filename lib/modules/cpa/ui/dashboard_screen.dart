@@ -1,4 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/widgets/custom_circle_avatar.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:get/get.dart';
 import 'package:jiffy/jiffy.dart';
@@ -264,10 +265,12 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            CircleAvatar(
-                              radius: 26,
-                              backgroundColor: Colors.grey.shade300,
+                            CustomCircleAvatar(
+                              radius: 25,
+                              imgUrl: user!['img_url'],
+                              alternateText: user['first_name'],
                             ),
+
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(

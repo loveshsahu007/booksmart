@@ -62,6 +62,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     _phoneCtrl.text = user!.phoneNumber;
 
     _profileImageUrl = user!.imgUrl;
+    setState(() {
+      _buildProfileImageSection();
+    });
   }
 
   /// Pick image from gallery and store bytes for preview.

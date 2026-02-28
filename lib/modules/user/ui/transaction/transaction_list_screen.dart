@@ -1,5 +1,6 @@
 import 'package:booksmart/constant/data.dart';
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/models/bank_model.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
 import 'dart:async';
@@ -37,57 +38,111 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
   final categoryDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final typeDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final amountRangeDropdownKey = GlobalKey<DropdownSearchState<String>>();
+  final bankAccountDropdownKey = GlobalKey<DropdownSearchState<String>>();
+
+  /// Maps display label → BankAccountModel for the filter dropdown.
+  final Map<String, BankAccountModel> _accountLabelMap = {};
+
+  // Persisted selected filter labels (survive dialog close/reopen until reset)
+  String? _selectedCategory;
+  String? _selectedType;
+  String? _selectedAmountRange;
+  String? _selectedBankAccountLabel; // display label
+  String? _selectedBankAccountId; // Plaid account ID (derived)
 
   void _applyFilters() {
-    final selectedCategoryName =
-        categoryDropdownKey.currentState?.getSelectedItem;
+    // Persist selected labels from dropdown keys into state
+    _selectedCategory = categoryDropdownKey.currentState?.getSelectedItem;
+    _selectedType = typeDropdownKey.currentState?.getSelectedItem;
+    _selectedAmountRange = amountRangeDropdownKey.currentState?.getSelectedItem;
+    _selectedBankAccountLabel =
+        bankAccountDropdownKey.currentState?.getSelectedItem;
+
+    // Resolve category name → id
     Object? categoryId;
-    if (selectedCategoryName != null && selectedCategoryName != "All") {
+    if (_selectedCategory != null && _selectedCategory != 'All') {
       try {
         categoryId = categoryController.categories
-            .firstWhere((c) => c.name == selectedCategoryName)
+            .firstWhere((c) => c.name == _selectedCategory)
             .id;
       } catch (_) {
-        categoryId = selectedCategoryName;
+        categoryId = _selectedCategory;
       }
+    }
+
+    // Resolve bank-account label → Plaid account ID
+    if (_selectedBankAccountLabel != null &&
+        _accountLabelMap.containsKey(_selectedBankAccountLabel)) {
+      _selectedBankAccountId =
+          _accountLabelMap[_selectedBankAccountLabel]!.plaidAccountId;
+    } else {
+      _selectedBankAccountId = null;
     }
 
     transactionC.getTransactions(
       searchQuery: searchQuery,
-      category: categoryId ?? "All",
-      type: typeDropdownKey.currentState?.getSelectedItem,
-      amountRange: amountRangeDropdownKey.currentState?.getSelectedItem,
+      category: categoryId ?? 'All',
+      type: _selectedType,
+      amountRange: _selectedAmountRange,
       startDate: startDate,
       endDate: endDate,
+      bankAccountId: _selectedBankAccountId,
     );
   }
 
   Future<void> _showFilterDialog() async {
+    // Build the bank-account label map from BankController
+    _accountLabelMap.clear();
+    final bankCtrl = Get.find<BankController>(
+      tag: getCurrentOrganization!.id.toString(),
+    );
+    for (final bank in bankCtrl.banks) {
+      for (final account in bank.accounts) {
+        final label =
+            '${bank.institutionName} – ${account.name}'
+            '${account.mask != null ? " (••${account.mask})" : ""}';
+        _accountLabelMap[label] = account;
+      }
+    }
+
     await customDialog(
       title: "Filter Transactions",
       child: ListView(
         padding: const EdgeInsets.all(15),
         shrinkWrap: true,
         children: [
+          // Bank Account filter
+          if (_accountLabelMap.isNotEmpty) ...[
+            _buildFilterDropdown(
+              label: 'Bank Account',
+              items: ['All', ..._accountLabelMap.keys],
+              dropDownKey: bankAccountDropdownKey,
+              selectedItem: _selectedBankAccountLabel,
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // Category filter
           _buildFilterDropdown(
-            label: "Category",
+            label: 'Category',
             items: ['All', ...categoryController.categories.map((e) => e.name)],
             dropDownKey: categoryDropdownKey,
+            selectedItem: _selectedCategory,
           ),
           const SizedBox(height: 16),
 
           // Type filter
           _buildFilterDropdown(
-            label: "Type",
+            label: 'Type',
             items: ['All', personalTransactionType, businessTransactionType],
             dropDownKey: typeDropdownKey,
+            selectedItem: _selectedType,
           ),
           const SizedBox(height: 16),
 
           // Amount Range filter
           _buildFilterDropdown(
-            label: "Amount Range",
+            label: 'Amount Range',
             items: [
               'All',
               'Under \$50',
@@ -96,6 +151,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
               'Over \$500',
             ],
             dropDownKey: amountRangeDropdownKey,
+            selectedItem: _selectedAmountRange,
           ),
           const SizedBox(height: 16),
 
@@ -146,11 +202,11 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     ).then((_) => setState(() {}));
   }
 
-  // TODO: Shahzad Please show the bank accounts in the filter dropdown and handle it inside query
   Widget _buildFilterDropdown({
     required String label,
     required List<String> items,
     required GlobalKey<DropdownSearchState<String>> dropDownKey,
+    String? selectedItem,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -160,8 +216,9 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
         CustomDropDownWidget<String>(
           dropDownKey: dropDownKey,
           label: label,
-          hint: "Select $label",
+          hint: 'Select $label',
           items: items,
+          selectedItem: selectedItem,
         ),
       ],
     );
@@ -171,10 +228,16 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
     categoryDropdownKey.currentState?.clear();
     typeDropdownKey.currentState?.clear();
     amountRangeDropdownKey.currentState?.clear();
+    bankAccountDropdownKey.currentState?.clear();
     setState(() {
       startDate = null;
       endDate = null;
-      searchQuery = "";
+      searchQuery = '';
+      _selectedCategory = null;
+      _selectedType = null;
+      _selectedAmountRange = null;
+      _selectedBankAccountLabel = null;
+      _selectedBankAccountId = null;
     });
   }
 
@@ -182,6 +245,7 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
       categoryDropdownKey.currentState?.getSelectedItem != null ||
       typeDropdownKey.currentState?.getSelectedItem != null ||
       amountRangeDropdownKey.currentState?.getSelectedItem != null ||
+      bankAccountDropdownKey.currentState?.getSelectedItem != null ||
       startDate != null ||
       searchQuery.isNotEmpty;
 
@@ -303,9 +367,13 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                                           ?.getSelectedItem,
                                       startDate: startDate,
                                       endDate: endDate,
+                                      bankAccountId: _selectedBankAccountId,
                                     );
                                   },
-                                  child: const Text("Load More"),
+                                  child: const Text(
+                                    "Load More",
+                                    style: TextStyle(color: Colors.black),
+                                  ),
                                 ),
                         );
                       }
