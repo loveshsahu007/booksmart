@@ -120,7 +120,7 @@ class _DateRangePickerWidgetState extends State<DateRangePickerWidget> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.date_range, color: colorScheme.secondary, size: 20),
+          Icon(Icons.date_range, size: 20),
           const SizedBox(width: 8),
           AppText(
             displayText,
