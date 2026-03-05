@@ -48,7 +48,7 @@ class CustomCircleAvatar extends StatelessWidget {
             imageUrl: imgUrl!,
             width: radius * 2,
             height: radius * 2,
-            fit: BoxFit.cover,
+            fit: BoxFit.fill,
             placeholder: (context, url) => Center(
               child: SizedBox(
                 width: radius * 0.4,

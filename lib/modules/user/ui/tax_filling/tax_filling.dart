@@ -1,6 +1,7 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/models/user_document_model.dart';
 import 'package:booksmart/modules/user/controllers/tax_document_controller.dart';
+import 'package:booksmart/modules/user/ui/tax_filling/document_access_requests_dialog.dart';
 import 'package:booksmart/modules/user/ui/tax_filling/upload_tax_doc_dialog.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
@@ -76,7 +77,7 @@ class _TaxFillingScreenState extends State<TaxFillingScreen> {
               spacing: 10,
               children: [
                 Expanded(
-                  flex: 4,
+                  flex: 5,
                   child: AppTextField(
                     hintText: 'Search documents…',
                     keyboardType: TextInputType.text,
@@ -94,6 +95,18 @@ class _TaxFillingScreenState extends State<TaxFillingScreen> {
                       horizontal: 6,
                     ),
                     onTapFunction: showUploadTaxDocumentDialog,
+                  ),
+                ),
+                Expanded(
+                  child: AppButton(
+                    radius: 8,
+                    buttonText: 'Accessible to',
+                    fontSize: 16,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 18,
+                      horizontal: 6,
+                    ),
+                    onTapFunction: showDocumentAccessRequestsDialog,
                   ),
                 ),
               ],

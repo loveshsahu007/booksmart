@@ -34,6 +34,7 @@ class TaxDocumentController extends GetxController {
   /// Loads all documents belonging to the current user.
   Future<void> fetchDocuments() async {
     final userId = supabase.auth.currentUser?.id;
+    print("******1* $userId");
     if (userId == null) return;
 
     try {
