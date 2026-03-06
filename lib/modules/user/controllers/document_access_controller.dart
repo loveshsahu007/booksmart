@@ -70,44 +70,64 @@ class DocumentAccessController extends GetxController {
     }
   }
 
-  /// Returns the request for [orderId] & [cpaId], or null if none exists.
-  Future<DocumentAccessRequest?> getRequest(int orderId, int cpaId) async {
+  /// Returns the request for [orderId] & [cpaId], or for [userId] & [cpaId] if orderId is null.
+  Future<DocumentAccessRequest?> getRequest({
+    int? orderId,
+    required int cpaId,
+    int? userId,
+  }) async {
     try {
-      final result = await supabase
+      var query = supabase
           .from(SupabaseTable.documentAccessRequests)
           .select(
             'id, order_id, cpa_id, user_id, status, requested_at, responded_at, created_at, updated_at',
           )
-          .eq('order_id', orderId)
-          .eq('cpa_id', cpaId)
-          .maybeSingle();
+          .eq('cpa_id', cpaId);
 
-      if (result == null) return null;
-      return DocumentAccessRequest.fromJson(result);
+      if (orderId != null) {
+        final data = await query.eq('order_id', orderId).maybeSingle();
+        if (data == null) return null;
+        return DocumentAccessRequest.fromJson(data);
+      } else if (userId != null) {
+        final list = await query
+            .eq('user_id', userId)
+            .order('created_at', ascending: false)
+            .limit(1);
+        final List dataList = list as List;
+        if (dataList.isEmpty) return null;
+        return DocumentAccessRequest.fromJson(dataList.first);
+      } else {
+        return null;
+      }
     } catch (e, st) {
       log('DocumentAccessController.getRequest error: $e\n$st');
       return null;
     }
   }
 
-  /// Sends a new access request from a CPA to a user for a given order.
+  /// Sends a new access request from a CPA to a user for a given order or lead.
   Future<bool> sendAccessRequest({
-    required int orderId,
+    int? orderId,
     required int cpaId,
     required int userId,
   }) async {
     try {
       isSending.value = true;
 
-      await supabase.from(SupabaseTable.documentAccessRequests).insert({
-        'order_id': orderId,
+      final data = <String, dynamic>{
         'cpa_id': cpaId,
         'user_id': userId,
         'status': 'pending',
         'requested_at': DateTime.now().toIso8601String(),
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
-      });
+      };
+
+      if (orderId != null) {
+        data['order_id'] = orderId;
+      }
+
+      await supabase.from(SupabaseTable.documentAccessRequests).insert(data);
 
       Get.snackbar('Request Sent', 'Document access request sent successfully');
       return true;

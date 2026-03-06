@@ -13,7 +13,7 @@ enum DocumentAccessStatus {
 
 class DocumentAccessRequest {
   final int id;
-  final int orderId;
+  final int? orderId;
   final int cpaId;
   final int userId;
   final DocumentAccessStatus status;
@@ -29,7 +29,7 @@ class DocumentAccessRequest {
 
   const DocumentAccessRequest({
     required this.id,
-    required this.orderId,
+    this.orderId,
     required this.cpaId,
     required this.userId,
     required this.status,
@@ -54,7 +54,7 @@ class DocumentAccessRequest {
     final cpaMap = json['cpa'] as Map<String, dynamic>?;
     return DocumentAccessRequest(
       id: json['id'] as int,
-      orderId: json['order_id'] as int,
+      orderId: json['order_id'] as int?,
       cpaId: json['cpa_id'] as int,
       userId: json['user_id'] as int,
       status: DocumentAccessStatus.fromString(
@@ -79,7 +79,7 @@ class DocumentAccessRequest {
   }
 
   Map<String, dynamic> toJson() => {
-    'order_id': orderId,
+    if (orderId != null) 'order_id': orderId,
     'cpa_id': cpaId,
     'user_id': userId,
     'status': status.name,

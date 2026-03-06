@@ -1,6 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/models/document_access_request_model.dart';
-import 'package:booksmart/models/order_model.dart';
+import 'package:booksmart/models/lead_model.dart';
 import 'package:booksmart/models/user_document_model.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/modules/user/controllers/document_access_controller.dart';
@@ -8,8 +8,8 @@ import 'package:booksmart/modules/user/controllers/tax_document_controller.dart'
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// Entry point — called from the "Documents" button in CpaOrderDetailScreen.
-void showUserDocumentsDialog({required OrderModel order}) {
+/// Entry point — called from the "Documents" button in LeadsScreenCPA.
+void showUserDocumentsDialog({required LeadModel lead}) {
   // Ensure controller is available
   if (!Get.isRegistered<DocumentAccessController>()) {
     Get.put(DocumentAccessController());
@@ -30,7 +30,7 @@ void showUserDocumentsDialog({required OrderModel order}) {
           constraints: const BoxConstraints(maxWidth: 480, maxHeight: 600),
           child: Material(
             color: Colors.transparent,
-            child: _UserDocumentsDialogContent(order: order),
+            child: _UserDocumentsDialogContent(lead: lead),
           ),
         ),
       );
@@ -48,8 +48,8 @@ Future<void> _launchUrl(String url) async {
 }
 
 class _UserDocumentsDialogContent extends StatefulWidget {
-  final OrderModel order;
-  const _UserDocumentsDialogContent({required this.order});
+  final LeadModel lead;
+  const _UserDocumentsDialogContent({required this.lead});
 
   @override
   State<_UserDocumentsDialogContent> createState() =>
@@ -73,7 +73,7 @@ class _UserDocumentsDialogContentState
 
   Future<void> _init() async {
     final cpaId = authPerson?.id ?? -1;
-    final req = await _ctrl.getRequest(widget.order.id, cpaId);
+    final req = await _ctrl.getRequest(cpaId: cpaId, userId: widget.lead.userId);
 
     if (!mounted) return;
 
@@ -86,8 +86,8 @@ class _UserDocumentsDialogContentState
     if (_hasAccess == true) {
       // Pass both so the controller can fallback if authId is missing
       await _ctrl.fetchUserDocuments(
-        numericId: widget.order.userId,
-        authId: widget.order.user?.authId,
+        numericId: widget.lead.userId,
+        authId: widget.lead.userWrapper?['auth_id'],
       );
     }
   }
@@ -104,15 +104,15 @@ class _UserDocumentsDialogContentState
     return _hasAccess == true
         ? _DocumentsGrantedView(ctrl: _ctrl)
         : _NoAccessView(
-            order: widget.order,
+            lead: widget.lead,
             ctrl: _ctrl,
             existingRequest: _existingRequest,
             onRequestSent: () => setState(() {
               _existingRequest = DocumentAccessRequest(
                 id: -1,
-                orderId: widget.order.id,
+                orderId: null,
                 cpaId: authPerson?.id ?? -1,
-                userId: widget.order.userId,
+                userId: widget.lead.userId,
                 status: DocumentAccessStatus.pending,
                 requestedAt: DateTime.now(),
                 createdAt: DateTime.now(),
@@ -244,13 +244,13 @@ class _DocTile extends StatelessWidget {
 // ── No access: show request button ───────────────────────────────────────────
 
 class _NoAccessView extends StatelessWidget {
-  final OrderModel order;
+  final LeadModel lead;
   final DocumentAccessController ctrl;
   final DocumentAccessRequest? existingRequest;
   final VoidCallback onRequestSent;
 
   const _NoAccessView({
-    required this.order,
+    required this.lead,
     required this.ctrl,
     required this.existingRequest,
     required this.onRequestSent,
@@ -343,9 +343,9 @@ class _NoAccessView extends StatelessWidget {
                     : () async {
                         final cpaId = authPerson?.id ?? -1;
                         final success = await ctrl.sendAccessRequest(
-                          orderId: order.id,
+                          // no orderId
                           cpaId: cpaId,
-                          userId: order.userId,
+                          userId: lead.userId,
                         );
                         if (success) {
                           onRequestSent();

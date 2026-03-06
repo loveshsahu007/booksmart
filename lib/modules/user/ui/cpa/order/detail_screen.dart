@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:booksmart/models/order_model.dart';
 import 'package:booksmart/modules/user/controllers/order_controller.dart';
-import 'package:booksmart/modules/user/ui/cpa/order/user_documents_dialog.dart';
 
 import '../../../../common/controllers/auth_controller.dart';
 
@@ -134,13 +133,6 @@ class CpaOrderDetailScreen extends StatelessWidget {
               textAlign: TextAlign.center,
               fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            if ((order.status.name.toUpperCase() == "ACCEPTED")) ...{
-              AppButton(
-                buttonText: "Documents",
-                onTapFunction: () => showUserDocumentsDialog(order: order),
-              ),
-            },
           ],
         ),
       ),

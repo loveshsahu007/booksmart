@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:jiffy/jiffy.dart';
 import '../../common/controllers/chat_controller.dart';
 import '../controllers/leads_controller.dart';
+import '../../user/ui/cpa/order/user_documents_dialog.dart';
 
 class LeadsScreenCPA extends StatelessWidget {
   const LeadsScreenCPA({super.key});
@@ -82,6 +83,18 @@ class LeadsScreenCPA extends StatelessWidget {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        height: 35,
+                        width: 100,
+                        child: AppButton(
+                          buttonText: "Documents",
+                          fontSize: 12,
+                          onTapFunction: () =>
+                              showUserDocumentsDialog(lead: lead),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
                       IconButton(
                         onPressed: () {
                           Get.find<ChatController>().loadChat(lead.userId);
