@@ -120,3 +120,93 @@ Future<Map<String, dynamic>?> syncBankTransactions(int bankId) async {
         return null;
       });
 }
+
+enum StripeCardAction {
+  create_setup_intent,
+  list_cards,
+  set_default_card,
+  delete_card,
+}
+
+/// Payload can be null if [action] is list_cards,
+Future<Map<String, dynamic>> handleStripeCardManagement({
+  required StripeCardAction action,
+  String? paymentMethodId,
+  bool isTestMode = true,
+}) async {
+  final String url =
+      'https://pvppwmkswnluidlwnnck.supabase.co/functions/v1/stripe_card_manager${isTestMode ? "?test=true" : ""}';
+
+  final session = supabase.auth.currentSession;
+  if (session == null) throw Exception("User not logged in");
+
+  final response = await GetConnect().post(
+    url,
+    jsonEncode({
+      'action': action.name,
+      'payload': paymentMethodId == null
+          ? {}
+          : {"payment_method_id": paymentMethodId},
+    }),
+    headers: {
+      'Authorization': 'Bearer ${supabase.auth.currentSession?.accessToken}',
+      'Content-Type': 'application/json',
+    },
+  );
+  log(response.bodyString ?? "handleStripeCardManagement ::: null");
+
+  if (response.statusCode != 200) {
+    throw Exception('Error: ${response.body}');
+  }
+
+  return jsonDecode(response.bodyString ?? "{}") as Map<String, dynamic>;
+}
+
+enum StripeBusinessAccountAction {
+  create_account,
+  start_onboarding,
+  open_dashboard,
+  get_business_account_info,
+}
+
+///
+/// {
+///   "success": true,
+///   "account_exists": true,
+///   "stripe_account_id": "acct_1T8pVpR84xNUdMa7",
+///   "onboarding_complete": true,
+///   "payouts_enabled": true,
+///   "charges_enabled": true,
+///   "pending_requirements": [],
+///   "balance_available": 0,
+///   "balance_pending": 0
+/// }
+Future<Map<String, dynamic>> callStripeCPA({
+  required StripeBusinessAccountAction action,
+  Map<String, dynamic>? payload,
+  bool isTestMode = true,
+}) async {
+  final session = supabase.auth.currentSession;
+  if (session == null) throw Exception("User not logged in");
+
+  final url = Uri.parse(
+    'https://pvppwmkswnluidlwnnck.supabase.co/functions/v1/stripe_connect${isTestMode ? "?test=true" : ""}',
+  );
+
+  final response = await GetConnect().post(
+    url.toString(),
+    jsonEncode({'action': action.name, 'payload': payload ?? {}}),
+    headers: {
+      'Authorization': 'Bearer ${supabase.auth.currentSession?.accessToken}',
+      'Content-Type': 'application/json',
+    },
+  );
+
+  log(response.bodyString ?? "callStripeCPA ::: null");
+
+  if (response.statusCode != 200) {
+    throw Exception(response.bodyString ?? 'Unknown error');
+  }
+
+  return jsonDecode(response.bodyString ?? '{}') as Map<String, dynamic>;
+}

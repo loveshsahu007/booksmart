@@ -2,6 +2,7 @@ import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/common/providers/auth_provider.dart';
 import 'package:booksmart/modules/cpa/ui/cpa_services.dart';
+import 'package:booksmart/modules/cpa/ui/stripe_account_screen.dart';
 import 'package:booksmart/routes/routes.dart';
 import 'package:booksmart/widgets/custom_circle_avatar.dart';
 import 'package:flutter/foundation.dart';
@@ -131,6 +132,10 @@ class _SettingsScreenCPAState extends State<SettingsScreenCPA> {
             activeThumbColor: colorScheme.primary,
           ),
 
+          const SizedBox(height: 10),
+          buildTile("Stripe Account", () {
+            goToStripeAccountScreen();
+          }),
           const SizedBox(height: 10),
 
           buildTile("Delete Account", () {}, isDestructive: true),

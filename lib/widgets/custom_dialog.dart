@@ -6,6 +6,7 @@ Future<T?> customDialog<T>({
   required Widget child,
   bool barrierDismissible = true,
   double? maxWidth = 600,
+  double? maxHeight,
   EdgeInsetsGeometry titleRowPadding = const EdgeInsets.symmetric(
     horizontal: 10,
     vertical: 10,
@@ -18,7 +19,10 @@ Future<T?> customDialog<T>({
       return Align(
         alignment: Alignment.center,
         child: Container(
-          constraints: BoxConstraints(maxWidth: maxWidth ?? double.infinity),
+          constraints: BoxConstraints(
+            maxWidth: maxWidth ?? double.infinity,
+            maxHeight: maxHeight ?? double.infinity,
+          ),
           margin: const EdgeInsets.all(30),
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,

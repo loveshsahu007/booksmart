@@ -12,6 +12,7 @@ import '../../../common/controllers/auth_controller.dart';
 //import '../../../../helpers/name_initial_helper.dart';
 import '../../../../routes/routes.dart';
 import '../../../../widgets/app_text.dart';
+import '../stripe/card_list_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -181,7 +182,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 10),
 
           buildTile("Banks", () {
-            goToBanksListScreen(shouldCloseBefore: false);
+            goToBanksListScreen();
+          }),
+          const SizedBox(height: 10),
+          buildTile("Cards", () {
+            goToCardListScreen();
           }),
           const SizedBox(height: 10),
 

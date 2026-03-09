@@ -19,8 +19,10 @@
 
 ## TODO
 - confirm transaction TYPE again, and also adjust it in case of PLAID ... 
+- add STRIPE_PROD_SECRET_KEY on supabase
 
 
 Plaid Test username
 username: user_good
 password: pass_good
+
