@@ -1,6 +1,10 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/models/user_base_model.dart';
+import 'package:booksmart/services/edge_functions.dart';
+import 'package:booksmart/widgets/confirmation_dialog.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
+import 'package:booksmart/widgets/loading.dart';
+import 'package:booksmart/widgets/snackbar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:booksmart/models/order_model.dart';
@@ -212,15 +216,38 @@ class CpaOrderDetailScreen extends StatelessWidget {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () async {
-                      await controller.updateOrderStatus(
-                        order.id,
-                        OrderStatus.accepted,
+                      showConfirmationDialog(
+                        title: "Are you sure!",
+                        description:
+                            "Please review all order details carefully. By clicking Accept, your default payment method will be charged. You can manage or update your payment details in Settings > Cards.",
+                        onYes: () async {
+                          Get.close(2); // confirmation dialog & order-detail
+                          showLoading();
+                          await processCpaOrderPayment(orderId: order.id).then((
+                            value,
+                          ) {
+                            dismissLoadingWidget();
+                            if (value == null) {
+                              showSnackBar(
+                                "Please wait while we process your payment. You can refresh the screen if the status doesn't update in a few moments, or wait for our notification.",
+                              );
+                              controller.fetchActiveOrders();
+                            } else {
+                              showSnackBar(value, isError: true);
+                            }
+                          });
+                        },
                       );
-                      if (kIsWeb) {
-                        Get.back();
-                      } else {
-                        Get.back();
-                      }
+
+                      // await controller.updateOrderStatus(
+                      //   order.id,
+                      //   OrderStatus.accepted,
+                      // );
+                      // if (kIsWeb) {
+                      //   Get.back();
+                      // } else {
+                      //   Get.back();
+                      // }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,

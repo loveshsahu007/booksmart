@@ -140,7 +140,7 @@ Future<Map<String, dynamic>> handleStripeCardManagement({
   final session = supabase.auth.currentSession;
   if (session == null) throw Exception("User not logged in");
 
-  final response = await GetConnect().post(
+  final response = await GetConnect(timeout: Duration(seconds: 30)).post(
     url,
     jsonEncode({
       'action': action.name,
@@ -181,7 +181,7 @@ enum StripeBusinessAccountAction {
 ///   "balance_available": 0,
 ///   "balance_pending": 0
 /// }
-Future<Map<String, dynamic>> callStripeCPA({
+Future<Map<String, dynamic>> stripeConnectCPA({
   required StripeBusinessAccountAction action,
   Map<String, dynamic>? payload,
   bool isTestMode = true,
@@ -209,4 +209,45 @@ Future<Map<String, dynamic>> callStripeCPA({
   }
 
   return jsonDecode(response.bodyString ?? '{}') as Map<String, dynamic>;
+}
+
+Future<String?> processCpaOrderPayment({
+  required int orderId,
+  bool isTestMode = true,
+}) async {
+  try {
+    final url = Uri.parse(
+      'https://pvppwmkswnluidlwnnck.supabase.co/functions/v1/cpa_order_payment${isTestMode ? "?test=true" : ""}',
+    );
+
+    final response = await GetConnect(timeout: const Duration(seconds: 30))
+        .post(
+          url.toString(),
+          jsonEncode({'order_id': orderId}),
+          headers: {
+            'Authorization':
+                'Bearer ${supabase.auth.currentSession?.accessToken}',
+            'Content-Type': 'application/json',
+          },
+        );
+
+    log(response.bodyString ?? "processCpaOrderPayment ::: null");
+
+    if (response.bodyString == null) {
+      return "Unable to process payment. Please try again.";
+    }
+
+    final Map<String, dynamic> data = jsonDecode(response.bodyString!);
+
+    if (response.isOk && data['success'] == true) {
+      return null;
+    }
+
+    return data['error'] ??
+        "Something went wrong while processing the payment.";
+  } catch (e, x) {
+    log(e.toString());
+    log(x.toString());
+    return "Something went wrong while processing the payment.";
+  }
 }

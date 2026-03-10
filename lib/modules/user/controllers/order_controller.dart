@@ -25,6 +25,12 @@ class OrderController extends GetxController {
   final activeOrders = <OrderModel>[].obs;
 
   @override
+  void onInit() {
+    super.onInit();
+    fetchActiveOrders();
+  }
+
+  @override
   void onClose() {
     titleController.dispose();
     descriptionController.dispose();

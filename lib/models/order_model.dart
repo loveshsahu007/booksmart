@@ -19,6 +19,7 @@ enum OrderStatus {
 enum StripePaymentStatus {
   unpaid,
   paid,
+  processing,
   failed,
   refunded;
 
@@ -56,6 +57,7 @@ class OrderModel {
   final DateTime? dueDate;
   final PersonModel? cpa;
   final PersonModel? user;
+
   final String? stripePaymentIntentId;
   final StripePaymentStatus paymentStatus;
   final DateTime? paidAt;

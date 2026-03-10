@@ -3,8 +3,22 @@ import 'package:booksmart/modules/user/controllers/order_controller.dart';
 import 'package:booksmart/modules/user/ui/cpa/components/cpa_order_card.dart';
 import 'package:get/get.dart';
 
-class OrdersScreenCPA extends StatelessWidget {
+class OrdersScreenCPA extends StatefulWidget {
   const OrdersScreenCPA({super.key});
+
+  @override
+  State<OrdersScreenCPA> createState() => _OrdersScreenCPAState();
+}
+
+class _OrdersScreenCPAState extends State<OrdersScreenCPA> {
+  @override
+  void initState() {
+    super.initState();
+
+    if (!Get.isRegistered<OrderController>()) {
+      Get.put(OrderController(), permanent: true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,10 +34,6 @@ class OrdersScreenCPA extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GetX<OrderController>(
-                init: OrderController(),
-                initState: (_) {
-                  Get.find<OrderController>().fetchActiveOrders();
-                },
                 builder: (controller) {
                   if (controller.isLoading.value) {
                     return const Center(child: CircularProgressIndicator());

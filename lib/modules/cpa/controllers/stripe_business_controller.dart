@@ -22,7 +22,7 @@ class StripeCPAController extends GetxController {
     try {
       loading.value = true;
 
-      final info = await callStripeCPA(
+      final info = await stripeConnectCPA(
         action: StripeBusinessAccountAction.get_business_account_info,
       );
 
@@ -39,7 +39,9 @@ class StripeCPAController extends GetxController {
     try {
       loading.value = true;
 
-      await callStripeCPA(action: StripeBusinessAccountAction.create_account);
+      await stripeConnectCPA(
+        action: StripeBusinessAccountAction.create_account,
+      );
 
       await loadAccount();
     } catch (e) {
@@ -49,7 +51,7 @@ class StripeCPAController extends GetxController {
 
   Future<void> startOnboarding() async {
     try {
-      final res = await callStripeCPA(
+      final res = await stripeConnectCPA(
         action: StripeBusinessAccountAction.start_onboarding,
       );
 
@@ -65,7 +67,7 @@ class StripeCPAController extends GetxController {
 
   Future<void> openDashboard() async {
     try {
-      final res = await callStripeCPA(
+      final res = await stripeConnectCPA(
         action: StripeBusinessAccountAction.open_dashboard,
       );
 

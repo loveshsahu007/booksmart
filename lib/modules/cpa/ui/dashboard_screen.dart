@@ -1,12 +1,9 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/widgets/custom_circle_avatar.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:get/get.dart';
-import 'package:jiffy/jiffy.dart';
 import '../../common/controllers/chat_controller.dart';
-import '../../common/ui/chat/chat_screen.dart';
-import '../../../models/user_base_model.dart';
 import '../controllers/leads_controller.dart';
+import 'components/lead_card.dart';
 
 class DashboardScreenCPA extends StatefulWidget {
   const DashboardScreenCPA({super.key});
@@ -83,23 +80,6 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
               },
             ),
 
-            // const SizedBox(height: 24),
-
-            // Wrap(
-            //   spacing: 10,
-            //   children: [
-            //     ElevatedButton(
-            //       onPressed: () {
-            //         goToOrderDetailScreenCPA();
-            //       },
-            //       child: const AppText(
-            //         "Order Detail Screen (Temp)",
-            //         fontSize: 14,
-            //         color: Colors.black,
-            //       ),
-            //     ),
-            //   ],
-            // ),
             const SizedBox(height: 24),
 
             // ==== LEADS MANAGEMENT CHART ====
@@ -127,11 +107,12 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
                   const SizedBox(height: 16),
                   Obx(() {
                     final data = leadsController.chartData;
-                    if (data.isEmpty)
+                    if (data.isEmpty) {
                       return const SizedBox(
                         height: 220,
                         child: Center(child: Text("No data")),
                       );
+                    }
 
                     return SizedBox(
                       height: 220,
@@ -250,79 +231,8 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final lead = displayLeads[index];
-                    final user = lead.userWrapper;
-                    final name = user != null
-                        ? "${user['first_name']} ${user['last_name']}"
-                        : "Unknown User";
 
-                    return Card(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 1.5,
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            CustomCircleAvatar(
-                              radius: 25,
-                              imgUrl: user!['img_url'],
-                              alternateText: user['first_name'],
-                            ),
-
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  AppText(
-                                    name,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                  AppText("Lead", fontSize: 12),
-                                  AppText(
-                                    'Received: ${Jiffy.parseFromDateTime(lead.createdAt.toLocal()).fromNow()}',
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            ElevatedButton(
-                              onPressed: () async {
-                                await chatController.loadChat(lead.userId);
-                                if (chatController.currentChat.value != null &&
-                                    lead.userWrapper != null) {
-                                  final otherUser = PersonModel.fromJson(
-                                    lead.userWrapper!,
-                                  );
-                                  goToChatScreen(otherUser);
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.amberAccent,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                              ),
-                              child: AppText(
-                                'Chat',
-                                color: Colors.black,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                    return LeadCard(lead: lead);
                   },
                 );
               },

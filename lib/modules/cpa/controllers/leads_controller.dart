@@ -8,7 +8,7 @@ import '../../../models/lead_model.dart';
 import '../../../models/user_base_model.dart';
 
 class LeadsController extends GetxController {
-  final leads = <LeadModel>[].obs;
+  final RxList<LeadModel> leads = <LeadModel>[].obs;
   final isLoading = false.obs;
 
   @override

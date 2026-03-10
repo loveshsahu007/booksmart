@@ -18,6 +18,10 @@ class CpaModel extends Core {
   final int? verifiedBy;
   final DateTime? verifiedAt;
 
+  final String? stripeBusinessAccountId;
+  final String? stripeAccountId;
+  final bool stripePayoutsEnabled;
+
   int get getExperienceInYears {
     if (careerStartDate == null) {
       return 0;
@@ -46,6 +50,9 @@ class CpaModel extends Core {
     required this.verificationStatus,
     required this.verifiedBy,
     required this.verifiedAt,
+    required this.stripeBusinessAccountId,
+    required this.stripeAccountId,
+    required this.stripePayoutsEnabled,
   });
 
   factory CpaModel.fromJson(Map<String, dynamic> json) {
@@ -86,6 +93,17 @@ class CpaModel extends Core {
       verifiedAt: DateTime.tryParse(
         handleResponseFromJson<String?>(json, "verified_at") ?? "",
       ),
+      stripeBusinessAccountId: handleResponseFromJson<String?>(
+        json,
+        "stripe_business_account_id",
+      ),
+      stripeAccountId: handleResponseFromJson<String?>(
+        json,
+        "stripe_account_id",
+      ),
+      stripePayoutsEnabled:
+          handleResponseFromJson<bool?>(json, "stripe_payouts_enabled") ??
+          false,
     );
   }
 
@@ -104,6 +122,9 @@ class CpaModel extends Core {
       "verification_status": verificationStatus,
       "verified_by": verifiedBy,
       "verified_at": verifiedAt?.toIso8601String(),
+      "stripe_business_account_id": stripeBusinessAccountId,
+      "stripe_account_id": stripeAccountId,
+      "stripe_payouts_enabled": stripePayoutsEnabled,
     });
   }
 }
