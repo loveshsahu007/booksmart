@@ -1,10 +1,10 @@
 import 'package:booksmart/models/lead_model.dart';
-import 'package:booksmart/modules/common/controllers/chat_controller.dart';
+import 'package:booksmart/models/user_base_model.dart';
+import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
 import 'package:booksmart/modules/user/ui/cpa/order/user_documents_dialog.dart';
 import 'package:booksmart/widgets/app_text.dart';
 import 'package:booksmart/widgets/custom_circle_avatar.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:jiffy/jiffy.dart';
 
 import '../../../../widgets/app_button.dart';
@@ -66,8 +66,10 @@ class _LeadCardState extends State<LeadCard> {
               ),
               const SizedBox(width: 4),
               IconButton(
-                onPressed: () async {
-                  await Get.find<ChatController>().loadChat(widget.lead.userId);
+                onPressed: () {
+                  final personData = Map<String, dynamic>.from(user);
+                  final person = PersonModel.fromJson(personData);
+                  goToChatScreen(person);
                 },
                 icon: const Icon(Icons.chat_bubble_outline),
                 tooltip: 'Chat',
