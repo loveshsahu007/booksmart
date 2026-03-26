@@ -86,7 +86,7 @@ class _LeadCardState extends State<LeadCard> {
 
   void _showUserDetailDialog(BuildContext context, Map<String, dynamic>? user) {
     customDialog(
-      title: 'User Detail Dialog',
+      title: 'User Details',
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         child: Column(
@@ -107,11 +107,7 @@ class _LeadCardState extends State<LeadCard> {
               ),
               if (user['email'] != null) ...[
                 const SizedBox(height: 4),
-                AppText(
-                  user['email'],
-                  fontSize: 14,
-                  color: Colors.grey,
-                ),
+                AppText(user['email'], fontSize: 14, color: Colors.grey),
               ],
               const SizedBox(height: 24),
             ] else ...[

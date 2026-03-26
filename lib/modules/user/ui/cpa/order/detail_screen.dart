@@ -34,18 +34,25 @@ void goToCpaOrderDetailScreen({
   }
 }
 
-class CpaOrderDetailScreen extends StatelessWidget {
+class CpaOrderDetailScreen extends StatefulWidget {
   final OrderModel order;
   const CpaOrderDetailScreen({super.key, required this.order});
 
   @override
-  Widget build(BuildContext context) {
-    // Ensure controller is found (it should be initialized in dashboard or upstream)
-    // If not, put it. safe check.
+  State<CpaOrderDetailScreen> createState() => _CpaOrderDetailScreenState();
+}
+
+class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
     if (!Get.isRegistered<OrderController>()) {
       Get.put(OrderController());
     }
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: kIsWeb ? null : AppBar(title: const Text("Order Details")),
       body: SingleChildScrollView(
@@ -57,17 +64,20 @@ class CpaOrderDetailScreen extends StatelessWidget {
             _buildOrderHeader(context),
             const SizedBox(height: 24),
             // CPA Info
-            if (order.cpa != null)
+            if (widget.order.cpa != null)
               ListTile(
                 leading: const CircleAvatar(
                   backgroundColor: Colors.grey,
                   child: Icon(Icons.person, color: Colors.white),
                 ),
-                title: Text("${order.cpa!.firstName} ${order.cpa!.lastName}"),
-                subtitle: Text(order.cpa!.email),
+                title: Text(
+                  "${widget.order.cpa!.firstName} ${widget.order.cpa!.lastName}",
+                ),
+                subtitle: Text(widget.order.cpa!.email),
                 trailing: IconButton(
                   onPressed: () {
                     // Open chat logic could be added here if we have context
+                    // TODO: user Get.context or implement chat without context
                   },
                   icon: const Icon(Icons.chat_bubble_outline),
                 ),
@@ -77,11 +87,12 @@ class CpaOrderDetailScreen extends StatelessWidget {
             _buildOrderInfoSection(context),
             const SizedBox(height: 24),
             // Description Section (was Deliverables, but Description is more generic for now)
-            if (order.description != null && order.description!.isNotEmpty)
+            if (widget.order.description != null &&
+                widget.order.description!.isNotEmpty)
               _buildDescriptionSection(context),
             const SizedBox(height: 24),
             // Action Buttons
-            if (order.status == OrderStatus.pending) ...{
+            if (widget.order.status == OrderStatus.pending) ...{
               if (authPerson?.role != UserRole.cpa)
                 _buildActionButtons(context),
               const SizedBox(height: 20),
@@ -95,10 +106,12 @@ class CpaOrderDetailScreen extends StatelessWidget {
   Widget _buildOrderHeader(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     Color statusColor = Colors.grey;
-    if (order.status == OrderStatus.completed) statusColor = Colors.green;
-    if (order.status == OrderStatus.pending) statusColor = Colors.orange;
-    if (order.status == OrderStatus.rejected ||
-        order.status == OrderStatus.cancelled) {
+    if (widget.order.status == OrderStatus.completed) {
+      statusColor = Colors.green;
+    }
+    if (widget.order.status == OrderStatus.pending) statusColor = Colors.orange;
+    if (widget.order.status == OrderStatus.rejected ||
+        widget.order.status == OrderStatus.cancelled) {
       statusColor = Colors.red;
     }
 
@@ -110,7 +123,7 @@ class CpaOrderDetailScreen extends StatelessWidget {
         child: Column(
           children: [
             AppText(
-              "Order #${order.id}",
+              "Order #${widget.order.id}",
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
@@ -123,7 +136,7 @@ class CpaOrderDetailScreen extends StatelessWidget {
                 border: Border.all(color: statusColor),
               ),
               child: AppText(
-                order.status.name.toUpperCase(),
+                widget.order.status.name.toUpperCase(),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: statusColor,
@@ -131,7 +144,7 @@ class CpaOrderDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             AppText(
-              order.title,
+              widget.order.title,
               fontSize: 16,
               color: colorScheme.onSurface,
               textAlign: TextAlign.center,
@@ -160,11 +173,14 @@ class CpaOrderDetailScreen extends StatelessWidget {
 
             child: Column(
               children: [
-                if (order.startDate != null)
-                  _buildInfoRow("Start Date", _formatDate(order.startDate!)),
-                if (order.dueDate != null)
-                  _buildInfoRow("Due Date", _formatDate(order.dueDate!)),
-                _buildInfoRow("Cost", "\$${order.amount}"),
+                if (widget.order.startDate != null)
+                  _buildInfoRow(
+                    "Start Date",
+                    _formatDate(widget.order.startDate!),
+                  ),
+                if (widget.order.dueDate != null)
+                  _buildInfoRow("Due Date", _formatDate(widget.order.dueDate!)),
+                _buildInfoRow("Cost", "\$${widget.order.amount}"),
               ],
             ),
           ),
@@ -182,7 +198,7 @@ class CpaOrderDetailScreen extends StatelessWidget {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(order.description!),
+            child: Text(widget.order.description!),
           ),
         ),
       ],
@@ -223,9 +239,9 @@ class CpaOrderDetailScreen extends StatelessWidget {
                         onYes: () async {
                           Get.close(2); // confirmation dialog & order-detail
                           showLoading();
-                          await processCpaOrderPayment(orderId: order.id).then((
-                            value,
-                          ) {
+                          await processCpaOrderPayment(
+                            orderId: widget.order.id,
+                          ).then((value) {
                             dismissLoadingWidget();
                             if (value == null) {
                               showSnackBar(
@@ -289,7 +305,7 @@ class CpaOrderDetailScreen extends StatelessWidget {
   }
 
   String _formatDate(DateTime date) {
-    return "${date.day}/${date.month}/${date.year}";
+    return "${date.month}/${date.day}/${date.year}";
   }
 
   void _showDeclineReasonDialog(
@@ -324,7 +340,7 @@ class CpaOrderDetailScreen extends StatelessWidget {
                     textColor: Colors.white,
                     onTapFunction: () async {
                       await controller.updateOrderStatus(
-                        order.id,
+                        widget.order.id,
                         OrderStatus.rejected,
                       );
                       Get.back(); // Close sheet

@@ -362,6 +362,7 @@ class _ProfileScreenCPAState extends State<ProfileScreenCPA> {
       showSnackBar(
         'Please agree to the terms and conditions',
         title: 'Agreement Required',
+        isError: true,
       );
       return;
     }

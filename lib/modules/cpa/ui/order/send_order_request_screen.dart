@@ -1,6 +1,8 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/helpers/currency_formatter.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:booksmart/widgets/custom_drop_down.dart';
+import 'package:booksmart/widgets/snackbar.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
@@ -103,6 +105,7 @@ class _SendOrderRequestScreenState extends State<SendOrderRequestScreen> {
                 hintText: "Enter total price (e.g., 750.00)",
                 maxLines: 1,
                 controller: _priceController,
+                inputFormatters: [CurrencyTextInputFormatter()],
               ),
 
               const SizedBox(height: 8),
@@ -360,39 +363,37 @@ class _SendOrderRequestScreenState extends State<SendOrderRequestScreen> {
   void _submitOrderRequest() {
     if (_formKey.currentState!.validate()) {
       if (_deliverables.isEmpty) {
-        Get.snackbar(
-          "Missing Deliverables",
+        showSnackBar(
           "Please add at least one deliverable",
-          snackPosition: SnackPosition.BOTTOM,
+          title: "Missing Deliverables",
+          isError: true,
         );
         return;
       }
 
       if (_orderExpiryDateTime == null) {
-        Get.snackbar(
-          "Missing Expiry Date",
+        showSnackBar(
           "Please select order expiry date and time",
-          snackPosition: SnackPosition.BOTTOM,
+          title: "Missing Expiry Date",
+          isError: true,
         );
         return;
       }
 
       if (_deliveryDateTime == null) {
-        Get.snackbar(
-          "Missing Delivery Date",
+        showSnackBar(
           "Please select delivery date",
-          snackPosition: SnackPosition.BOTTOM,
+          title: "Missing Delivery Date",
+          isError: true,
         );
         return;
       }
 
       // Success - Submit order request
       Get.back();
-      Get.snackbar(
-        "Order Request Sent!",
+      showSnackBar(
         "Your order request has been sent to the client successfully",
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 3),
+        title: "Order Request Sent!",
       );
     }
   }
