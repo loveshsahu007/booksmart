@@ -5,6 +5,8 @@ import 'package:booksmart/services/storage_service.dart';
 import 'package:booksmart/supabase/buckets.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/utils/supabase.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -77,13 +79,20 @@ class TaxDocumentController extends GetxController {
   /// Picks a file from the device gallery / file system.
   Future<void> pickFromDevice() async {
     try {
-      final picker = ImagePicker();
-      final file = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 90,
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: kIsWeb,
       );
-      if (file != null) {
-        pickedFile = file;
+      if (result != null && result.files.isNotEmpty) {
+        final platformFile = result.files.single;
+        if (kIsWeb && platformFile.bytes != null) {
+          pickedFile = XFile.fromData(
+            platformFile.bytes!,
+            name: platformFile.name,
+          );
+        } else if (platformFile.path != null) {
+          pickedFile = XFile(platformFile.path!);
+        }
         update(); // refresh dialog UI
       }
     } catch (e) {
@@ -154,7 +163,6 @@ class TaxDocumentController extends GetxController {
       // 4. Reset picked file and refresh list
       pickedFile = null;
       await fetchDocuments();
-      Get.snackbar('Success', 'Document uploaded successfully');
       return true;
     } catch (e, st) {
       log('TaxDocumentController.uploadDocument error: $e\n$st');
@@ -216,6 +224,16 @@ class TaxDocumentController extends GetxController {
     if (mime == null) return Icons.insert_drive_file;
     if (mime.startsWith('image/')) return Icons.image;
     if (mime == 'application/pdf') return Icons.picture_as_pdf;
+    if (mime.contains('word')) return Icons.description;
+    if (mime.contains('spreadsheet') ||
+        mime.contains('excel') ||
+        mime.contains('csv'))
+      return Icons.table_chart;
+    if (mime.contains('presentation') || mime.contains('powerpoint'))
+      return Icons.slideshow;
+    if (mime.contains('zip') || mime.contains('compressed'))
+      return Icons.folder_zip;
+    if (mime.startsWith('text/')) return Icons.text_snippet;
     return Icons.insert_drive_file;
   }
 }

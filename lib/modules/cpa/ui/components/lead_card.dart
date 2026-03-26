@@ -6,6 +6,9 @@ import 'package:booksmart/widgets/app_text.dart';
 import 'package:booksmart/widgets/custom_circle_avatar.dart';
 import 'package:flutter/material.dart';
 import 'package:jiffy/jiffy.dart';
+import 'package:get/get.dart';
+import 'package:booksmart/widgets/custom_dialog.dart';
+import 'package:booksmart/modules/cpa/ui/order/send_order_request_screen.dart';
 
 import '../../../../widgets/app_button.dart';
 
@@ -29,7 +32,7 @@ class _LeadCardState extends State<LeadCard> {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          // Navigate to lead details
+          _showUserDetailDialog(context, user);
         },
         child: Container(
           padding: const EdgeInsets.all(14),
@@ -76,6 +79,90 @@ class _LeadCardState extends State<LeadCard> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showUserDetailDialog(BuildContext context, Map<String, dynamic>? user) {
+    customDialog(
+      title: 'User Detail Dialog',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (user != null) ...[
+              CustomCircleAvatar(
+                radius: 40,
+                imgUrl: user['img_url'],
+                alternateText: user['first_name'],
+              ),
+              const SizedBox(height: 12),
+              AppText(
+                "${user['first_name']} ${user['last_name']}",
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+              if (user['email'] != null) ...[
+                const SizedBox(height: 4),
+                AppText(
+                  user['email'],
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+              ],
+              const SizedBox(height: 24),
+            ] else ...[
+              const AppText("Unknown User"),
+              const SizedBox(height: 24),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    buttonText: "Chat",
+                    fontSize: 12,
+                    onTapFunction: () {
+                      if (user != null) {
+                        Get.back();
+                        final personData = Map<String, dynamic>.from(user);
+                        final person = PersonModel.fromJson(personData);
+                        goToChatScreen(person);
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: AppButton(
+                    buttonText: "Documents",
+                    fontSize: 12,
+                    onTapFunction: () {
+                      Get.back();
+                      showUserDocumentsDialog(lead: widget.lead);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    buttonText: "Send Order Request",
+                    fontSize: 12,
+                    onTapFunction: () {
+                      Get.back();
+                      goToSendOrderRequestScreen();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
