@@ -11,6 +11,7 @@ import 'package:booksmart/models/order_model.dart';
 import 'package:booksmart/modules/user/controllers/order_controller.dart';
 
 import '../../../../common/controllers/auth_controller.dart';
+import '../../../../common/ui/chat/chat_screen.dart';
 
 void goToCpaOrderDetailScreen({
   bool shouldCloseBefore = false,
@@ -76,8 +77,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                 subtitle: Text(widget.order.cpa!.email),
                 trailing: IconButton(
                   onPressed: () {
-                    // Open chat logic could be added here if we have context
-                    // TODO: user Get.context or implement chat without context
+                    goToChatScreen(widget.order.cpa!);
                   },
                   icon: const Icon(Icons.chat_bubble_outline),
                 ),
