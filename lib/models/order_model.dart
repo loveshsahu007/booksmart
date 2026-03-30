@@ -6,7 +6,8 @@ enum OrderStatus {
   accepted,
   rejected,
   completed,
-  cancelled;
+  cancelled,
+  revision;
 
   static OrderStatus fromString(String status) {
     return OrderStatus.values.firstWhere(
@@ -69,6 +70,17 @@ class OrderModel {
   final DateTime? cpaPaidAt;
   final String? stripeTransferId;
 
+  final int? cancelledBy;
+  final String? cancellationReason;
+  final DateTime? cancelledAt;
+
+  final String? deliverMessage;
+  final DateTime? deliverAt;
+
+  final String? userReviewMessage;
+  final double? userReviewStars;
+  final DateTime? userReviewAt;
+
   OrderModel({
     required this.id,
     required this.cpaId,
@@ -93,6 +105,17 @@ class OrderModel {
     required this.cpaPayoutStatus,
     this.cpaPaidAt,
     this.stripeTransferId,
+
+    this.cancelledBy,
+    this.cancellationReason,
+    this.cancelledAt,
+
+    this.deliverMessage,
+    this.deliverAt,
+
+    this.userReviewMessage,
+    this.userReviewStars,
+    this.userReviewAt,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -159,6 +182,32 @@ class OrderModel {
         json,
         "stripe_transfer_id",
       ),
+
+      cancelledBy: handleResponseFromJson<int>(json, "cancelled_by"),
+      cancellationReason: handleResponseFromJson<String>(
+        json,
+        "cancellation_reason",
+      ),
+      cancelledAt: DateTime.tryParse(
+        handleResponseFromJson<String>(json, "cancelled_at") ?? "",
+      ),
+
+      deliverMessage: handleResponseFromJson<String>(json, "deliver_message"),
+      deliverAt: DateTime.tryParse(
+        handleResponseFromJson<String>(json, "deliver_at") ?? "",
+      ),
+
+      userReviewMessage: handleResponseFromJson<String>(
+        json,
+        "user_review_message",
+      ),
+      userReviewStars: (handleResponseFromJson<num>(
+        json,
+        "user_review_stars",
+      ))?.toDouble(),
+      userReviewAt: DateTime.tryParse(
+        handleResponseFromJson<String>(json, "user_review_at") ?? "",
+      ),
     );
   }
 
@@ -179,10 +228,22 @@ class OrderModel {
       "payment_status": paymentStatus.name,
       "paid_at": paidAt?.toIso8601String(),
       "platform_fee": platformFee,
+
       "cpa_payout_amount": cpaPayoutAmount,
       "cpa_payout_status": cpaPayoutStatus.name,
       "cpa_paid_at": cpaPaidAt?.toIso8601String(),
       "stripe_transfer_id": stripeTransferId,
+
+      "cancelled_by": cancelledBy,
+      "cancellation_reason": cancellationReason,
+      "cancelled_at": cancelledAt?.toIso8601String(),
+
+      "deliver_message": deliverMessage,
+      "deliver_at": deliverAt?.toIso8601String(),
+
+      "user_review_message": userReviewMessage,
+      "user_review_stars": userReviewStars,
+      "user_review_at": userReviewAt?.toIso8601String(),
     };
   }
 }

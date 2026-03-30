@@ -1,10 +1,12 @@
 import 'dart:developer';
 
 import 'package:booksmart/models/user_document_model.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/services/storage_service.dart';
 import 'package:booksmart/supabase/buckets.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/utils/supabase.dart';
+import 'package:booksmart/widgets/snackbar.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -35,8 +37,8 @@ class TaxDocumentController extends GetxController {
 
   /// Loads all documents belonging to the current user.
   Future<void> fetchDocuments() async {
-    final userId = supabase.auth.currentUser?.id;
-    print("******1* $userId");
+    final int? userId = authUser?.id;
+
     if (userId == null) return;
 
     try {
@@ -110,17 +112,17 @@ class TaxDocumentController extends GetxController {
     String? taxYear,
     String? category,
   }) async {
-    final userId = supabase.auth.currentUser?.id;
+    final int? userId = authUser?.id;
     if (userId == null) {
-      Get.snackbar('Error', 'User not authenticated');
+      showSnackBar('User not authenticated', isError: true);
       return false;
     }
     if (pickedFile == null) {
-      Get.snackbar('Error', 'Please select a file first');
+      showSnackBar('Please select a file first', isError: true);
       return false;
     }
     if (name.trim().isEmpty) {
-      Get.snackbar('Error', 'Please enter a document name');
+      showSnackBar('Please enter a document name', isError: true);
       return false;
     }
 
@@ -227,12 +229,15 @@ class TaxDocumentController extends GetxController {
     if (mime.contains('word')) return Icons.description;
     if (mime.contains('spreadsheet') ||
         mime.contains('excel') ||
-        mime.contains('csv'))
+        mime.contains('csv')) {
       return Icons.table_chart;
-    if (mime.contains('presentation') || mime.contains('powerpoint'))
+    }
+    if (mime.contains('presentation') || mime.contains('powerpoint')) {
       return Icons.slideshow;
-    if (mime.contains('zip') || mime.contains('compressed'))
+    }
+    if (mime.contains('zip') || mime.contains('compressed')) {
       return Icons.folder_zip;
+    }
     if (mime.startsWith('text/')) return Icons.text_snippet;
     return Icons.insert_drive_file;
   }

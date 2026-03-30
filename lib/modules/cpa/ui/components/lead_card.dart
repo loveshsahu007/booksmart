@@ -56,18 +56,8 @@ class _LeadCardState extends State<LeadCard> {
                   ],
                 ),
               ),
+
               const SizedBox(width: 8),
-              SizedBox(
-                height: 35,
-                width: 100,
-                child: AppButton(
-                  buttonText: "Documents",
-                  fontSize: 12,
-                  onTapFunction: () =>
-                      showUserDocumentsDialog(lead: widget.lead),
-                ),
-              ),
-              const SizedBox(width: 4),
               IconButton(
                 onPressed: () {
                   final personData = Map<String, dynamic>.from(user);

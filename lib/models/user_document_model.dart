@@ -1,6 +1,6 @@
 class UserDocument {
   final int id;
-  final String userId;
+  final int userId;
   final String name;
   final String fileUrl;
   final String? category;
@@ -8,6 +8,9 @@ class UserDocument {
   final int? fileSize; // bytes
   final String? mimeType;
   final DateTime createdAt;
+
+  final int? cpaId;
+  final String? orderId;
 
   const UserDocument({
     required this.id,
@@ -19,12 +22,14 @@ class UserDocument {
     this.fileSize,
     this.mimeType,
     required this.createdAt,
+    this.cpaId,
+    this.orderId,
   });
 
   factory UserDocument.fromJson(Map<String, dynamic> json) {
     return UserDocument(
       id: json['id'] as int,
-      userId: json['user_id'] as String,
+      userId: json['user_id'] as int,
       name: json['name'] as String,
       fileUrl: json['file_url'] as String,
       category: json['category'] as String?,
@@ -32,6 +37,8 @@ class UserDocument {
       fileSize: json['file_size'] as int?,
       mimeType: json['mime_type'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
+      cpaId: json['cpa_id'] as int?,
+      orderId: json['order_id'] as String?,
     );
   }
 
@@ -43,6 +50,8 @@ class UserDocument {
     if (taxYear != null) 'tax_year': taxYear,
     if (fileSize != null) 'file_size': fileSize,
     if (mimeType != null) 'mime_type': mimeType,
+    if (cpaId != null) 'cpa_id': cpaId,
+    if (orderId != null) 'order_id': orderId,
   };
 
   /// Human-readable file size (e.g. "2.34 MB").

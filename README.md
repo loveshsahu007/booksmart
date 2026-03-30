@@ -22,7 +22,7 @@
 - add STRIPE_PROD_SECRET_KEY on supabase
 
 
-Plaid Test username
+Plaid Test username.
 username: user_good
 password: pass_good
 
