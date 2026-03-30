@@ -75,6 +75,8 @@ class _CpaDetailScreenState extends State<CpaDetailScreen> {
 
             const SizedBox(height: 20),
 
+            // TODO: show the CPA liscence number under the name of CPA
+
             // Services Section
             _buildServicesSection(scheme),
 

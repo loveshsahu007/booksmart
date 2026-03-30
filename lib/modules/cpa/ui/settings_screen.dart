@@ -138,7 +138,7 @@ class _SettingsScreenCPAState extends State<SettingsScreenCPA> {
           }),
           const SizedBox(height: 10),
 
-          buildTile("Delete Account", () {}, isDestructive: true),
+          buildTile("Delete Account", () {}),
           const SizedBox(height: 10),
 
           buildTile("Logout", () {

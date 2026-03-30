@@ -74,17 +74,34 @@ const List<String> cpaSpecialtyOptions = [
   'Multi-State Taxation',
   'International Tax',
   'Trusts & Estates',
+  'CFO Services',
   'Cryptocurrency Taxation',
   'Sales & Use Tax',
   'Payroll Tax Compliance',
   'Tax Strategy & Planning',
-  'Bookkeeping Clean-up',
+  'Bookkeeping & Accounting',
   'Audit & Assurance',
   'Financial Planning',
   'Estate Planning',
   'Business Valuation',
   'IRS Representation',
   'Non-Profit Accounting',
+];
+
+const List<String> cpaServices = [
+  'Tax Preparation and Filing',
+  'Tax Planning and Strategy',
+  'Bookkeeping and Accounting',
+  'CFO Services',
+  'Financial Reporting/Valuation Services',
+  'Corporate and Business Services',
+  'Payroll and Employment Taxes',
+  'Audit and Assurance',
+  'International Tax Services',
+  'Compliance and Regulatory',
+  'Estate and Trust Tax Services',
+  'Forensic Accounting',
+  'Other',
 ];
 
 const String personalTransactionType = "Personal";

@@ -189,11 +189,12 @@ class _RequestTile extends StatelessWidget {
 
           // ── Action buttons (only for pending) ─────────────────────────────
           if (request.status == DocumentAccessStatus.pending)
-            Padding(
+            Container(
+              alignment: Alignment.centerRight,
               padding: const EdgeInsets.only(top: 12),
               child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Spacer(),
                   // Reject
                   OutlinedButton.icon(
                     onPressed: () => ctrl.updateStatus(
@@ -202,6 +203,9 @@ class _RequestTile extends StatelessWidget {
                     ),
                     icon: const Icon(Icons.close, size: 16),
                     label: const Text('Reject'),
+
+                    // TODO: for dark version, border and text should be white
+                    // for light-mode it should be grey
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red,
                       side: const BorderSide(color: Colors.red),

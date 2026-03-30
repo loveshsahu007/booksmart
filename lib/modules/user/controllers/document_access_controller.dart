@@ -194,48 +194,20 @@ class DocumentAccessController extends GetxController {
 
   /// Fetches documents for a user.
   ///
-  /// Since `user_documents.user_id` stores the auth UUID (String),
-  /// and our orders store numeric IDs (int), we first ensure we have the UUID.
-  Future<void> fetchUserDocuments({int? numericId, String? authId}) async {
+  Future<void> fetchUserDocuments(int userId) async {
     try {
       isLoading.value = true;
       userDocuments.clear();
 
-      String? targetAuthId = authId;
-
-      // If authId is missing but we have numericId, resolve it first
-      if ((targetAuthId == null || targetAuthId.isEmpty) && numericId != null) {
-        log(
-          'DocumentAccessController: resolving auth_id for numericId $numericId',
-        );
-        final userRow = await supabase
-            .from(SupabaseTable.user)
-            .select('auth_id')
-            .eq('id', numericId)
-            .maybeSingle();
-        targetAuthId = userRow?['auth_id'] as String?;
-      }
-
-      if (targetAuthId == null || targetAuthId.isEmpty) {
-        log(
-          '❌ DocumentAccessController: could not determine authId (UUID) for query. numericId: $numericId',
-        );
-        return;
-      }
-
-      log(
-        '🔍 DocumentAccessController: fetching documents for authId (UUID): $targetAuthId',
-      );
-
       final result = await supabase
           .from(SupabaseTable.userDocuments)
           .select()
-          .eq('user_id', targetAuthId)
+          .eq('user_id', userId)
           .order('created_at', ascending: false);
 
       final List data = result as List;
       log(
-        '✅ DocumentAccessController: query success. Found ${data.length} documents for $targetAuthId',
+        '✅ DocumentAccessController: query success. Found ${data.length} documents for $userId',
       );
 
       userDocuments.value = data.map((e) => UserDocument.fromJson(e)).toList();

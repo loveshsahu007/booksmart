@@ -73,7 +73,10 @@ class _UserDocumentsDialogContentState
 
   Future<void> _init() async {
     final cpaId = authPerson?.id ?? -1;
-    final req = await _ctrl.getRequest(cpaId: cpaId, userId: widget.lead.userId);
+    final req = await _ctrl.getRequest(
+      cpaId: cpaId,
+      userId: widget.lead.userId,
+    );
 
     if (!mounted) return;
 
@@ -85,10 +88,7 @@ class _UserDocumentsDialogContentState
 
     if (_hasAccess == true) {
       // Pass both so the controller can fallback if authId is missing
-      await _ctrl.fetchUserDocuments(
-        numericId: widget.lead.userId,
-        authId: widget.lead.userWrapper?['auth_id'],
-      );
+      await _ctrl.fetchUserDocuments(widget.lead.userId);
     }
   }
 
