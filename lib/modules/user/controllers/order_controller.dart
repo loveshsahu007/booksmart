@@ -8,6 +8,9 @@ import 'package:booksmart/utils/supabase.dart';
 import 'package:get/get.dart';
 import '../../../models/order_model.dart';
 import '../../common/controllers/chat_controller.dart';
+import 'package:booksmart/services/storage_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:booksmart/supabase/buckets.dart';
 
 import 'package:booksmart/models/user_base_model.dart';
 
@@ -20,6 +23,7 @@ class OrderController extends GetxController {
   final amountController = TextEditingController();
   final startDate = Rx<DateTime?>(null);
   final dueDate = Rx<DateTime?>(null);
+  final selectedServices = <String>[].obs;
 
   // Active orders list (for user dashboard)
   final activeOrders = <OrderModel>[].obs;
@@ -62,6 +66,7 @@ class OrderController extends GetxController {
         'status': OrderStatus.pending.name,
         'start_date': startDate.value?.toIso8601String(),
         'due_date': dueDate.value?.toIso8601String(),
+        'services': selectedServices.toList(),
       };
 
       final result = await SupabaseCrudService.insert(
@@ -110,6 +115,7 @@ class OrderController extends GetxController {
     amountController.clear();
     startDate.value = null;
     dueDate.value = null;
+    selectedServices.clear();
   }
 
   Future<void> fetchActiveOrders() async {
@@ -167,6 +173,46 @@ class OrderController extends GetxController {
     } catch (e) {
       log("Error updating order status: $e");
       Get.snackbar("Error", "Failed to update status");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> deliverOrder({
+    required int orderId,
+    required String message,
+    required List<XFile> files,
+  }) async {
+    try {
+      isLoading.value = true;
+      List<String> uploadedUrls = [];
+      for (var f in files) {
+        final url = await uploadFileToSupabaseStorage(
+          file: f,
+          bucketName: SupabaseStorageBucket.documents,
+        );
+        if (url != null) {
+          uploadedUrls.add(url);
+        }
+      }
+
+      await SupabaseCrudService.update(
+        table: SupabaseTable.orders,
+        data: {
+          'status': OrderStatus.delivered.name,
+          'deliver_message': message,
+          'deliver_at': DateTime.now().toIso8601String(),
+          'delivery_files': uploadedUrls,
+        },
+        filters: {'id': orderId},
+      );
+
+      await fetchActiveOrders();
+      Get.back(); // close dialog
+      Get.snackbar("Success", "Order delivered successfully!");
+    } catch (e) {
+      log("Error delivering order: $e");
+      Get.snackbar("Error", "Failed to deliver order");
     } finally {
       isLoading.value = false;
     }

@@ -236,6 +236,49 @@ class _RequestTile extends StatelessWidget {
                 ],
               ),
             ),
+
+          // ── Action buttons (only for accepted) ────────────────────────────
+          if (request.status == DocumentAccessStatus.accepted)
+            Container(
+              alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(top: 12),
+              child: GestureDetector(
+                onTap: () => ctrl.updateStatus(
+                  request.id,
+                  DocumentAccessStatus.rejected,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    // Using red with low opacity for the background to match the "rejected" theme
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.remove_circle_outline,
+                        size: 13,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(width: 4),
+                      const Text(
+                        'Remove Access',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

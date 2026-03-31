@@ -7,7 +7,8 @@ enum OrderStatus {
   rejected,
   completed,
   cancelled,
-  revision;
+  revision,
+  delivered;
 
   static OrderStatus fromString(String status) {
     return OrderStatus.values.firstWhere(
@@ -76,6 +77,8 @@ class OrderModel {
 
   final String? deliverMessage;
   final DateTime? deliverAt;
+  final List<String> services;
+  final List<String>? deliveryFiles;
 
   final String? userReviewMessage;
   final double? userReviewStars;
@@ -112,6 +115,8 @@ class OrderModel {
 
     this.deliverMessage,
     this.deliverAt,
+    this.services = const [],
+    this.deliveryFiles,
 
     this.userReviewMessage,
     this.userReviewStars,
@@ -196,6 +201,13 @@ class OrderModel {
       deliverAt: DateTime.tryParse(
         handleResponseFromJson<String>(json, "deliver_at") ?? "",
       ),
+      services: (json['services'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      deliveryFiles: (json['delivery_files'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
 
       userReviewMessage: handleResponseFromJson<String>(
         json,
@@ -240,6 +252,8 @@ class OrderModel {
 
       "deliver_message": deliverMessage,
       "deliver_at": deliverAt?.toIso8601String(),
+      "services": services,
+      "delivery_files": deliveryFiles,
 
       "user_review_message": userReviewMessage,
       "user_review_stars": userReviewStars,

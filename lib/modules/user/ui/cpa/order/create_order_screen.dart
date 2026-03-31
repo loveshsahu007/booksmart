@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../../../widgets/custom_dialog.dart';
+import 'package:booksmart/widgets/multiple_selection_dropdown_widget.dart';
+import 'package:dropdown_search/dropdown_search.dart';
+import 'package:booksmart/constant/data.dart';
 
 void goToCreateOrderCPAScreen({
   required int userId,
@@ -44,6 +47,7 @@ class CreateOrderScreen extends StatefulWidget {
 
 class _CreateOrderScreenState extends State<CreateOrderScreen> {
   final OrderController controller = Get.put(OrderController());
+  final _servicesDropDownKey = GlobalKey<DropdownSearchState<String>>();
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +90,24 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               hintText: "Amount (\$)",
               labelText: "Amount",
               keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "Select CPA Services",
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            Obx(
+              () => CustomMultiDropDownWidget<String>(
+                dropDownKey: _servicesDropDownKey,
+                items: cpaServices,
+                selectedItems: controller.selectedServices.toList(),
+                onChanged: (values) {
+                  controller.selectedServices.value = values;
+                },
+                hint: "Select services",
+                showSearchBox: true,
+              ),
             ),
             const SizedBox(height: 16),
             _buildDatePicker(

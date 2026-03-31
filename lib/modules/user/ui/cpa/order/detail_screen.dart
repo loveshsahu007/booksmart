@@ -12,6 +12,9 @@ import 'package:booksmart/modules/user/controllers/order_controller.dart';
 
 import '../../../../common/controllers/auth_controller.dart';
 import '../../../../common/ui/chat/chat_screen.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void goToCpaOrderDetailScreen({
   bool shouldCloseBefore = false,
@@ -91,12 +94,100 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                 widget.order.description!.isNotEmpty)
               _buildDescriptionSection(context),
             const SizedBox(height: 24),
+            // Delivery Details Section
+            if ((widget.order.deliverMessage != null &&
+                    widget.order.deliverMessage!.isNotEmpty) ||
+                (widget.order.deliveryFiles != null &&
+                    widget.order.deliveryFiles!.isNotEmpty))
+              _buildDeliveryDetailsSection(context),
             // Action Buttons
-            if (widget.order.status == OrderStatus.pending) ...{
+            if (widget.order.status == OrderStatus.pending) ...[
               if (authPerson?.role != UserRole.cpa)
                 _buildActionButtons(context),
               const SizedBox(height: 20),
-            },
+            ],
+            if ((widget.order.status == OrderStatus.accepted ||
+                    widget.order.status == OrderStatus.revision) &&
+                authPerson?.role == UserRole.cpa) ...[
+              SizedBox(
+                width: double.infinity,
+                child: AppButton(
+                  buttonText: widget.order.status == OrderStatus.revision
+                      ? "Re-Deliver Order"
+                      : "Deliver Order",
+                  onTapFunction: () {
+                    _showDeliverOrderDialog(
+                      context,
+                      isReDelivery: widget.order.status == OrderStatus.revision,
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+            if (widget.order.status == OrderStatus.delivered &&
+                authPerson?.role != UserRole.cpa) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        // User rejects delivery
+                        showConfirmationDialog(
+                          title: "Reject Delivery",
+                          description:
+                              "Are you sure you want to reject this delivery and ask for revision?",
+                          onYes: () async {
+                            Get.back(); // close dialog
+                            await Get.find<OrderController>().updateOrderStatus(
+                              widget.order.id,
+                              OrderStatus.revision,
+                            );
+                          },
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const AppText("Reject Delivery", fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        // User accepts delivery
+                        showConfirmationDialog(
+                          title: "Accept Delivery",
+                          description:
+                              "Are you sure you want to accept this delivery? The order will be marked as completed.",
+                          onYes: () async {
+                            Get.back(); // close dialog
+                            await Get.find<OrderController>().updateOrderStatus(
+                              widget.order.id,
+                              OrderStatus.completed,
+                            );
+                          },
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const AppText(
+                        "Accept Delivery",
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
           ],
         ),
       ),
@@ -181,6 +272,54 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                 if (widget.order.dueDate != null)
                   _buildInfoRow("Due Date", _formatDate(widget.order.dueDate!)),
                 _buildInfoRow("Cost", "\$${widget.order.amount}"),
+                if (widget.order.services.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(
+                    height: 10,
+                  ), // changed to 10 to be safe before too, but brackets fix it
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      AppText(
+                        "Services",
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: widget.order.services.map((e) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Theme.of(
+                                  context,
+                                ).primaryColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                e,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Theme.of(context).primaryColor,
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -196,11 +335,75 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
         AppText("  Description", fontSize: 14, fontWeight: FontWeight.bold),
         const SizedBox(height: 8),
         Card(
+          margin: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Text(widget.order.description!),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildDeliveryDetailsSection(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppText(
+          "  Delivery Details",
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+        ),
+        const SizedBox(height: 8),
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.order.deliverMessage != null &&
+                    widget.order.deliverMessage!.isNotEmpty) ...[
+                  Text(widget.order.deliverMessage!),
+                  const SizedBox(height: 16),
+                ],
+                if (widget.order.deliveryFiles != null &&
+                    widget.order.deliveryFiles!.isNotEmpty) ...[
+                  AppText(
+                    "Attached Files",
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: widget.order.deliveryFiles!.map((url) {
+                      final uri = Uri.tryParse(url);
+                      final filename =
+                          uri?.pathSegments.last.split('_').last ?? "Document";
+                      return ActionChip(
+                        label: Text(
+                          filename,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        avatar: const Icon(Icons.download, size: 16),
+                        onPressed: () async {
+                          if (uri != null && await canLaunchUrl(uri)) {
+                            await launchUrl(uri);
+                          } else {
+                            Get.snackbar("Error", "Could not open file link.");
+                          }
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -353,6 +556,144 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
             const SizedBox(height: 10),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDeliverOrderDialog(
+    BuildContext context, {
+    bool isReDelivery = false,
+  }) {
+    if (kIsWeb) {
+      customDialog(
+        child: DeliverOrderWidget(
+          orderId: widget.order.id,
+          isReDelivery: isReDelivery,
+        ),
+        title: isReDelivery ? "Re-Deliver Order" : "Deliver Order",
+        barrierDismissible: true,
+      );
+    } else {
+      Get.to(
+        () => Scaffold(
+          appBar: AppBar(
+            title: Text(isReDelivery ? "Re-Deliver Order" : "Deliver Order"),
+          ),
+          body: SingleChildScrollView(
+            child: DeliverOrderWidget(
+              orderId: widget.order.id,
+              isReDelivery: isReDelivery,
+            ),
+          ),
+        ),
+      );
+    }
+  }
+}
+
+class DeliverOrderWidget extends StatefulWidget {
+  final int orderId;
+  final bool isReDelivery;
+
+  const DeliverOrderWidget({
+    super.key,
+    required this.orderId,
+    this.isReDelivery = false,
+  });
+
+  @override
+  State<DeliverOrderWidget> createState() => _DeliverOrderWidgetState();
+}
+
+class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
+  final _messageController = TextEditingController();
+  final List<XFile> _selectedFiles = [];
+
+  void _pickFiles() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        withData: true, // Need bytes for web upload!
+      );
+      if (result != null) {
+        setState(() {
+          _selectedFiles.addAll(
+            result.files.map((f) {
+              return XFile.fromData(f.bytes!, name: f.name, path: f.path);
+            }),
+          );
+        });
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Error picking files: $e");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = Get.find<OrderController>();
+    return Container(
+      padding: const EdgeInsets.all(20),
+      width: kIsWeb ? 500 : double.infinity,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppTextField(
+            controller: _messageController,
+            hintText: "Add a description or message...",
+            labelText: "Delivery Message",
+            maxLines: 4,
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            "Attachments",
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          if (_selectedFiles.isNotEmpty)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _selectedFiles.map((file) {
+                return Chip(
+                  label: Text(file.name),
+                  onDeleted: () {
+                    setState(() {
+                      _selectedFiles.remove(file);
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _pickFiles,
+            icon: const Icon(Icons.attach_file),
+            label: const Text("Select Files"),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            child: Obx(
+              () => AppButton(
+                buttonText: "Deliver",
+                isLoading: controller.isLoading.value,
+                onTapFunction: () async {
+                  if (_messageController.text.trim().isEmpty) {
+                    Get.snackbar("Error", "Please add a delivery message");
+                    return;
+                  }
+                  await controller.deliverOrder(
+                    orderId: widget.orderId,
+                    message: _messageController.text.trim(),
+                    files: _selectedFiles,
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
