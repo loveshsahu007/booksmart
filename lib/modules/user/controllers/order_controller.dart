@@ -13,6 +13,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:booksmart/supabase/buckets.dart';
 
 import 'package:booksmart/models/user_base_model.dart';
+import 'package:booksmart/modules/user/controllers/tax_document_controller.dart';
 
 class OrderController extends GetxController {
   final isLoading = false.obs;
@@ -182,13 +183,52 @@ class OrderController extends GetxController {
     required int orderId,
     required String message,
     required List<XFile> files,
+    List<Map<String, dynamic>>? fileMetadata, // Optional metadata for each file
+    int? clientUserId, // Client's user ID for proper categorization
   }) async {
     try {
       isLoading.value = true;
       List<String> uploadedUrls = [];
-      for (var f in files) {
+
+      final taxDocCtrl = Get.isRegistered<TaxDocumentController>()
+          ? Get.find<TaxDocumentController>()
+          : Get.put(TaxDocumentController());
+
+      final cpaId = Get.find<AuthController>().person?.id;
+
+      for (int i = 0; i < files.length; i++) {
+        final file = files[i];
+        final metadata = (fileMetadata != null && i < fileMetadata.length)
+            ? fileMetadata[i]
+            : null;
+
+        if (metadata != null && clientUserId != null) {
+          // Use the formal upload with metadata
+          final success = await taxDocCtrl.uploadDocument(
+            name: metadata['name'] ?? file.name,
+            taxYear: metadata['year'],
+            category: metadata['category'],
+            userId: clientUserId,
+            orderId: orderId,
+            cpaId: cpaId,
+            manualFile: file,
+          );
+
+          if (success) {
+            // We need the URL. Since uploadDocument doesn't return it directly,
+            // we might need to modify it or fetch the latest.
+            // However, the current behavior of deliverOrder is to save URLs in delivery_files.
+            // Let's assume for now we still want those URLs in the order record.
+            // I'll modify uploadDocument to return the URL? No, let's just use the formal flow.
+            
+            // To get the URL, I'll perform a quick select or modify uploadDocument.
+            // For now, let's just use the direct upload for the order status but formal for the docs.
+          }
+        }
+
+        // We still need the URLs for the order record's delivery_files column
         final url = await uploadFileToSupabaseStorage(
-          file: f,
+          file: file,
           bucketName: SupabaseStorageBucket.documents,
         );
         if (url != null) {

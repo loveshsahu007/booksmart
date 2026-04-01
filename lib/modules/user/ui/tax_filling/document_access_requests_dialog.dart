@@ -151,14 +151,21 @@ class _RequestTile extends StatelessWidget {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: Colors.indigo.withValues(alpha: 0.15),
-                child: Text(
-                  _initials(request.cpaFullName),
-                  style: const TextStyle(
-                    color: Colors.indigo,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
+                backgroundImage: (request.cpaImageUrl != null &&
+                        request.cpaImageUrl!.isNotEmpty)
+                    ? NetworkImage(request.cpaImageUrl!)
+                    : null,
+                child: (request.cpaImageUrl == null ||
+                        request.cpaImageUrl!.isEmpty)
+                    ? Text(
+                        _initials(request.cpaFullName),
+                        style: const TextStyle(
+                          color: Colors.indigo,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      )
+                    : null,
               ),
               const SizedBox(width: 12),
               Expanded(

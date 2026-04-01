@@ -10,7 +10,7 @@ class UserDocument {
   final DateTime createdAt;
 
   final int? cpaId;
-  final String? orderId;
+  final int? orderId;
 
   const UserDocument({
     required this.id,
@@ -38,7 +38,7 @@ class UserDocument {
       mimeType: json['mime_type'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       cpaId: json['cpa_id'] as int?,
-      orderId: json['order_id'] as String?,
+      orderId: json['order_id'] as int?,
     );
   }
 

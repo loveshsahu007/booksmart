@@ -1,5 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/models/user_base_model.dart';
+import 'package:booksmart/modules/user/ui/cpa/order/components/metadata_dialog.dart';
 import 'package:booksmart/services/edge_functions.dart';
 import 'package:booksmart/widgets/confirmation_dialog.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
@@ -13,7 +14,6 @@ import 'package:booksmart/modules/user/controllers/order_controller.dart';
 import '../../../../common/controllers/auth_controller.dart';
 import '../../../../common/ui/chat/chat_screen.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void goToCpaOrderDetailScreen({
@@ -70,9 +70,9 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
             // CPA Info
             if (widget.order.cpa != null)
               ListTile(
-                leading: const CircleAvatar(
+                leading: CircleAvatar(
                   backgroundColor: Colors.grey,
-                  child: Icon(Icons.person, color: Colors.white),
+                  backgroundImage: NetworkImage(widget.order.cpa!.imgUrl),
                 ),
                 title: Text(
                   "${widget.order.cpa!.firstName} ${widget.order.cpa!.lastName}",
@@ -89,7 +89,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
             // Order Information
             _buildOrderInfoSection(context),
             const SizedBox(height: 24),
-            // Description Section (was Deliverables, but Description is more generic for now)
+            // Description Section
             if (widget.order.description != null &&
                 widget.order.description!.isNotEmpty)
               _buildDescriptionSection(context),
@@ -132,13 +132,12 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () {
-                        // User rejects delivery
                         showConfirmationDialog(
                           title: "Reject Delivery",
                           description:
                               "Are you sure you want to reject this delivery and ask for revision?",
                           onYes: () async {
-                            Get.back(); // close dialog
+                            Get.back();
                             await Get.find<OrderController>().updateOrderStatus(
                               widget.order.id,
                               OrderStatus.revision,
@@ -158,13 +157,12 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        // User accepts delivery
                         showConfirmationDialog(
                           title: "Accept Delivery",
                           description:
                               "Are you sure you want to accept this delivery? The order will be marked as completed.",
                           onYes: () async {
-                            Get.back(); // close dialog
+                            Get.back();
                             await Get.find<OrderController>().updateOrderStatus(
                               widget.order.id,
                               OrderStatus.completed,
@@ -210,7 +208,6 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(10),
-
         child: Column(
           children: [
             AppText(
@@ -251,7 +248,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppText(
+        const AppText(
           " Order Information",
           fontSize: 16,
           fontWeight: FontWeight.bold,
@@ -261,7 +258,6 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
           clipBehavior: Clip.antiAlias,
           child: Container(
             padding: const EdgeInsets.all(16),
-
             child: Column(
               children: [
                 if (widget.order.startDate != null)
@@ -275,9 +271,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                 if (widget.order.services.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Divider(),
-                  const SizedBox(
-                    height: 10,
-                  ), // changed to 10 to be safe before too, but brackets fix it
+                  const SizedBox(height: 10),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -332,7 +326,11 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppText("  Description", fontSize: 14, fontWeight: FontWeight.bold),
+        const AppText(
+          "  Description",
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+        ),
         const SizedBox(height: 8),
         Card(
           margin: EdgeInsets.zero,
@@ -349,7 +347,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        AppText(
+        const AppText(
           "  Delivery Details",
           fontSize: 14,
           fontWeight: FontWeight.bold,
@@ -369,7 +367,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                 ],
                 if (widget.order.deliveryFiles != null &&
                     widget.order.deliveryFiles!.isNotEmpty) ...[
-                  AppText(
+                  const AppText(
                     "Attached Files",
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
@@ -420,7 +418,6 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      // Decline order
                       _showDeclineReasonDialog(context, controller);
                     },
                     style: OutlinedButton.styleFrom(
@@ -438,9 +435,9 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                       showConfirmationDialog(
                         title: "Are you sure!",
                         description:
-                            "Please review all order details carefully. By clicking Accept, your default payment method will be charged. You can manage or update your payment details in Settings > Cards.",
+                            "Please review all order details carefully. By clicking Accept, your default payment method will be charged.",
                         onYes: () async {
-                          Get.close(2); // confirmation dialog & order-detail
+                          Get.close(2);
                           showLoading();
                           await processCpaOrderPayment(
                             orderId: widget.order.id,
@@ -448,7 +445,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                             dismissLoadingWidget();
                             if (value == null) {
                               showSnackBar(
-                                "Please wait while we process your payment. You can refresh the screen if the status doesn't update in a few moments, or wait for our notification.",
+                                "Please wait while we process your payment.",
                               );
                               controller.fetchActiveOrders();
                             } else {
@@ -457,16 +454,6 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                           });
                         },
                       );
-
-                      // await controller.updateOrderStatus(
-                      //   order.id,
-                      //   OrderStatus.accepted,
-                      // );
-                      // if (kIsWeb) {
-                      //   Get.back();
-                      // } else {
-                      //   Get.back();
-                      // }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
@@ -523,7 +510,11 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppText("Decline Order", fontSize: 18, fontWeight: FontWeight.bold),
+            const AppText(
+              "Decline Order",
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
             const SizedBox(height: 16),
             const Text("Are you sure you want to decline this order?"),
             const SizedBox(height: 20),
@@ -546,8 +537,8 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                         widget.order.id,
                         OrderStatus.rejected,
                       );
-                      Get.back(); // Close sheet
-                      Get.back(); // Close screen
+                      Get.back();
+                      Get.back();
                     },
                   ),
                 ),
@@ -607,22 +598,24 @@ class DeliverOrderWidget extends StatefulWidget {
 
 class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
   final _messageController = TextEditingController();
-  final List<XFile> _selectedFiles = [];
+  final List<DocumentMetadata> _selectedDocuments = [];
 
   void _pickFiles() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
-        withData: true, // Need bytes for web upload!
+        withData: true,
       );
       if (result != null) {
-        setState(() {
-          _selectedFiles.addAll(
-            result.files.map((f) {
-              return XFile.fromData(f.bytes!, name: f.name, path: f.path);
-            }),
-          );
-        });
+        for (var f in result.files) {
+          final xFile = XFile.fromData(f.bytes!, name: f.name, path: f.path);
+          final metadata = await showDocumentMetadataDialog(file: xFile);
+          if (metadata != null) {
+            setState(() {
+              _selectedDocuments.add(metadata);
+            });
+          }
+        }
       }
     } catch (e) {
       Get.snackbar("Error", "Error picking files: $e");
@@ -651,16 +644,16 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          if (_selectedFiles.isNotEmpty)
+          if (_selectedDocuments.isNotEmpty)
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: _selectedFiles.map((file) {
+              children: _selectedDocuments.map((doc) {
                 return Chip(
-                  label: Text(file.name),
+                  label: Text(doc.name),
                   onDeleted: () {
                     setState(() {
-                      _selectedFiles.remove(file);
+                      _selectedDocuments.remove(doc);
                     });
                   },
                 );
@@ -687,7 +680,19 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
                   await controller.deliverOrder(
                     orderId: widget.orderId,
                     message: _messageController.text.trim(),
-                    files: _selectedFiles,
+                    files: _selectedDocuments.map((e) => e.file).toList(),
+                    fileMetadata: _selectedDocuments
+                        .map(
+                          (e) => {
+                            'name': e.name,
+                            'year': e.year,
+                            'category': e.category,
+                          },
+                        )
+                        .toList(),
+                    clientUserId: controller.activeOrders
+                        .firstWhere((o) => o.id == widget.orderId)
+                        .userId,
                   );
                 },
               ),

@@ -332,11 +332,13 @@ class _NoAccessView extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Button — shown only if no pending/rejected request
-          if (!isPending && !isRejected)
+          if (!isPending)
             Obx(
               () => AppButton(
                 buttonText: ctrl.isSending.value
                     ? 'Sending…'
+                    : isRejected
+                    ? 'Re-Send Document Access Request'
                     : 'Send Document Access Request',
                 onTapFunction: ctrl.isSending.value
                     ? null
@@ -354,7 +356,7 @@ class _NoAccessView extends StatelessWidget {
               ),
             ),
 
-          if (isPending || isRejected)
+          if (isPending)
             AppButton(buttonText: 'Close', onTapFunction: () => Get.back()),
         ],
       ),

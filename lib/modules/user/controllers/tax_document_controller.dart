@@ -111,13 +111,19 @@ class TaxDocumentController extends GetxController {
     required String name,
     String? taxYear,
     String? category,
+    int? userId,
+    int? orderId,
+    int? cpaId,
+    XFile? manualFile,
   }) async {
-    final int? userId = authUser?.id;
-    if (userId == null) {
+    final int? effectiveUserId = userId ?? authUser?.id;
+    if (effectiveUserId == null) {
       showSnackBar('User not authenticated', isError: true);
       return false;
     }
-    if (pickedFile == null) {
+
+    final XFile? fileToUpload = manualFile ?? pickedFile;
+    if (fileToUpload == null) {
       showSnackBar('Please select a file first', isError: true);
       return false;
     }
@@ -131,7 +137,7 @@ class TaxDocumentController extends GetxController {
 
       // 1. Upload to Storage
       final fileUrl = await uploadFileToSupabaseStorage(
-        file: pickedFile!,
+        file: fileToUpload,
         bucketName: SupabaseStorageBucket.documents,
       );
 
@@ -143,19 +149,21 @@ class TaxDocumentController extends GetxController {
       // 2. Get file size
       int? fileSize;
       try {
-        final bytes = await pickedFile!.readAsBytes();
+        final bytes = await fileToUpload.readAsBytes();
         fileSize = bytes.length;
       } catch (_) {}
 
       // 3. Insert DB row
       final payload = <String, dynamic>{
-        'user_id': userId,
+        'user_id': effectiveUserId,
         'name': name.trim(),
         'file_url': fileUrl,
         if (taxYear != null && taxYear.isNotEmpty) 'tax_year': taxYear,
         if (category != null && category.isNotEmpty) 'category': category,
         if (fileSize != null) 'file_size': fileSize,
-        'mime_type': _guessMime(pickedFile!.name),
+        if (orderId != null) 'order_id': orderId,
+        if (cpaId != null) 'cpa_id': cpaId,
+        'mime_type': _guessMime(fileToUpload.name),
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };
@@ -163,7 +171,9 @@ class TaxDocumentController extends GetxController {
       await supabase.from(SupabaseTable.userDocuments).insert(payload);
 
       // 4. Reset picked file and refresh list
-      pickedFile = null;
+      if (manualFile == null) {
+        pickedFile = null;
+      }
       await fetchDocuments();
       return true;
     } catch (e, st) {

@@ -36,7 +36,7 @@ class DocumentAccessController extends GetxController {
           .from(SupabaseTable.documentAccessRequests)
           .select(
             'id, order_id, cpa_id, user_id, status, requested_at, responded_at, created_at, updated_at,'
-            'cpa:cpa_id(first_name, last_name, email)',
+            'cpa:cpa_id(first_name, last_name, email, img_url)',
           )
           .eq('user_id', _currentNumericId())
           .order('created_at', ascending: false);
@@ -179,6 +179,7 @@ class DocumentAccessController extends GetxController {
           cpaFirstName: old.cpaFirstName,
           cpaLastName: old.cpaLastName,
           cpaEmail: old.cpaEmail,
+          cpaImageUrl: old.cpaImageUrl,
         );
         requests.refresh();
       }

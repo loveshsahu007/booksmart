@@ -26,6 +26,7 @@ class DocumentAccessRequest {
   final String? cpaFirstName;
   final String? cpaLastName;
   final String? cpaEmail;
+  final String? cpaImageUrl;
 
   const DocumentAccessRequest({
     required this.id,
@@ -40,6 +41,7 @@ class DocumentAccessRequest {
     this.cpaFirstName,
     this.cpaLastName,
     this.cpaEmail,
+    this.cpaImageUrl,
   });
 
   String get cpaFullName {
@@ -75,6 +77,7 @@ class DocumentAccessRequest {
       cpaFirstName: cpaMap?['first_name'] as String?,
       cpaLastName: cpaMap?['last_name'] as String?,
       cpaEmail: cpaMap?['email'] as String?,
+      cpaImageUrl: cpaMap?['img_url'] as String?,
     );
   }
 
