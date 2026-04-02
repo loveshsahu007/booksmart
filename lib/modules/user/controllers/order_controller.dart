@@ -9,11 +9,11 @@ import 'package:get/get.dart';
 import '../../../models/order_model.dart';
 import '../../common/controllers/chat_controller.dart';
 import 'package:booksmart/services/storage_service.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:booksmart/supabase/buckets.dart';
 
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/user/controllers/tax_document_controller.dart';
+import 'package:booksmart/widgets/snackbar.dart';
 
 class OrderController extends GetxController {
   final isLoading = false.obs;
@@ -202,37 +202,31 @@ class OrderController extends GetxController {
             ? fileMetadata[i]
             : null;
 
+        String? finalUrl;
+
+        // 1. Try formal upload with metadata if available
         if (metadata != null && clientUserId != null) {
-          // Use the formal upload with metadata
-          final success = await taxDocCtrl.uploadDocument(
+          finalUrl = await taxDocCtrl.uploadDocument(
             name: metadata['name'] ?? file.name,
-            taxYear: metadata['year'],
+            taxYear: metadata['year']?.toString(),
             category: metadata['category'],
             userId: clientUserId,
             orderId: orderId,
             cpaId: cpaId,
             manualFile: file,
           );
-
-          if (success) {
-            // We need the URL. Since uploadDocument doesn't return it directly,
-            // we might need to modify it or fetch the latest.
-            // However, the current behavior of deliverOrder is to save URLs in delivery_files.
-            // Let's assume for now we still want those URLs in the order record.
-            // I'll modify uploadDocument to return the URL? No, let's just use the formal flow.
-            
-            // To get the URL, I'll perform a quick select or modify uploadDocument.
-            // For now, let's just use the direct upload for the order status but formal for the docs.
-          }
         }
 
-        // We still need the URLs for the order record's delivery_files column
-        final url = await uploadFileToSupabaseStorage(
-          file: file,
-          bucketName: SupabaseStorageBucket.documents,
-        );
-        if (url != null) {
-          uploadedUrls.add(url);
+        // 2. Fallback to direct upload if not already uploaded or if metadata was missing
+        if (finalUrl == null) {
+          finalUrl = await uploadFileToSupabaseStorage(
+            file: file,
+            bucketName: SupabaseStorageBucket.documents,
+          );
+        }
+
+        if (finalUrl != null) {
+          uploadedUrls.add(finalUrl);
         }
       }
 
@@ -248,11 +242,15 @@ class OrderController extends GetxController {
       );
 
       await fetchActiveOrders();
-      Get.back(); // close dialog
-      Get.snackbar("Success", "Order delivered successfully!");
+
+      // Close dialog first
+      Get.back();
+
+      // Show success message using the safer showSnackBar helper
+      showSnackBar("Order delivered successfully!");
     } catch (e) {
       log("Error delivering order: $e");
-      Get.snackbar("Error", "Failed to deliver order");
+      showSnackBar("Failed to deliver order", isError: true);
     } finally {
       isLoading.value = false;
     }

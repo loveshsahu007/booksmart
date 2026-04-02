@@ -1,6 +1,7 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/widgets/custom_drop_down.dart';
 import 'package:dropdown_search/dropdown_search.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
@@ -21,7 +22,7 @@ class DocumentMetadata {
 }
 
 Future<DocumentMetadata?> showDocumentMetadataDialog({
-  required XFile file,
+  XFile? file,
 }) async {
   return await Get.generalDialog<DocumentMetadata>(
     pageBuilder: (context, animation, secondaryAnimation) {
@@ -30,27 +31,27 @@ Future<DocumentMetadata?> showDocumentMetadataDialog({
         child: Container(
           margin: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             color: Get.isDarkMode
                 ? Get.theme.colorScheme.surface
                 : Colors.white,
           ),
-          constraints: const BoxConstraints(maxWidth: 400),
+          constraints: const BoxConstraints(maxWidth: 450),
           child: Material(
             color: Colors.transparent,
-            child: _MetadataDialogContent(file: file),
+            child: _MetadataDialogContent(initialFile: file),
           ),
         ),
       );
     },
-    barrierDismissible: false,
+    barrierDismissible: true,
     barrierLabel: 'showDocumentMetadataDialog',
   );
 }
 
 class _MetadataDialogContent extends StatefulWidget {
-  final XFile file;
-  const _MetadataDialogContent({required this.file});
+  final XFile? initialFile;
+  const _MetadataDialogContent({this.initialFile});
 
   @override
   State<_MetadataDialogContent> createState() => _MetadataDialogContentState();
@@ -69,13 +70,19 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
   final categoryDropdownKey = GlobalKey<DropdownSearchState<String>>();
   late final TextEditingController nameCtrl;
 
+  XFile? selectedFile;
   String? selectedYear;
   String? selectedCategory;
 
   @override
   void initState() {
     super.initState();
-    nameCtrl = TextEditingController(text: path.basenameWithoutExtension(widget.file.name));
+    selectedFile = widget.initialFile;
+    nameCtrl = TextEditingController(
+      text: selectedFile != null
+          ? path.basenameWithoutExtension(selectedFile!.name)
+          : '',
+    );
   }
 
   @override
@@ -84,53 +91,123 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
     super.dispose();
   }
 
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        withData: true,
+      );
+      if (result != null && result.files.single.bytes != null) {
+        final f = result.files.single;
+        setState(() {
+          selectedFile = XFile.fromData(f.bytes!, name: f.name, path: f.path);
+          if (nameCtrl.text.isEmpty) {
+            nameCtrl.text = path.basenameWithoutExtension(f.name);
+          }
+        });
+      }
+    } catch (e) {
+      Get.snackbar("Error", "Error picking file: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const AppText(
-            'Document Details',
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
+          const Center(
+            child: AppText(
+              'Add Document to Delivery',
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-          const SizedBox(height: 15),
-          
-          // File Name Display
-          Row(
-            children: [
-              const Icon(Icons.attach_file, size: 16),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  widget.file.name,
-                  style: const TextStyle(fontSize: 13, color: Colors.grey),
-                  overflow: TextOverflow.ellipsis,
+          const SizedBox(height: 20),
+
+          // File Status/Pick Button
+          if (selectedFile == null)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _pickFile,
+                icon: const Icon(Icons.cloud_upload_outlined),
+                label: const Text('Pick Document File'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 15),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.insert_drive_file, color: Colors.blue),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          selectedFile!.name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const Text(
+                          'Selected File',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _pickFile,
+                    child: const Text('Change'),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 20),
 
           AppTextField(
             controller: nameCtrl,
             hintText: 'Document Name *',
+            labelText: 'Document Name',
             keyboardType: TextInputType.name,
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
           CustomDropDownWidget<String>(
             dropDownKey: yearDropdownKey,
             label: 'Tax Year',
             hint: 'Select Year',
             items: const [
-              '2029', '2028', '2027', '2026', '2025', '2024', '2023', '2022',
+              '2029',
+              '2028',
+              '2027',
+              '2026',
+              '2025',
+              '2024',
+              '2023',
+              '2022',
             ],
             onChanged: (v) => setState(() => selectedYear = v),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
           CustomDropDownWidget<String>(
             dropDownKey: categoryDropdownKey,
@@ -139,21 +216,28 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
             items: categories,
             onChanged: (v) => setState(() => selectedCategory = v),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 28),
 
           Row(
-            spacing: 10,
+            spacing: 12,
             children: [
               Expanded(
-                child: AppButton(
-                  buttonText: 'Cancel',
-                  onTapFunction: () => Get.back(),
+                child: OutlinedButton(
+                  onPressed: () => Get.back(),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('Cancel'),
                 ),
               ),
               Expanded(
                 child: AppButton(
-                  buttonText: 'Proceed',
+                  buttonText: 'Process',
                   onTapFunction: () {
+                    if (selectedFile == null) {
+                      Get.snackbar('Error', 'Please select a file first');
+                      return;
+                    }
                     if (nameCtrl.text.trim().isEmpty) {
                       Get.snackbar('Error', 'Please enter a document name');
                       return;
@@ -163,7 +247,7 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
                         name: nameCtrl.text.trim(),
                         year: selectedYear,
                         category: selectedCategory,
-                        file: widget.file,
+                        file: selectedFile!,
                       ),
                     );
                   },

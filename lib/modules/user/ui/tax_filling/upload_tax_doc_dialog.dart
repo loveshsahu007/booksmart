@@ -75,12 +75,12 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
   }
 
   Future<void> _save() async {
-    final success = await _ctrl.uploadDocument(
+    final fileUrl = await _ctrl.uploadDocument(
       name: nameCtrl.text,
       taxYear: selectedYear,
       category: selectedCategory,
     );
-    if (success) {
+    if (fileUrl != null) {
       Get.back();
       showSnackBar('Document Uploaded Successfully');
     }

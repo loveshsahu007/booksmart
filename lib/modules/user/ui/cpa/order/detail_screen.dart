@@ -13,7 +13,6 @@ import 'package:booksmart/modules/user/controllers/order_controller.dart';
 
 import '../../../../common/controllers/auth_controller.dart';
 import '../../../../common/ui/chat/chat_screen.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void goToCpaOrderDetailScreen({
@@ -602,20 +601,11 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
 
   void _pickFiles() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        withData: true,
-      );
-      if (result != null) {
-        for (var f in result.files) {
-          final xFile = XFile.fromData(f.bytes!, name: f.name, path: f.path);
-          final metadata = await showDocumentMetadataDialog(file: xFile);
-          if (metadata != null) {
-            setState(() {
-              _selectedDocuments.add(metadata);
-            });
-          }
-        }
+      final metadata = await showDocumentMetadataDialog();
+      if (metadata != null) {
+        setState(() {
+          _selectedDocuments.add(metadata);
+        });
       }
     } catch (e) {
       Get.snackbar("Error", "Error picking files: $e");
@@ -645,17 +635,30 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
           ),
           const SizedBox(height: 8),
           if (_selectedDocuments.isNotEmpty)
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            Column(
               children: _selectedDocuments.map((doc) {
-                return Chip(
-                  label: Text(doc.name),
-                  onDeleted: () {
-                    setState(() {
-                      _selectedDocuments.remove(doc);
-                    });
-                  },
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.description, size: 20),
+                    title: Text(doc.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text(
+                      [
+                        if (doc.category != null) doc.category!,
+                        if (doc.year != null) doc.year!,
+                      ].join(' · '),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                      onPressed: () {
+                        setState(() {
+                          _selectedDocuments.remove(doc);
+                        });
+                      },
+                    ),
+                  ),
                 );
               }).toList(),
             ),

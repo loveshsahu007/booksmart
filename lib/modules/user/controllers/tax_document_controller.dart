@@ -103,11 +103,8 @@ class TaxDocumentController extends GetxController {
     }
   }
 
-  /// Uploads [pickedFile] to the `documents` bucket, then inserts a row in
-  /// `user_documents`. Refreshes the list on success.
-  ///
-  /// Returns `true` on success, `false` otherwise.
-  Future<bool> uploadDocument({
+  /// Returns the `fileUrl` on success, `null` otherwise.
+  Future<String?> uploadDocument({
     required String name,
     String? taxYear,
     String? category,
@@ -119,17 +116,17 @@ class TaxDocumentController extends GetxController {
     final int? effectiveUserId = userId ?? authUser?.id;
     if (effectiveUserId == null) {
       showSnackBar('User not authenticated', isError: true);
-      return false;
+      return null;
     }
 
     final XFile? fileToUpload = manualFile ?? pickedFile;
     if (fileToUpload == null) {
       showSnackBar('Please select a file first', isError: true);
-      return false;
+      return null;
     }
     if (name.trim().isEmpty) {
       showSnackBar('Please enter a document name', isError: true);
-      return false;
+      return null;
     }
 
     try {
@@ -142,8 +139,8 @@ class TaxDocumentController extends GetxController {
       );
 
       if (fileUrl == null || fileUrl.isEmpty) {
-        Get.snackbar('Error', 'Upload failed. Try again.');
-        return false;
+        showSnackBar('Upload failed. Try again.', isError: true);
+        return null;
       }
 
       // 2. Get file size
@@ -175,11 +172,11 @@ class TaxDocumentController extends GetxController {
         pickedFile = null;
       }
       await fetchDocuments();
-      return true;
+      return fileUrl;
     } catch (e, st) {
       log('TaxDocumentController.uploadDocument error: $e\n$st');
-      Get.snackbar('Error', 'Failed to upload document: $e');
-      return false;
+      showSnackBar('Failed to upload document: $e', isError: true);
+      return null;
     } finally {
       isUploading.value = false;
     }

@@ -193,6 +193,29 @@ class DocumentAccessController extends GetxController {
     }
   }
 
+  /// Deletes a request (used when user rejects or removes access).
+  Future<void> deleteRequest(int requestId) async {
+    try {
+      isLoading.value = true;
+
+      await supabase
+          .from(SupabaseTable.documentAccessRequests)
+          .delete()
+          .eq('id', requestId);
+
+      // Update local list
+      requests.removeWhere((r) => r.id == requestId);
+      requests.refresh();
+
+      Get.snackbar('Deleted', 'Access request removed');
+    } catch (e, st) {
+      log('DocumentAccessController.deleteRequest error: $e\n$st');
+      Get.snackbar('Error', 'Failed to delete request');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   /// Fetches documents for a user.
   ///
   Future<void> fetchUserDocuments(int userId) async {

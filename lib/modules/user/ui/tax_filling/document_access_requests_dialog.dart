@@ -151,11 +151,13 @@ class _RequestTile extends StatelessWidget {
               CircleAvatar(
                 radius: 20,
                 backgroundColor: Colors.indigo.withValues(alpha: 0.15),
-                backgroundImage: (request.cpaImageUrl != null &&
+                backgroundImage:
+                    (request.cpaImageUrl != null &&
                         request.cpaImageUrl!.isNotEmpty)
                     ? NetworkImage(request.cpaImageUrl!)
                     : null,
-                child: (request.cpaImageUrl == null ||
+                child:
+                    (request.cpaImageUrl == null ||
                         request.cpaImageUrl!.isEmpty)
                     ? Text(
                         _initials(request.cpaFullName),
@@ -204,14 +206,10 @@ class _RequestTile extends StatelessWidget {
                 children: [
                   // Reject
                   OutlinedButton.icon(
-                    onPressed: () => ctrl.updateStatus(
-                      request.id,
-                      DocumentAccessStatus.rejected,
-                    ),
+                    onPressed: () => ctrl.deleteRequest(request.id),
                     icon: const Icon(Icons.close, size: 16),
                     label: const Text('Reject'),
 
-                    // TODO: for dark version, border and text should be white
                     // for light-mode it should be grey
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.red,
@@ -250,10 +248,7 @@ class _RequestTile extends StatelessWidget {
               alignment: Alignment.centerRight,
               padding: const EdgeInsets.only(top: 12),
               child: GestureDetector(
-                onTap: () => ctrl.updateStatus(
-                  request.id,
-                  DocumentAccessStatus.rejected,
-                ),
+                onTap: () => ctrl.deleteRequest(request.id),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
