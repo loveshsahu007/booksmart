@@ -1,9 +1,7 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/helpers/currency_formatter.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
-import 'package:booksmart/widgets/custom_drop_down.dart';
 import 'package:booksmart/widgets/snackbar.dart';
-import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
@@ -44,13 +42,6 @@ class _SendOrderRequestScreenState extends State<SendOrderRequestScreen> {
   DateTime? _deliveryDateTime;
 
   final List<String> _deliverables = [];
-  final List<String> _cancellationPolicies = [
-    'Flexible - Full refund 24 hours before delivery',
-    'Moderate - 50% refund before work starts',
-    'Strict - No refund after acceptance',
-    'Custom - To be discussed',
-  ];
-  final _cancelationDropDownKey = GlobalKey<DropdownSearchState<String>>();
 
   @override
   Widget build(BuildContext context) {
@@ -63,30 +54,6 @@ class _SendOrderRequestScreenState extends State<SendOrderRequestScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppText(
-                        "Create Order Request",
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                      const SizedBox(height: 8),
-                      AppText(
-                        "Fill in the details below to send a professional order request to your client",
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-
               // Description
               _buildSectionHeader("Project Description"),
 
@@ -118,7 +85,7 @@ class _SendOrderRequestScreenState extends State<SendOrderRequestScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildSectionHeader("Order Expiry"),
+                        _buildSectionHeader("Order Expiration"),
                         Card(
                           margin: EdgeInsets.zero,
                           child: InkWell(
@@ -191,20 +158,6 @@ class _SendOrderRequestScreenState extends State<SendOrderRequestScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-
-              // Cancellation Policy
-              _buildSectionHeader("Cancellation Policy"),
-              CustomDropDownWidget<String>(
-                dropDownKey: _cancelationDropDownKey,
-                label: 'Category',
-
-                items: _cancellationPolicies,
-              ),
-              // CustomDropDownWidget(
-              //   dropDownKey: _cancelationDropDownKey,
-              //   items: _cancellationPolicies,
-              // ),
               const SizedBox(height: 20),
 
               // Deliverables

@@ -1,9 +1,11 @@
+import 'package:booksmart/helpers/currency_formatter.dart';
 import 'package:booksmart/models/order_model.dart';
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../../../helpers/date_formatter.dart';
 import '../../../../../widgets/app_text.dart';
 import '../order/detail_screen.dart';
 
@@ -83,14 +85,14 @@ class OrderCard extends StatelessWidget {
                           const SizedBox(width: 6),
                           if (order.startDate != null)
                             AppText(
-                              'Start: ${_formatDate(order.startDate!)}',
+                              'Start: ${formatDate(order.startDate!)}',
                               fontSize: 12,
                             ),
                           if (order.startDate != null && order.dueDate != null)
                             const SizedBox(width: 10),
                           if (order.dueDate != null)
                             AppText(
-                              'Due: ${_formatDate(order.dueDate!)}',
+                              'Due: ${formatDate(order.dueDate!)}',
                               fontSize: 12,
                             ),
                         ],
@@ -107,7 +109,7 @@ class OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         AppText(
-                          'Price: \$${order.amount}',
+                          'Price: \$${formatNumber(order.amount)}',
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
@@ -152,9 +154,5 @@ class OrderCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static String _formatDate(DateTime date) {
-    return "${date.day}/${date.month}/${date.year}";
   }
 }

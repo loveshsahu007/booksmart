@@ -4,6 +4,8 @@ import 'package:booksmart/widgets/date_range_picker.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
 
+import '../../../../../helpers/date_formatter.dart';
+
 class BalanceSheetTab extends StatefulWidget {
   const BalanceSheetTab({super.key});
 
@@ -56,7 +58,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> {
             child: Column(
               children: [
                 AppText(
-                  "As of ${_formatDate(selectedDate)}",
+                  "As of ${formatDate(selectedDate)}",
                   fontSize: 14,
                   color: Colors.white70,
                 ),
@@ -300,24 +302,5 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> {
         ),
       ),
     );
-  }
-
-  /// 🔹 Format date (e.g. Sep 30, 2025)
-  String _formatDate(DateTime date) {
-    final months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    return "${months[date.month - 1]} ${date.day}, ${date.year}";
   }
 }

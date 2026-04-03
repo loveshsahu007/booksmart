@@ -60,6 +60,14 @@ class _LeadCardState extends State<LeadCard> {
               const SizedBox(width: 8),
               IconButton(
                 onPressed: () {
+                  // TODO: show order request dialog
+                },
+                icon: const Icon(Icons.request_quote_outlined),
+                tooltip: 'Send order request',
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () {
                   final personData = Map<String, dynamic>.from(user);
                   final person = PersonModel.fromJson(personData);
                   goToChatScreen(person);

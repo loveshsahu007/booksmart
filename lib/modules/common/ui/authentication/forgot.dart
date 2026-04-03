@@ -1,3 +1,4 @@
+import 'package:booksmart/widgets/snackbar.dart';
 import 'package:get/get.dart';
 import '../../../../constant/exports.dart';
 
@@ -173,11 +174,11 @@ class _ForgotResetPasswordScreenState extends State<ForgotResetPasswordScreen> {
                           onTapFunction: () {
                             if (_formKey.currentState?.validate() ?? false) {
                               if (isReset) {
-                                Get.snackbar(
-                                  "Success",
+                                showSnackBar(
                                   "Password has been reset!",
-                                  snackPosition: SnackPosition.BOTTOM,
+                                  title: "Success",
                                 );
+
                                 Get.offAllNamed(Routes.login);
                               } else {
                                 Get.snackbar(

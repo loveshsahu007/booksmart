@@ -56,6 +56,9 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
                         Icons.leaderboard,
                       ),
                     ),
+
+                    // TODO: navigate to the order-screen
+                    // implement onclick for _buildStatCard, so that we can it for others as well, wrap it with material and inkwell so that it have ink effect on hovering and clicking
                     _buildStatCard(
                       'Orders',
                       '4',

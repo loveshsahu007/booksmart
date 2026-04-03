@@ -11,6 +11,8 @@ import 'package:get/get.dart';
 import 'package:booksmart/models/order_model.dart';
 import 'package:booksmart/modules/user/controllers/order_controller.dart';
 
+import '../../../../../helpers/currency_formatter.dart';
+import '../../../../../helpers/date_formatter.dart';
 import '../../../../common/controllers/auth_controller.dart';
 import '../../../../common/ui/chat/chat_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -262,11 +264,11 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                 if (widget.order.startDate != null)
                   _buildInfoRow(
                     "Start Date",
-                    _formatDate(widget.order.startDate!),
+                    formatDate(widget.order.startDate!),
                   ),
                 if (widget.order.dueDate != null)
-                  _buildInfoRow("Due Date", _formatDate(widget.order.dueDate!)),
-                _buildInfoRow("Cost", "\$${widget.order.amount}"),
+                  _buildInfoRow("Due Date", formatDate(widget.order.dueDate!)),
+                _buildInfoRow("Cost", "\$${formatNumber(widget.order.amount)}"),
                 if (widget.order.services.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Divider(),
@@ -493,10 +495,6 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    return "${date.month}/${date.day}/${date.year}";
-  }
-
   void _showDeclineReasonDialog(
     BuildContext context,
     OrderController controller,
@@ -642,7 +640,10 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
                   child: ListTile(
                     dense: true,
                     leading: const Icon(Icons.description, size: 20),
-                    title: Text(doc.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    title: Text(
+                      doc.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     subtitle: Text(
                       [
                         if (doc.category != null) doc.category!,
@@ -651,7 +652,11 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
                       style: const TextStyle(fontSize: 12),
                     ),
                     trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.red,
+                        size: 20,
+                      ),
                       onPressed: () {
                         setState(() {
                           _selectedDocuments.remove(doc);

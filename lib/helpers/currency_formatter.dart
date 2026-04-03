@@ -58,3 +58,9 @@ class CurrencyTextInputFormatter extends TextInputFormatter {
     );
   }
 }
+
+/// It will put commas as per US standard
+String formatNumber(num amount) {
+  final formatter = NumberFormat('#,##0.00', 'en_US');
+  return formatter.format(amount);
+}
