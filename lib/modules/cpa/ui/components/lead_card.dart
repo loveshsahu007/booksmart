@@ -1,6 +1,7 @@
 import 'package:booksmart/models/lead_model.dart';
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
+import 'package:booksmart/modules/user/ui/cpa/order/create_order_screen.dart';
 import 'package:booksmart/modules/user/ui/cpa/order/user_documents_dialog.dart';
 import 'package:booksmart/widgets/app_text.dart';
 import 'package:booksmart/widgets/custom_circle_avatar.dart';
@@ -8,8 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:jiffy/jiffy.dart';
 import 'package:get/get.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
-import 'package:booksmart/modules/cpa/ui/order/send_order_request_screen.dart';
-
 import '../../../../widgets/app_button.dart';
 
 class LeadCard extends StatefulWidget {
@@ -59,8 +58,12 @@ class _LeadCardState extends State<LeadCard> {
 
               const SizedBox(width: 8),
               IconButton(
+                key: const Key('send_order_request_icon_btn'),
                 onPressed: () {
-                  // TODO: show order request dialog
+                  goToCreateOrderCPAScreen(
+                    userId: widget.lead.userId,
+                    userName: name,
+                  );
                 },
                 icon: const Icon(Icons.request_quote_outlined),
                 tooltip: 'Send order request',
@@ -116,6 +119,7 @@ class _LeadCardState extends State<LeadCard> {
               children: [
                 Expanded(
                   child: AppButton(
+                    key: const Key('chat_btn'),
                     buttonText: "Chat",
                     fontSize: 12,
                     onTapFunction: () {
@@ -131,6 +135,7 @@ class _LeadCardState extends State<LeadCard> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: AppButton(
+                    key: const Key('documents_btn'),
                     buttonText: "Documents",
                     fontSize: 12,
                     onTapFunction: () {
@@ -146,11 +151,18 @@ class _LeadCardState extends State<LeadCard> {
               children: [
                 Expanded(
                   child: AppButton(
+                    key: const Key('send_order_request_btn'),
                     buttonText: "Send Order Request",
                     fontSize: 12,
                     onTapFunction: () {
-                      Get.back();
-                      goToSendOrderRequestScreen();
+                      final userName = user != null
+                          ? "${user['first_name']} ${user['last_name']}"
+                          : "Unknown User";
+                      goToCreateOrderCPAScreen(
+                        shouldCloseBefore: true,
+                        userId: widget.lead.userId,
+                        userName: userName,
+                      );
                     },
                   ),
                 ),

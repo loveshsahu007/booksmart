@@ -1,31 +1,42 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/modules/cpa/ui/order/send_order_request_screen.dart';
+import 'package:booksmart/modules/user/ui/cpa/order/create_order_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../widgets/custom_dialog.dart';
 
-void goToLeadDetailScreen({bool shouldCloseBefore = false}) {
+void goToLeadDetailScreen({
+  required int userId,
+  required String userName,
+  bool shouldCloseBefore = false,
+}) {
   if (kIsWeb) {
     if (shouldCloseBefore) {
       Get.back(); // close previous dialog
     }
     customDialog(
-      child: LeadDetailScreen(),
+      child: LeadDetailScreen(userId: userId, userName: userName),
       title: 'Lead Details',
       barrierDismissible: true,
     );
   } else {
     if (shouldCloseBefore) {
-      Get.off(() => const LeadDetailScreen());
+      Get.off(() => LeadDetailScreen(userId: userId, userName: userName));
     } else {
-      Get.to(() => const LeadDetailScreen());
+      Get.to(() => LeadDetailScreen(userId: userId, userName: userName));
     }
   }
 }
 
 class LeadDetailScreen extends StatelessWidget {
-  const LeadDetailScreen({super.key});
+  final int userId;
+  final String userName;
+
+  const LeadDetailScreen({
+    super.key,
+    required this.userId,
+    required this.userName,
+  });
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -53,7 +64,10 @@ class LeadDetailScreen extends StatelessWidget {
                   CircleAvatar(
                     radius: 25,
 
-                    child: AppText('SJ', fontWeight: FontWeight.bold),
+                    child: AppText(
+                      userName.isNotEmpty ? userName.substring(0, 1).toUpperCase() : 'U',
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -61,7 +75,7 @@ class LeadDetailScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         AppText(
-                          'Sarah Johnson',
+                          userName,
 
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -243,7 +257,11 @@ class LeadDetailScreen extends StatelessWidget {
                   child: AppButton(
                     radius: 8,
                     onTapFunction: () {
-                      goToSendOrderRequestScreen();
+                      goToCreateOrderCPAScreen(
+                        userId: userId,
+                        userName: userName,
+                        shouldCloseBefore: false,
+                      );
                     },
                     buttonText: 'Send Order Request',
                   ),

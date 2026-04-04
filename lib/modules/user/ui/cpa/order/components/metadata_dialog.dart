@@ -2,10 +2,8 @@ import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/widgets/custom_drop_down.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as path;
+import 'package:path/path.dart' as p; // Use alias 'p' to avoid name collisions
 
 class DocumentMetadata {
   final String name;
@@ -21,9 +19,7 @@ class DocumentMetadata {
   });
 }
 
-Future<DocumentMetadata?> showDocumentMetadataDialog({
-  XFile? file,
-}) async {
+Future<DocumentMetadata?> showDocumentMetadataDialog({XFile? file}) async {
   return await Get.generalDialog<DocumentMetadata>(
     pageBuilder: (context, animation, secondaryAnimation) {
       return Align(
@@ -68,7 +64,10 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
 
   final yearDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final categoryDropdownKey = GlobalKey<DropdownSearchState<String>>();
-  late final TextEditingController nameCtrl;
+
+  // FIXED: Removed 'late final' to avoid the LateInitializationError
+  // during complex build cycles.
+  late TextEditingController nameCtrl;
 
   XFile? selectedFile;
   String? selectedYear;
@@ -78,11 +77,14 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
   void initState() {
     super.initState();
     selectedFile = widget.initialFile;
-    nameCtrl = TextEditingController(
-      text: selectedFile != null
-          ? path.basenameWithoutExtension(selectedFile!.name)
-          : '',
-    );
+
+    // Initialize controller with initial text based on the file name
+    String initialName = '';
+    if (selectedFile != null) {
+      initialName = p.basenameWithoutExtension(selectedFile!.name);
+    }
+
+    nameCtrl = TextEditingController(text: initialName);
   }
 
   @override
@@ -95,18 +97,25 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
     try {
       final result = await FilePicker.platform.pickFiles(
         withData: true,
+        type: FileType.any,
       );
+
       if (result != null && result.files.single.bytes != null) {
         final f = result.files.single;
         setState(() {
           selectedFile = XFile.fromData(f.bytes!, name: f.name, path: f.path);
+          // Only update name if it's currently empty to avoid overwriting user input
           if (nameCtrl.text.isEmpty) {
-            nameCtrl.text = path.basenameWithoutExtension(f.name);
+            nameCtrl.text = p.basenameWithoutExtension(f.name);
           }
         });
       }
     } catch (e) {
-      Get.snackbar("Error", "Error picking file: $e");
+      Get.snackbar(
+        "Error",
+        "Error picking file: $e",
+        snackPosition: SnackPosition.BOTTOM,
+      );
     }
   }
 
@@ -127,7 +136,7 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
           ),
           const SizedBox(height: 20),
 
-          // File Status/Pick Button
+          // File Selection Area
           if (selectedFile == null)
             SizedBox(
               width: double.infinity,
@@ -147,9 +156,9 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
+                color: Colors.blue.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                border: Border.all(color: Colors.blue.withOpacity(0.3)),
               ),
               child: Row(
                 children: [
@@ -163,8 +172,9 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
                           selectedFile!.name,
                           style: const TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.bold,
                           ),
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const Text(
@@ -174,10 +184,7 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
                       ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: _pickFile,
-                    child: const Text('Change'),
-                  ),
+                  TextButton(onPressed: _pickFile, child: const Text('Change')),
                 ],
               ),
             ),
@@ -195,16 +202,7 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
             dropDownKey: yearDropdownKey,
             label: 'Tax Year',
             hint: 'Select Year',
-            items: const [
-              '2029',
-              '2028',
-              '2027',
-              '2026',
-              '2025',
-              '2024',
-              '2023',
-              '2022',
-            ],
+            items: const ['2026', '2025', '2024', '2023', '2022'],
             onChanged: (v) => setState(() => selectedYear = v),
           ),
           const SizedBox(height: 12),
@@ -219,7 +217,6 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
           const SizedBox(height: 28),
 
           Row(
-            spacing: 12,
             children: [
               Expanded(
                 child: OutlinedButton(
@@ -230,18 +227,20 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
                   child: const Text('Cancel'),
                 ),
               ),
+              const SizedBox(width: 12),
               Expanded(
                 child: AppButton(
                   buttonText: 'Process',
                   onTapFunction: () {
                     if (selectedFile == null) {
-                      Get.snackbar('Error', 'Please select a file first');
+                      Get.snackbar('Required', 'Please select a file first');
                       return;
                     }
                     if (nameCtrl.text.trim().isEmpty) {
-                      Get.snackbar('Error', 'Please enter a document name');
+                      Get.snackbar('Required', 'Please enter a document name');
                       return;
                     }
+
                     Get.back(
                       result: DocumentMetadata(
                         name: nameCtrl.text.trim(),

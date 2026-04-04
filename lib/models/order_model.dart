@@ -79,6 +79,8 @@ class OrderModel {
   final DateTime? deliverAt;
   final List<String> services;
   final List<String>? deliveryFiles;
+  final List<String>? deliverables;
+  final String? cancellationPolicy;
 
   final String? userReviewMessage;
   final double? userReviewStars;
@@ -117,6 +119,8 @@ class OrderModel {
     this.deliverAt,
     this.services = const [],
     this.deliveryFiles,
+    this.deliverables,
+    this.cancellationPolicy,
 
     this.userReviewMessage,
     this.userReviewStars,
@@ -208,6 +212,13 @@ class OrderModel {
       deliveryFiles: (json['delivery_files'] as List<dynamic>?)
           ?.map((e) => e.toString())
           .toList(),
+      deliverables: (json['deliverables'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      cancellationPolicy: handleResponseFromJson<String>(
+        json,
+        "cancellation_policy",
+      ),
 
       userReviewMessage: handleResponseFromJson<String>(
         json,
@@ -254,6 +265,8 @@ class OrderModel {
       "deliver_at": deliverAt?.toIso8601String(),
       "services": services,
       "delivery_files": deliveryFiles,
+      "deliverables": deliverables,
+      "cancellation_policy": cancellationPolicy,
 
       "user_review_message": userReviewMessage,
       "user_review_stars": userReviewStars,

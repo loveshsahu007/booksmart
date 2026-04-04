@@ -5,6 +5,9 @@ import 'package:booksmart/models/user_document_model.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/utils/supabase.dart';
+import 'package:booksmart/widgets/snackbar.dart';
+import 'package:booksmart/constant/global_context_key.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class DocumentAccessController extends GetxController {
@@ -128,8 +131,9 @@ class DocumentAccessController extends GetxController {
       }
 
       await supabase.from(SupabaseTable.documentAccessRequests).insert(data);
-
-      Get.snackbar('Request Sent', 'Document access request sent successfully');
+      Get.back();
+      showSnackBar('Request Sent');
+      // Get.snackbar('Request Sent', 'Document access request sent successfully');
       return true;
     } catch (e, st) {
       log('DocumentAccessController.sendAccessRequest error: $e\n$st');
@@ -198,19 +202,39 @@ class DocumentAccessController extends GetxController {
     try {
       isLoading.value = true;
 
-      await supabase
+      // Using select() to verify if any rows were actually affected by the delete
+      final List result = await supabase
           .from(SupabaseTable.documentAccessRequests)
           .delete()
-          .eq('id', requestId);
+          .eq('id', requestId)
+          .select();
+
+      log('Delete request result: $result');
+
+      if (result.isEmpty) {
+        log('⚠️ Warning: No rows were deleted for request ID: $requestId. This might be due to RLS policies.');
+      }
 
       // Update local list
       requests.removeWhere((r) => r.id == requestId);
       requests.refresh();
 
-      Get.snackbar('Deleted', 'Access request removed');
+      // Use ScaffoldMessenger for a more stable notification that doesn't rely on GetX's overlay context
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: const Text('Access request removed'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
     } catch (e, st) {
       log('DocumentAccessController.deleteRequest error: $e\n$st');
-      Get.snackbar('Error', 'Failed to delete request');
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: Text('Failed to delete request: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       isLoading.value = false;
     }

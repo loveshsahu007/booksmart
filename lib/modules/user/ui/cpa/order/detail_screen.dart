@@ -11,11 +11,14 @@ import 'package:get/get.dart';
 import 'package:booksmart/models/order_model.dart';
 import 'package:booksmart/modules/user/controllers/order_controller.dart';
 
-import '../../../../../helpers/currency_formatter.dart';
-import '../../../../../helpers/date_formatter.dart';
 import '../../../../common/controllers/auth_controller.dart';
 import '../../../../common/ui/chat/chat_screen.dart';
+import 'package:booksmart/models/user_document_model.dart';
+import 'package:booksmart/modules/user/controllers/tax_document_controller.dart';
+import 'package:booksmart/supabase/tables.dart';
+import 'package:booksmart/utils/supabase.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:developer';
 
 void goToCpaOrderDetailScreen({
   bool shouldCloseBefore = false,
@@ -48,11 +51,42 @@ class CpaOrderDetailScreen extends StatefulWidget {
 }
 
 class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
+  final List<UserDocument> _deliveryDocs = [];
+  bool _isFetchingDocs = false;
+  late OrderModel _currentOrder;
+
   @override
   void initState() {
     super.initState();
+    _currentOrder = widget.order;
     if (!Get.isRegistered<OrderController>()) {
       Get.put(OrderController());
+    }
+    _fetchDeliveryDocs();
+  }
+
+  Future<void> _fetchDeliveryDocs() async {
+    if (_currentOrder.deliveryFiles == null ||
+        _currentOrder.deliveryFiles!.isEmpty)
+      return;
+    try {
+      setState(() => _isFetchingDocs = true);
+      final result = await supabase
+          .from(SupabaseTable.userDocuments)
+          .select()
+          .eq('order_id', _currentOrder.id);
+
+      if (mounted) {
+        setState(() {
+          _deliveryDocs.addAll(
+            (result as List).map((e) => UserDocument.fromJson(e)).toList(),
+          );
+          _isFetchingDocs = false;
+        });
+      }
+    } catch (e) {
+      log("Error fetching delivery docs: $e");
+      if (mounted) setState(() => _isFetchingDocs = false);
     }
   }
 
@@ -69,19 +103,19 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
             _buildOrderHeader(context),
             const SizedBox(height: 24),
             // CPA Info
-            if (widget.order.cpa != null)
+            if (_currentOrder.cpa != null)
               ListTile(
                 leading: CircleAvatar(
                   backgroundColor: Colors.grey,
-                  backgroundImage: NetworkImage(widget.order.cpa!.imgUrl),
+                  backgroundImage: NetworkImage(_currentOrder.cpa!.imgUrl),
                 ),
                 title: Text(
-                  "${widget.order.cpa!.firstName} ${widget.order.cpa!.lastName}",
+                  "${_currentOrder.cpa!.firstName} ${_currentOrder.cpa!.lastName}",
                 ),
-                subtitle: Text(widget.order.cpa!.email),
+                subtitle: Text(_currentOrder.cpa!.email),
                 trailing: IconButton(
                   onPressed: () {
-                    goToChatScreen(widget.order.cpa!);
+                    goToChatScreen(_currentOrder.cpa!);
                   },
                   icon: const Icon(Icons.chat_bubble_outline),
                 ),
@@ -91,42 +125,42 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
             _buildOrderInfoSection(context),
             const SizedBox(height: 24),
             // Description Section
-            if (widget.order.description != null &&
-                widget.order.description!.isNotEmpty)
+            if (_currentOrder.description != null &&
+                _currentOrder.description!.isNotEmpty)
               _buildDescriptionSection(context),
             const SizedBox(height: 24),
             // Delivery Details Section
-            if ((widget.order.deliverMessage != null &&
-                    widget.order.deliverMessage!.isNotEmpty) ||
-                (widget.order.deliveryFiles != null &&
-                    widget.order.deliveryFiles!.isNotEmpty))
+            if ((_currentOrder.deliverMessage != null &&
+                    _currentOrder.deliverMessage!.isNotEmpty) ||
+                (_currentOrder.deliveryFiles != null &&
+                    _currentOrder.deliveryFiles!.isNotEmpty))
               _buildDeliveryDetailsSection(context),
             // Action Buttons
-            if (widget.order.status == OrderStatus.pending) ...[
+            if (_currentOrder.status == OrderStatus.pending) ...[
               if (authPerson?.role != UserRole.cpa)
                 _buildActionButtons(context),
               const SizedBox(height: 20),
             ],
-            if ((widget.order.status == OrderStatus.accepted ||
-                    widget.order.status == OrderStatus.revision) &&
+            if ((_currentOrder.status == OrderStatus.accepted ||
+                    _currentOrder.status == OrderStatus.revision) &&
                 authPerson?.role == UserRole.cpa) ...[
               SizedBox(
                 width: double.infinity,
                 child: AppButton(
-                  buttonText: widget.order.status == OrderStatus.revision
+                  buttonText: _currentOrder.status == OrderStatus.revision
                       ? "Re-Deliver Order"
                       : "Deliver Order",
                   onTapFunction: () {
                     _showDeliverOrderDialog(
                       context,
-                      isReDelivery: widget.order.status == OrderStatus.revision,
+                      isReDelivery: _currentOrder.status == OrderStatus.revision,
                     );
                   },
                 ),
               ),
               const SizedBox(height: 20),
             ],
-            if (widget.order.status == OrderStatus.delivered &&
+            if (_currentOrder.status == OrderStatus.delivered &&
                 authPerson?.role != UserRole.cpa) ...[
               Row(
                 children: [
@@ -138,11 +172,11 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                           description:
                               "Are you sure you want to reject this delivery and ask for revision?",
                           onYes: () async {
-                            Get.back();
                             await Get.find<OrderController>().updateOrderStatus(
-                              widget.order.id,
+                              _currentOrder.id,
                               OrderStatus.revision,
                             );
+                            Get.back();
                           },
                         );
                       },
@@ -158,15 +192,105 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        showConfirmationDialog(
-                          title: "Accept Delivery",
-                          description:
-                              "Are you sure you want to accept this delivery? The order will be marked as completed.",
-                          onYes: () async {
-                            Get.back();
-                            await Get.find<OrderController>().updateOrderStatus(
-                              widget.order.id,
-                              OrderStatus.completed,
+                        Get.generalDialog(
+                          barrierDismissible: true,
+                          barrierLabel: "Accept Delivery",
+                          pageBuilder: (context, anim1, anim2) {
+                            bool isAccepting = false;
+                            return StatefulBuilder(
+                              builder: (context, setDialogState) {
+                                return Align(
+                                  alignment: Alignment.center,
+                                  child: Card(
+                                    margin: const EdgeInsets.all(30),
+                                    child: Container(
+                                      constraints: const BoxConstraints(maxWidth: 320),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Align(
+                                            alignment: Alignment.centerRight,
+                                            child: Padding(
+                                              padding: const EdgeInsets.only(right: 10),
+                                              child: SizedBox(
+                                                width: 30,
+                                                height: 30,
+                                                child: IconButton(
+                                                  onPressed: () => Get.back(),
+                                                  icon: const Icon(Icons.close),
+                                                  iconSize: 20,
+                                                  padding: EdgeInsets.zero,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const Text(
+                                            "Accept Delivery",
+                                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(height: 20),
+                                          const Padding(
+                                            padding: EdgeInsets.symmetric(horizontal: 20),
+                                            child: Text(
+                                              "Are you sure you want to accept this delivery? The order will be marked as completed.",
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                height: 1.2,
+                                                decoration: TextDecoration.none,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 20),
+                                          ElevatedButton(
+                                            onPressed: isAccepting ? null : () async {
+                                              setDialogState(() => isAccepting = true);
+                                              
+                                              await Get.find<OrderController>().updateOrderStatus(
+                                                _currentOrder.id,
+                                                OrderStatus.completed,
+                                              );
+                                              
+                                              Get.back(); // Close dialog
+
+                                              showSnackBar(
+                                                "Delivery accepted successfully",
+                                                title: "✔ Delivery Accepted",
+                                                begroundColor: Colors.green,
+                                              );
+
+                                              setState(() {
+                                                _currentOrder = OrderModel.fromJson({
+                                                  ..._currentOrder.toJson(),
+                                                  'status': OrderStatus.completed.name,
+                                                });
+                                              });
+                                            },
+                                            child: isAccepting
+                                                ? Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: const [
+                                                      SizedBox(
+                                                        width: 16,
+                                                        height: 16,
+                                                        child: CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                        ),
+                                                      ),
+                                                      SizedBox(width: 8),
+                                                      Text("Processing..."),
+                                                    ],
+                                                  )
+                                                : const Text("Yes"),
+                                          ),
+                                          const SizedBox(height: 20),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             );
                           },
                         );
@@ -196,12 +320,12 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
   Widget _buildOrderHeader(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     Color statusColor = Colors.grey;
-    if (widget.order.status == OrderStatus.completed) {
+    if (_currentOrder.status == OrderStatus.completed) {
       statusColor = Colors.green;
     }
-    if (widget.order.status == OrderStatus.pending) statusColor = Colors.orange;
-    if (widget.order.status == OrderStatus.rejected ||
-        widget.order.status == OrderStatus.cancelled) {
+    if (_currentOrder.status == OrderStatus.pending) statusColor = Colors.orange;
+    if (_currentOrder.status == OrderStatus.rejected ||
+        _currentOrder.status == OrderStatus.cancelled) {
       statusColor = Colors.red;
     }
 
@@ -212,7 +336,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
         child: Column(
           children: [
             AppText(
-              "Order #${widget.order.id}",
+              "Order #${_currentOrder.id}",
               fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
@@ -225,7 +349,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                 border: Border.all(color: statusColor),
               ),
               child: AppText(
-                widget.order.status.name.toUpperCase(),
+                _currentOrder.status.name.toUpperCase(),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: statusColor,
@@ -233,7 +357,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
             ),
             const SizedBox(height: 8),
             AppText(
-              widget.order.title,
+              _currentOrder.title,
               fontSize: 16,
               color: colorScheme.onSurface,
               textAlign: TextAlign.center,
@@ -261,15 +385,73 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                if (widget.order.startDate != null)
+                if (_currentOrder.startDate != null)
                   _buildInfoRow(
                     "Start Date",
-                    formatDate(widget.order.startDate!),
+                    _formatDate(_currentOrder.startDate!),
                   ),
-                if (widget.order.dueDate != null)
-                  _buildInfoRow("Due Date", formatDate(widget.order.dueDate!)),
-                _buildInfoRow("Cost", "\$${formatNumber(widget.order.amount)}"),
-                if (widget.order.services.isNotEmpty) ...[
+                if (_currentOrder.dueDate != null)
+                  _buildInfoRow("Due Date", _formatDate(_currentOrder.dueDate!)),
+                _buildInfoRow("Cost", "\$${_currentOrder.amount}"),
+                if (_currentOrder.deliverables != null && _currentOrder.deliverables!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      AppText(
+                        "Deliverables",
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: _currentOrder.deliverables!.map((e) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Text(
+                                "• $e",
+                                style: const TextStyle(fontSize: 13),
+                                textAlign: TextAlign.right,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (_currentOrder.cancellationPolicy != null && _currentOrder.cancellationPolicy!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Divider(),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      AppText(
+                        "Cancellation Policy",
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          _currentOrder.cancellationPolicy!,
+                          style: const TextStyle(fontSize: 13),
+                          textAlign: TextAlign.right,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (_currentOrder.services.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Divider(),
                   const SizedBox(height: 10),
@@ -289,7 +471,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                           alignment: WrapAlignment.end,
                           spacing: 4,
                           runSpacing: 4,
-                          children: widget.order.services.map((e) {
+                          children: _currentOrder.services.map((e) {
                             return Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -337,7 +519,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
           margin: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(widget.order.description!),
+            child: Text(_currentOrder.description!),
           ),
         ),
       ],
@@ -361,42 +543,77 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (widget.order.deliverMessage != null &&
-                    widget.order.deliverMessage!.isNotEmpty) ...[
-                  Text(widget.order.deliverMessage!),
+                if (_currentOrder.deliverMessage != null &&
+                    _currentOrder.deliverMessage!.isNotEmpty) ...[
+                  Text(_currentOrder.deliverMessage!),
                   const SizedBox(height: 16),
                 ],
-                if (widget.order.deliveryFiles != null &&
-                    widget.order.deliveryFiles!.isNotEmpty) ...[
+                if (_currentOrder.deliveryFiles != null &&
+                    _currentOrder.deliveryFiles!.isNotEmpty) ...[
                   const AppText(
                     "Attached Files",
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: widget.order.deliveryFiles!.map((url) {
-                      final uri = Uri.tryParse(url);
-                      final filename =
-                          uri?.pathSegments.last.split('_').last ?? "Document";
-                      return ActionChip(
-                        label: Text(
-                          filename,
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        avatar: const Icon(Icons.download, size: 16),
-                        onPressed: () async {
-                          if (uri != null && await canLaunchUrl(uri)) {
-                            await launchUrl(uri);
-                          } else {
-                            Get.snackbar("Error", "Could not open file link.");
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
+                  if (_isFetchingDocs)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(8),
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  if (_deliveryDocs.isNotEmpty)
+                    Column(
+                      children: _deliveryDocs
+                          .map(
+                            (doc) => buildUnifiedFileCard(
+                              name: doc.name,
+                              category: doc.category,
+                              year: doc.taxYear,
+                              mimeType: doc.mimeType,
+                              onView: () async {
+                                final uri = Uri.tryParse(doc.fileUrl);
+                                if (uri != null && await canLaunchUrl(uri)) {
+                                  await launchUrl(uri);
+                                }
+                              },
+                              onDelete: authPerson?.role == UserRole.cpa
+                                  ? () {} // Placeholder as requested
+                                  : null,
+                            ),
+                          )
+                          .toList(),
+                    )
+                  else if (_currentOrder.deliveryFiles != null &&
+                      _currentOrder.deliveryFiles!.isNotEmpty)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _currentOrder.deliveryFiles!.map((url) {
+                        final uri = Uri.tryParse(url);
+                        final filename =
+                            uri?.pathSegments.last.split('_').last ??
+                            "Document";
+                        return ActionChip(
+                          label: Text(
+                            filename,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          avatar: const Icon(Icons.download, size: 16),
+                          onPressed: () async {
+                            if (uri != null && await canLaunchUrl(uri)) {
+                              await launchUrl(uri);
+                            } else {
+                              Get.snackbar(
+                                "Error",
+                                "Could not open file link.",
+                              );
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
                 ],
               ],
             ),
@@ -441,7 +658,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                           Get.close(2);
                           showLoading();
                           await processCpaOrderPayment(
-                            orderId: widget.order.id,
+                            orderId: _currentOrder.id,
                           ).then((value) {
                             dismissLoadingWidget();
                             if (value == null) {
@@ -495,6 +712,10 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
     );
   }
 
+  String _formatDate(DateTime date) {
+    return "${date.month}/${date.day}/${date.year}";
+  }
+
   void _showDeclineReasonDialog(
     BuildContext context,
     OrderController controller,
@@ -531,7 +752,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                     textColor: Colors.white,
                     onTapFunction: () async {
                       await controller.updateOrderStatus(
-                        widget.order.id,
+                        _currentOrder.id,
                         OrderStatus.rejected,
                       );
                       Get.back();
@@ -555,7 +776,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
     if (kIsWeb) {
       customDialog(
         child: DeliverOrderWidget(
-          orderId: widget.order.id,
+          order: _currentOrder,
           isReDelivery: isReDelivery,
         ),
         title: isReDelivery ? "Re-Deliver Order" : "Deliver Order",
@@ -569,7 +790,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
           ),
           body: SingleChildScrollView(
             child: DeliverOrderWidget(
-              orderId: widget.order.id,
+              order: _currentOrder,
               isReDelivery: isReDelivery,
             ),
           ),
@@ -580,12 +801,12 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
 }
 
 class DeliverOrderWidget extends StatefulWidget {
-  final int orderId;
+  final OrderModel order;
   final bool isReDelivery;
 
   const DeliverOrderWidget({
     super.key,
-    required this.orderId,
+    required this.order,
     this.isReDelivery = false,
   });
 
@@ -596,6 +817,39 @@ class DeliverOrderWidget extends StatefulWidget {
 class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
   final _messageController = TextEditingController();
   final List<DocumentMetadata> _selectedDocuments = [];
+  final List<UserDocument> _existingDocs = [];
+  bool _isFetchingDocs = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isReDelivery) {
+      _messageController.text = widget.order.deliverMessage ?? "";
+      _fetchExistingDocs();
+    }
+  }
+
+  Future<void> _fetchExistingDocs() async {
+    try {
+      setState(() => _isFetchingDocs = true);
+      final result = await supabase
+          .from(SupabaseTable.userDocuments)
+          .select()
+          .eq('order_id', widget.order.id);
+
+      if (mounted) {
+        setState(() {
+          _existingDocs.addAll(
+            (result as List).map((e) => UserDocument.fromJson(e)).toList(),
+          );
+          _isFetchingDocs = false;
+        });
+      }
+    } catch (e) {
+      log("Error fetching existing docs: $e");
+      if (mounted) setState(() => _isFetchingDocs = false);
+    }
+  }
 
   void _pickFiles() async {
     try {
@@ -632,40 +886,45 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
-          if (_selectedDocuments.isNotEmpty)
+          if (_isFetchingDocs)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+
+          if (_existingDocs.isNotEmpty || _selectedDocuments.isNotEmpty)
             Column(
-              children: _selectedDocuments.map((doc) {
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    dense: true,
-                    leading: const Icon(Icons.description, size: 20),
-                    title: Text(
-                      doc.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    subtitle: Text(
-                      [
-                        if (doc.category != null) doc.category!,
-                        if (doc.year != null) doc.year!,
-                      ].join(' · '),
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        color: Colors.red,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _selectedDocuments.remove(doc);
-                        });
-                      },
-                    ),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Unified list header omitted for cleaner look, or added if needed
+                ..._existingDocs.map(
+                  (doc) => buildUnifiedFileCard(
+                    name: doc.name,
+                    category: doc.category,
+                    year: doc.taxYear,
+                    mimeType: doc.mimeType,
+                    onDelete: () => setState(() => _existingDocs.remove(doc)),
+                    onView: () async {
+                      final uri = Uri.tryParse(doc.fileUrl);
+                      if (uri != null && await canLaunchUrl(uri)) {
+                        await launchUrl(uri);
+                      }
+                    },
                   ),
-                );
-              }).toList(),
+                ),
+                ..._selectedDocuments.map(
+                  (doc) => buildUnifiedFileCard(
+                    name: doc.name,
+                    category: doc.category,
+                    year: doc.year,
+                    isNew: true,
+                    onDelete: () =>
+                        setState(() => _selectedDocuments.remove(doc)),
+                  ),
+                ),
+              ],
             ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -686,9 +945,10 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
                     return;
                   }
                   await controller.deliverOrder(
-                    orderId: widget.orderId,
+                    orderId: widget.order.id,
                     message: _messageController.text.trim(),
                     files: _selectedDocuments.map((e) => e.file).toList(),
+                    existingFiles: _existingDocs.map((e) => e.fileUrl).toList(),
                     fileMetadata: _selectedDocuments
                         .map(
                           (e) => {
@@ -698,9 +958,7 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
                           },
                         )
                         .toList(),
-                    clientUserId: controller.activeOrders
-                        .firstWhere((o) => o.id == widget.orderId)
-                        .userId,
+                    clientUserId: widget.order.userId,
                   );
                 },
               ),
@@ -710,4 +968,62 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
       ),
     );
   }
+}
+
+Widget buildUnifiedFileCard({
+  required String name,
+  String? category,
+  String? year,
+  String? mimeType,
+  bool isNew = false,
+  VoidCallback? onDelete,
+  VoidCallback? onView,
+}) {
+  return Card(
+    margin: const EdgeInsets.only(bottom: 10),
+    child: ListTile(
+      dense: true,
+      leading: Icon(
+        TaxDocumentController.iconForMime(mimeType),
+        color: isNew ? Colors.blue : null,
+        size: 24,
+      ),
+      title: Text(
+        name,
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+      ),
+      subtitle: (category != null || year != null)
+          ? Text(
+              [
+                if (category != null) category,
+                if (year != null) year,
+              ].join(' · '),
+              style: const TextStyle(fontSize: 11),
+            )
+          : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (onView != null)
+            IconButton(
+              icon: const Icon(Icons.download, size: 18),
+              onPressed: onView,
+              tooltip: 'View Document',
+              visualDensity: VisualDensity.compact,
+            ),
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(
+                Icons.delete_outline,
+                color: Colors.red,
+                size: 18,
+              ),
+              onPressed: onDelete,
+              tooltip: 'Remove',
+              visualDensity: VisualDensity.compact,
+            ),
+        ],
+      ),
+    ),
+  );
 }

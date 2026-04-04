@@ -20,6 +20,7 @@ class OrderController extends GetxController {
 
   // For order creation
   final titleController = TextEditingController();
+  final cancellationController = TextEditingController();
   final descriptionController = TextEditingController();
   final amountController = TextEditingController();
   final startDate = Rx<DateTime?>(null);
@@ -43,7 +44,10 @@ class OrderController extends GetxController {
     super.onClose();
   }
 
-  Future<bool> createOrder({required int userId}) async {
+  Future<bool> createOrder({
+    required int userId,
+    List<String>? deliverables,
+  }) async {
     if (titleController.text.trim().isEmpty ||
         amountController.text.trim().isEmpty) {
       Get.snackbar("Error", "Please fill in all required fields");
@@ -68,6 +72,9 @@ class OrderController extends GetxController {
         'start_date': startDate.value?.toIso8601String(),
         'due_date': dueDate.value?.toIso8601String(),
         'services': selectedServices.toList(),
+        if (deliverables != null) 'deliverables': deliverables,
+        if (cancellationController.text.trim().isNotEmpty)
+          'cancellation_policy': cancellationController.text.trim(),
       };
 
       final result = await SupabaseCrudService.insert(
@@ -93,8 +100,7 @@ class OrderController extends GetxController {
         } catch (e) {
           log("Error sending auto-message: $e");
         }
-
-        Get.snackbar("Success", "Order request sent successfully");
+        showSnackBar("Order request sent successfully", title: "Success");
         _clearForm();
         return true;
       } else {
@@ -183,6 +189,7 @@ class OrderController extends GetxController {
     required int orderId,
     required String message,
     required List<XFile> files,
+    List<String> existingFiles = const [],
     List<Map<String, dynamic>>? fileMetadata, // Optional metadata for each file
     int? clientUserId, // Client's user ID for proper categorization
   }) async {
@@ -218,12 +225,10 @@ class OrderController extends GetxController {
         }
 
         // 2. Fallback to direct upload if not already uploaded or if metadata was missing
-        if (finalUrl == null) {
-          finalUrl = await uploadFileToSupabaseStorage(
-            file: file,
-            bucketName: SupabaseStorageBucket.documents,
-          );
-        }
+        finalUrl ??= await uploadFileToSupabaseStorage(
+          file: file,
+          bucketName: SupabaseStorageBucket.documents,
+        );
 
         if (finalUrl != null) {
           uploadedUrls.add(finalUrl);
@@ -236,7 +241,7 @@ class OrderController extends GetxController {
           'status': OrderStatus.delivered.name,
           'deliver_message': message,
           'deliver_at': DateTime.now().toIso8601String(),
-          'delivery_files': uploadedUrls,
+          'delivery_files': [...existingFiles, ...uploadedUrls],
         },
         filters: {'id': orderId},
       );
