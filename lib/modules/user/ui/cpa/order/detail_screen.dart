@@ -153,7 +153,8 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                   onTapFunction: () {
                     _showDeliverOrderDialog(
                       context,
-                      isReDelivery: _currentOrder.status == OrderStatus.revision,
+                      isReDelivery:
+                          _currentOrder.status == OrderStatus.revision,
                     );
                   },
                 ),
@@ -204,15 +205,22 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                                   child: Card(
                                     margin: const EdgeInsets.all(30),
                                     child: Container(
-                                      constraints: const BoxConstraints(maxWidth: 320),
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 320,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 10,
+                                      ),
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Align(
                                             alignment: Alignment.centerRight,
                                             child: Padding(
-                                              padding: const EdgeInsets.only(right: 10),
+                                              padding: const EdgeInsets.only(
+                                                right: 10,
+                                              ),
                                               child: SizedBox(
                                                 width: 30,
                                                 height: 30,
@@ -227,11 +235,16 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                                           ),
                                           const Text(
                                             "Accept Delivery",
-                                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                                            style: TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                            ),
                                           ),
                                           const SizedBox(height: 20),
                                           const Padding(
-                                            padding: EdgeInsets.symmetric(horizontal: 20),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 20,
+                                            ),
                                             child: Text(
                                               "Are you sure you want to accept this delivery? The order will be marked as completed.",
                                               textAlign: TextAlign.center,
@@ -244,39 +257,55 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                                           ),
                                           const SizedBox(height: 20),
                                           ElevatedButton(
-                                            onPressed: isAccepting ? null : () async {
-                                              setDialogState(() => isAccepting = true);
-                                              
-                                              await Get.find<OrderController>().updateOrderStatus(
-                                                _currentOrder.id,
-                                                OrderStatus.completed,
-                                              );
-                                              
-                                              Get.back(); // Close dialog
+                                            onPressed: isAccepting
+                                                ? null
+                                                : () async {
+                                                    setDialogState(
+                                                      () => isAccepting = true,
+                                                    );
 
-                                              showSnackBar(
-                                                "Delivery accepted successfully",
-                                                title: "✔ Delivery Accepted",
-                                                begroundColor: Colors.green,
-                                              );
+                                                    await Get.find<
+                                                          OrderController
+                                                        >()
+                                                        .updateOrderStatus(
+                                                          _currentOrder.id,
+                                                          OrderStatus.completed,
+                                                        );
 
-                                              setState(() {
-                                                _currentOrder = OrderModel.fromJson({
-                                                  ..._currentOrder.toJson(),
-                                                  'status': OrderStatus.completed.name,
-                                                });
-                                              });
-                                            },
+                                                    Get.back(); // Close dialog
+
+                                                    showSnackBar(
+                                                      "Delivery accepted successfully",
+                                                      title:
+                                                          "✔ Delivery Accepted",
+                                                      begroundColor:
+                                                          Colors.green,
+                                                    );
+
+                                                    setState(() {
+                                                      _currentOrder =
+                                                          OrderModel.fromJson({
+                                                            ..._currentOrder
+                                                                .toJson(),
+                                                            'status':
+                                                                OrderStatus
+                                                                    .completed
+                                                                    .name,
+                                                          });
+                                                    });
+                                                  },
                                             child: isAccepting
                                                 ? Row(
-                                                    mainAxisSize: MainAxisSize.min,
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
                                                     children: const [
                                                       SizedBox(
                                                         width: 16,
                                                         height: 16,
-                                                        child: CircularProgressIndicator(
-                                                          strokeWidth: 2,
-                                                        ),
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                              strokeWidth: 2,
+                                                            ),
                                                       ),
                                                       SizedBox(width: 8),
                                                       Text("Processing..."),
@@ -323,7 +352,8 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
     if (_currentOrder.status == OrderStatus.completed) {
       statusColor = Colors.green;
     }
-    if (_currentOrder.status == OrderStatus.pending) statusColor = Colors.orange;
+    if (_currentOrder.status == OrderStatus.pending)
+      statusColor = Colors.orange;
     if (_currentOrder.status == OrderStatus.rejected ||
         _currentOrder.status == OrderStatus.cancelled) {
       statusColor = Colors.red;
@@ -391,9 +421,13 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                     _formatDate(_currentOrder.startDate!),
                   ),
                 if (_currentOrder.dueDate != null)
-                  _buildInfoRow("Due Date", _formatDate(_currentOrder.dueDate!)),
+                  _buildInfoRow(
+                    "Due Date",
+                    _formatDate(_currentOrder.dueDate!),
+                  ),
                 _buildInfoRow("Cost", "\$${_currentOrder.amount}"),
-                if (_currentOrder.deliverables != null && _currentOrder.deliverables!.isNotEmpty) ...[
+                if (_currentOrder.deliverables != null &&
+                    _currentOrder.deliverables!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Divider(),
                   const SizedBox(height: 10),
@@ -426,7 +460,8 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                     ],
                   ),
                 ],
-                if (_currentOrder.cancellationPolicy != null && _currentOrder.cancellationPolicy!.isNotEmpty) ...[
+                if (_currentOrder.cancellationPolicy != null &&
+                    _currentOrder.cancellationPolicy!.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   const Divider(),
                   const SizedBox(height: 10),
@@ -879,6 +914,7 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
             hintText: "Add a description or message...",
             labelText: "Delivery Message",
             maxLines: 4,
+            textInputAction: TextInputAction.newline,
           ),
           const SizedBox(height: 16),
           const Text(

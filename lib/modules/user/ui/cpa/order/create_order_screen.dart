@@ -9,6 +9,8 @@ import 'package:booksmart/widgets/multiple_selection_dropdown_widget.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:booksmart/constant/data.dart';
 
+import '../../../../../widgets/snackbar.dart';
+
 void goToCreateOrderCPAScreen({
   required int userId,
   required String userName,
@@ -200,8 +202,13 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                     userId: widget.userId,
                     deliverables: _deliverables,
                   );
+
                   if (success) {
                     Get.back();
+                    showSnackBar(
+                      "Order request sent successfully",
+                      title: "Success",
+                    );
                   }
                 },
               ),

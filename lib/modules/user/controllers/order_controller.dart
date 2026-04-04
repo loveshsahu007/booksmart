@@ -100,7 +100,7 @@ class OrderController extends GetxController {
         } catch (e) {
           log("Error sending auto-message: $e");
         }
-        showSnackBar("Order request sent successfully", title: "Success");
+
         _clearForm();
         return true;
       } else {
