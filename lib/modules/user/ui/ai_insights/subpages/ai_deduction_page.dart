@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:booksmart/widgets/date_range_picker.dart';
 import 'package:pie_chart/pie_chart.dart';
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/helpers/currency_formatter.dart';
 
 class AIDeductionPage extends StatefulWidget {
   const AIDeductionPage({super.key});
@@ -560,7 +561,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     );
   }
 
-  String _formatCurrency(double n) => '\$${n.toStringAsFixed(2)}';
+  String _formatCurrency(double n) => '\$${formatNumber(n)}';
   String _formatShortDate(DateTime d) {
     const months = [
       'Jan',

@@ -55,8 +55,8 @@ class OrderModel {
   final OrderStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
-  final DateTime? startDate;
-  final DateTime? dueDate;
+  final int? daysToComplete;
+  final DateTime? expirationDate;
   final PersonModel? cpa;
   final PersonModel? user;
 
@@ -96,8 +96,8 @@ class OrderModel {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
-    this.startDate,
-    this.dueDate,
+    this.daysToComplete,
+    this.expirationDate,
     this.cpa,
     this.user,
     this.stripePaymentIntentId,
@@ -148,11 +148,9 @@ class OrderModel {
             handleResponseFromJson<String>(json, "updated_at") ?? "",
           ) ??
           DateTime.now(),
-      startDate: DateTime.tryParse(
-        handleResponseFromJson<String>(json, "start_date") ?? "",
-      ),
-      dueDate: DateTime.tryParse(
-        handleResponseFromJson<String>(json, "due_date") ?? "",
+      daysToComplete: handleResponseFromJson<int>(json, "days_to_complete"),
+      expirationDate: DateTime.tryParse(
+        handleResponseFromJson<String>(json, "expiration_date") ?? "",
       ),
       cpa: json['cpa'] != null ? PersonModel.fromJson(json['cpa']) : null,
       user: json['user'] != null ? PersonModel.fromJson(json['user']) : null,
@@ -245,8 +243,8 @@ class OrderModel {
       "status": status.name,
       "created_at": createdAt.toIso8601String(),
       "updated_at": updatedAt.toIso8601String(),
-      "start_date": startDate?.toIso8601String(),
-      "due_date": dueDate?.toIso8601String(),
+      "days_to_complete": daysToComplete,
+      "expiration_date": expirationDate?.toIso8601String(),
       "stripe_payment_intent_id": stripePaymentIntentId,
       "payment_status": paymentStatus.name,
       "paid_at": paidAt?.toIso8601String(),

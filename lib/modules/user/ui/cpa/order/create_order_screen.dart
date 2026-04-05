@@ -1,8 +1,9 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/modules/user/controllers/order_controller.dart';
+import 'package:booksmart/helpers/date_formatter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+
 
 import '../../../../../widgets/custom_dialog.dart';
 import 'package:booksmart/widgets/multiple_selection_dropdown_widget.dart';
@@ -168,22 +169,23 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
             const SizedBox(height: 20),
 
-            // --- Dates ---
+            // --- Duration & Expiration Date ---
             Row(
               children: [
                 Expanded(
-                  child: _buildDatePicker(
-                    context,
-                    label: "Start Date",
-                    selectedDate: controller.startDate,
+                  child: AppTextField(
+                    controller: controller.daysToCompleteController,
+                    hintText: "Days to Complete (e.g. 7)",
+                    labelText: "Days to Complete",
+                    keyboardType: TextInputType.number,
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: _buildDatePicker(
                     context,
-                    label: "Due Date",
-                    selectedDate: controller.dueDate,
+                    label: "Expiration Date",
+                    selectedDate: controller.expirationDate,
                   ),
                 ),
               ],
@@ -287,7 +289,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
             children: [
               Expanded(
                 child: Text(
-                  date != null ? DateFormat('MM/dd/yyyy').format(date) : label,
+                  date != null ? formatDate(date) : label,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),

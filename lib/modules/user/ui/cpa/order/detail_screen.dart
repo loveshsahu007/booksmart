@@ -415,15 +415,15 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                if (_currentOrder.startDate != null)
+                if (_currentOrder.daysToComplete != null)
                   _buildInfoRow(
-                    "Start Date",
-                    _formatDate(_currentOrder.startDate!),
+                    "Days to Complete",
+                    "${_currentOrder.daysToComplete} Days",
                   ),
-                if (_currentOrder.dueDate != null)
+                if (_currentOrder.expirationDate != null)
                   _buildInfoRow(
-                    "Due Date",
-                    _formatDate(_currentOrder.dueDate!),
+                    "Expiration Date",
+                    _formatDate(_currentOrder.expirationDate!),
                   ),
                 _buildInfoRow("Cost", "\$${_currentOrder.amount}"),
                 if (_currentOrder.deliverables != null &&
@@ -971,33 +971,30 @@ class _DeliverOrderWidgetState extends State<DeliverOrderWidget> {
           const SizedBox(height: 24),
           SizedBox(
             width: double.infinity,
-            child: Obx(
-              () => AppButton(
-                buttonText: "Deliver",
-                isLoading: controller.isLoading.value,
-                onTapFunction: () async {
-                  if (_messageController.text.trim().isEmpty) {
-                    Get.snackbar("Error", "Please add a delivery message");
-                    return;
-                  }
-                  await controller.deliverOrder(
-                    orderId: widget.order.id,
-                    message: _messageController.text.trim(),
-                    files: _selectedDocuments.map((e) => e.file).toList(),
-                    existingFiles: _existingDocs.map((e) => e.fileUrl).toList(),
-                    fileMetadata: _selectedDocuments
-                        .map(
-                          (e) => {
-                            'name': e.name,
-                            'year': e.year,
-                            'category': e.category,
-                          },
-                        )
-                        .toList(),
-                    clientUserId: widget.order.userId,
-                  );
-                },
-              ),
+            child: AppButton(
+              buttonText: "Deliver",
+              onTapFunction: () async {
+                if (_messageController.text.trim().isEmpty) {
+                  Get.snackbar("Error", "Please add a delivery message");
+                  return;
+                }
+                await controller.deliverOrder(
+                  orderId: widget.order.id,
+                  message: _messageController.text.trim(),
+                  files: _selectedDocuments.map((e) => e.file).toList(),
+                  existingFiles: _existingDocs.map((e) => e.fileUrl).toList(),
+                  fileMetadata: _selectedDocuments
+                      .map(
+                        (e) => {
+                          'name': e.name,
+                          'year': e.year,
+                          'category': e.category,
+                        },
+                      )
+                      .toList(),
+                  clientUserId: widget.order.userId,
+                );
+              },
             ),
           ),
         ],

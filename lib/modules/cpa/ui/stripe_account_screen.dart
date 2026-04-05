@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../controllers/stripe_business_controller.dart';
+import 'package:booksmart/helpers/currency_formatter.dart';
 
 void goToStripeAccountScreen({bool shouldCloseBefore = false}) {
   if (kIsWeb) {
@@ -114,7 +115,7 @@ class _CPAStripeAccountScreenState extends State<CPAStripeAccountScreen> {
               children: [
                 const Text("Available"),
                 Text(
-                  "\$${controller.formatAmount(controller.balanceAvailable).toStringAsFixed(2)}",
+                  "\$${formatNumber(controller.formatAmount(controller.balanceAvailable))}",
                   style: const TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,
@@ -129,7 +130,7 @@ class _CPAStripeAccountScreenState extends State<CPAStripeAccountScreen> {
               children: [
                 const Text("Pending"),
                 Text(
-                  "\$${controller.formatAmount(controller.balancePending).toStringAsFixed(2)}",
+                  "\$${formatNumber(controller.formatAmount(controller.balancePending))}",
                   style: const TextStyle(
                     color: Colors.orange,
                     fontWeight: FontWeight.bold,

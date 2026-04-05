@@ -6,6 +6,7 @@ import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
 
 import '../../../../../constant/exports.dart';
 import '../detail_screen.dart';
+import 'package:booksmart/helpers/currency_formatter.dart';
 
 class CpaCard extends StatelessWidget {
   final CpaModel cpa;
@@ -72,7 +73,7 @@ class CpaCard extends StatelessWidget {
                         fontSize: 12,
                       ),
                       AppText(
-                        "Pricing: \$${cpa.hourlyRate.toStringAsFixed(0)}/hr",
+                        "Pricing: \$${formatNumber(cpa.hourlyRate)}/hr",
                         fontSize: 12,
                       ),
                       const SizedBox(height: 8),

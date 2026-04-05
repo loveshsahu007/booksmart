@@ -4,9 +4,10 @@ import 'package:booksmart/widgets/date_range_picker.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+
 
 import '../../../../widgets/custom_drop_down.dart';
+import 'package:booksmart/helpers/date_formatter.dart';
 
 void goToBulkReviewScreen({bool shouldCloseBefore = false}) {
   if (kIsWeb) {
@@ -268,9 +269,7 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
                             itemCount: filteredTransactions.length,
                             itemBuilder: (context, index) {
                               final t = filteredTransactions[index];
-                              final formattedDate = DateFormat(
-                                "MMM dd, yyyy",
-                              ).format(t['date']);
+                              final formattedDate = formatDate(t['date']);
 
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 12),

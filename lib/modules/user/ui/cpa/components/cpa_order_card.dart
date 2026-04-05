@@ -77,22 +77,22 @@ class OrderCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
 
-                    // Dates
-                    if (order.startDate != null || order.dueDate != null)
+                    // Duration & Expiration
+                    if (order.daysToComplete != null || order.expirationDate != null)
                       Row(
                         children: [
                           const Icon(Icons.calendar_today, size: 18),
                           const SizedBox(width: 6),
-                          if (order.startDate != null)
+                          if (order.daysToComplete != null)
                             AppText(
-                              'Start: ${formatDate(order.startDate!)}',
+                              'Duration: ${order.daysToComplete} Days',
                               fontSize: 12,
                             ),
-                          if (order.startDate != null && order.dueDate != null)
+                          if (order.daysToComplete != null && order.expirationDate != null)
                             const SizedBox(width: 10),
-                          if (order.dueDate != null)
+                          if (order.expirationDate != null)
                             AppText(
-                              'Due: ${formatDate(order.dueDate!)}',
+                              'Expires: ${formatDate(order.expirationDate!)}',
                               fontSize: 12,
                             ),
                         ],

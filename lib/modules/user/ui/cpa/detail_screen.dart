@@ -8,6 +8,7 @@ import '../../../../widgets/confirmation_dialog.dart';
 import '../../../../widgets/custom_dialog.dart';
 
 import 'package:booksmart/models/user_base_model.dart';
+import 'package:booksmart/helpers/currency_formatter.dart';
 
 void goToCpaDetailScreen(CpaModel cpa, {bool shouldCloseBefore = false}) {
   if (kIsWeb) {
@@ -124,7 +125,7 @@ class _CpaDetailScreenState extends State<CpaDetailScreen> {
                   title: AppText(service.title, fontWeight: FontWeight.bold),
                   subtitle: AppText(service.description, fontSize: 12),
                   trailing: AppText(
-                    "\$${service.price.toStringAsFixed(2)}",
+                    "\$${formatNumber(service.price)}",
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -224,7 +225,7 @@ class _CpaDetailScreenState extends State<CpaDetailScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: AppText(
-                        "Starting at \$${widget.cpa.hourlyRate.toStringAsFixed(0)} for standard filing",
+                        "Starting at \$${formatNumber(widget.cpa.hourlyRate)} for standard filing",
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),

@@ -6,7 +6,8 @@ import 'package:booksmart/modules/common/ui/chat/chat_screen.dart';
 import 'package:booksmart/utils/supabase.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+
+import 'package:booksmart/helpers/date_formatter.dart';
 
 void showUserDetailsDialog(PersonModel user) {
   final String fullName = '${user.firstName} ${user.lastName}'.trim().isEmpty
@@ -56,7 +57,7 @@ void showUserDetailsDialog(PersonModel user) {
               _infoRow('Role', user.role.name.toUpperCase()),
               _infoRow(
                 'Joined',
-                DateFormat('MMM d, yyyy').format(user.createdAt),
+                formatDate(user.createdAt),
               ),
 
               const SizedBox(height: 24),

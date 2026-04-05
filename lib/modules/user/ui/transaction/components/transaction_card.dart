@@ -7,6 +7,7 @@ import '../../../../../models/transaction_model.dart';
 import '../../../../admin/controllers/category_controler.dart';
 import '../../../controllers/bank_controller.dart';
 import '../add_transaction_manual.dart';
+import 'package:booksmart/helpers/currency_formatter.dart';
 
 String? getBankAccountName({
   required int? bankId,
@@ -75,7 +76,7 @@ class TransactionCard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            "$amountPrefix\$${transaction.amount.abs().toStringAsFixed(2)}",
+                            "$amountPrefix\$${formatNumber(transaction.amount.abs())}",
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,

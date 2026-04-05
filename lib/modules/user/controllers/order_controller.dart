@@ -14,6 +14,7 @@ import 'package:booksmart/supabase/buckets.dart';
 import 'package:booksmart/models/user_base_model.dart';
 import 'package:booksmart/modules/user/controllers/tax_document_controller.dart';
 import 'package:booksmart/widgets/snackbar.dart';
+import 'package:booksmart/widgets/loading.dart';
 
 class OrderController extends GetxController {
   final isLoading = false.obs;
@@ -23,11 +24,10 @@ class OrderController extends GetxController {
   final cancellationController = TextEditingController();
   final descriptionController = TextEditingController();
   final amountController = TextEditingController();
-  final startDate = Rx<DateTime?>(null);
-  final dueDate = Rx<DateTime?>(null);
+  final daysToCompleteController = TextEditingController();
+  final expirationDate = Rx<DateTime?>(null);
   final selectedServices = <String>[].obs;
 
-  // Active orders list (for user dashboard)
   final activeOrders = <OrderModel>[].obs;
 
   @override
@@ -41,6 +41,8 @@ class OrderController extends GetxController {
     titleController.dispose();
     descriptionController.dispose();
     amountController.dispose();
+    cancellationController.dispose();
+    daysToCompleteController.dispose();
     super.onClose();
   }
 
@@ -48,17 +50,21 @@ class OrderController extends GetxController {
     required int userId,
     List<String>? deliverables,
   }) async {
+    // Validation
     if (titleController.text.trim().isEmpty ||
-        amountController.text.trim().isEmpty) {
-      Get.snackbar("Error", "Please fill in all required fields");
+        amountController.text.trim().isEmpty ||
+        daysToCompleteController.text.trim().isEmpty ||
+        expirationDate.value == null) {
+      showSnackBar("Please fill in all required fields", isError: true);
       return false;
     }
 
     try {
       isLoading.value = true;
       final cpaId = Get.find<AuthController>().person?.id;
+
       if (cpaId == null) {
-        Get.snackbar("Error", "User not found");
+        showSnackBar("Authentication error: User not found", isError: true);
         return false;
       }
 
@@ -69,8 +75,8 @@ class OrderController extends GetxController {
         'description': descriptionController.text.trim(),
         'amount': double.tryParse(amountController.text.trim()) ?? 0.0,
         'status': OrderStatus.pending.name,
-        'start_date': startDate.value?.toIso8601String(),
-        'due_date': dueDate.value?.toIso8601String(),
+        'days_to_complete': int.tryParse(daysToCompleteController.text.trim()),
+        'expiration_date': expirationDate.value?.toIso8601String(),
         'services': selectedServices.toList(),
         if (deliverables != null) 'deliverables': deliverables,
         if (cancellationController.text.trim().isNotEmpty)
@@ -83,46 +89,40 @@ class OrderController extends GetxController {
       );
 
       if (result != null) {
-        // Send automated message
-        try {
-          if (Get.isRegistered<ChatController>()) {
-            final chatController = Get.find<ChatController>();
-
-            String orderIdStr = "";
-            if (result is List && result.isNotEmpty) {
-              orderIdStr = "Order #${result[0]['id']}";
-            }
-
-            final msg =
-                "Order Request Sent $orderIdStr\nTitle: ${titleController.text.trim()}\nAmount: \$${amountController.text.trim()}\n\nPlease check your dashboard for details.";
-            chatController.sendMessage(msg);
-          }
-        } catch (e) {
-          log("Error sending auto-message: $e");
-        }
+        // Handle automated chat message
+        _sendOrderCreationChatMessage(result);
 
         _clearForm();
+        showSnackBar("Order request sent successfully!");
         return true;
       } else {
-        Get.snackbar("Error", "Failed to send order request");
+        showSnackBar("Failed to send order request", isError: true);
         return false;
       }
     } catch (e) {
       log("Error creating order: $e");
-      Get.snackbar("Error", "An error occurred: $e");
+      showSnackBar("An error occurred: ${e.toString()}", isError: true);
       return false;
     } finally {
       isLoading.value = false;
     }
   }
 
-  void _clearForm() {
-    titleController.clear();
-    descriptionController.clear();
-    amountController.clear();
-    startDate.value = null;
-    dueDate.value = null;
-    selectedServices.clear();
+  void _sendOrderCreationChatMessage(dynamic result) {
+    try {
+      if (Get.isRegistered<ChatController>()) {
+        final chatController = Get.find<ChatController>();
+        String orderIdStr = "";
+        if (result is List && result.isNotEmpty) {
+          orderIdStr = "Order #${result[0]['id']}";
+        }
+        final msg =
+            "Order Request Sent $orderIdStr\nTitle: ${titleController.text.trim()}\nAmount: \$${amountController.text.trim()}\n\nPlease check your dashboard for details.";
+        chatController.sendMessage(msg);
+      }
+    } catch (e) {
+      log("Error sending auto-message: $e");
+    }
   }
 
   Future<void> fetchActiveOrders() async {
@@ -133,10 +133,6 @@ class OrderController extends GetxController {
 
       final isCpa = person.role == UserRole.cpa;
       final userId = person.id;
-
-      // Ensure we select the related cpa/user data
-      // If CPA, we want to see the User details (user:user_id(*))
-      // If User, we want to see the CPA details (cpa:cpa_id(*))
 
       var query = supabase
           .from(SupabaseTable.orders)
@@ -157,6 +153,7 @@ class OrderController extends GetxController {
           .toList();
     } catch (e) {
       log("Error fetching active orders: $e");
+      // Optional: showSnackBar("Failed to load orders", isError: true);
     } finally {
       isLoading.value = false;
     }
@@ -170,16 +167,17 @@ class OrderController extends GetxController {
         data: {'status': status.name},
         filters: {'id': orderId},
       );
-      // Refresh list
+
       await fetchActiveOrders();
+
       if (status == OrderStatus.accepted) {
-        Get.snackbar("Success", "Order accepted!");
+        showSnackBar("Order accepted!");
       } else if (status == OrderStatus.rejected) {
-        Get.snackbar("Info", "Order declined.");
+        showSnackBar("Order declined.", begroundColor: Colors.orange);
       }
     } catch (e) {
       log("Error updating order status: $e");
-      Get.snackbar("Error", "Failed to update status");
+      showSnackBar("Failed to update status", isError: true);
     } finally {
       isLoading.value = false;
     }
@@ -190,10 +188,11 @@ class OrderController extends GetxController {
     required String message,
     required List<XFile> files,
     List<String> existingFiles = const [],
-    List<Map<String, dynamic>>? fileMetadata, // Optional metadata for each file
-    int? clientUserId, // Client's user ID for proper categorization
+    List<Map<String, dynamic>>? fileMetadata,
+    int? clientUserId,
   }) async {
     try {
+      showLoading();
       isLoading.value = true;
       List<String> uploadedUrls = [];
 
@@ -201,8 +200,10 @@ class OrderController extends GetxController {
           ? Get.find<TaxDocumentController>()
           : Get.put(TaxDocumentController());
 
-      final cpaId = Get.find<AuthController>().person?.id;
+      final authController = Get.find<AuthController>();
+      final cpaId = authController.person?.id;
 
+      // 1. Upload Files loop
       for (int i = 0; i < files.length; i++) {
         final file = files[i];
         final metadata = (fileMetadata != null && i < fileMetadata.length)
@@ -211,7 +212,7 @@ class OrderController extends GetxController {
 
         String? finalUrl;
 
-        // 1. Try formal upload with metadata if available
+        // Formal Upload with metadata
         if (metadata != null && clientUserId != null) {
           finalUrl = await taxDocCtrl.uploadDocument(
             name: metadata['name'] ?? file.name,
@@ -224,7 +225,7 @@ class OrderController extends GetxController {
           );
         }
 
-        // 2. Fallback to direct upload if not already uploaded or if metadata was missing
+        // Fallback to storage directly
         finalUrl ??= await uploadFileToSupabaseStorage(
           file: file,
           bucketName: SupabaseStorageBucket.documents,
@@ -232,9 +233,13 @@ class OrderController extends GetxController {
 
         if (finalUrl != null) {
           uploadedUrls.add(finalUrl);
+        } else {
+          // Break the flow if a file fails to upload to prevent empty deliveries
+          throw Exception("Could not upload file: ${file.name}");
         }
       }
 
+      // 2. Update Database
       await SupabaseCrudService.update(
         table: SupabaseTable.orders,
         data: {
@@ -246,18 +251,33 @@ class OrderController extends GetxController {
         filters: {'id': orderId},
       );
 
+      // 3. Refresh and UI Close
       await fetchActiveOrders();
 
-      // Close dialog first
-      Get.back();
+      dismissLoadingWidget();
 
-      // Show success message using the safer showSnackBar helper
+      // Close delivery dialog/bottomsheet ONLY on success
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
+
       showSnackBar("Order delivered successfully!");
     } catch (e) {
+      dismissLoadingWidget();
       log("Error delivering order: $e");
-      showSnackBar("Failed to deliver order", isError: true);
+      showSnackBar("Delivery failed: ${e.toString()}", isError: true);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  void _clearForm() {
+    titleController.clear();
+    descriptionController.clear();
+    amountController.clear();
+    cancellationController.clear();
+    daysToCompleteController.clear();
+    expirationDate.value = null;
+    selectedServices.clear();
   }
 }

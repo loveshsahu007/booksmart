@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../widgets/app_text.dart';
+import 'package:booksmart/helpers/currency_formatter.dart';
 
 void goToCPAServicesScreen({bool shouldCloseBefore = false}) {
   if (kIsWeb) {
@@ -169,7 +170,7 @@ class _CpaServicesScreenState extends State<CpaServicesScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     AppText(
-                      "\$${service.price.toStringAsFixed(2)}",
+                      "\$${formatNumber(service.price)}",
                       fontWeight: FontWeight.bold,
                     ),
                     const SizedBox(width: 8),
