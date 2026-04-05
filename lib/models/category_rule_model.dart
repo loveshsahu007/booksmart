@@ -3,7 +3,9 @@ class CategoryRuleModel {
   final String memo;
   final int categoryId;
   final int? subCategoryId;
-  final int userId;
+
+  /// authId of user - changed from int to string
+  final String userId;
   final bool status;
   final DateTime createdAt;
   final DateTime updatedAt;

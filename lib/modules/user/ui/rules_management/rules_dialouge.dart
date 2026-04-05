@@ -91,7 +91,7 @@ void showAddEditRuleDialog({CategoryRuleModel? rule}) {
                         memo: memoCtrl.text.trim(),
                         categoryId: selectedCategory!,
                         subCategoryId: selectedSubCategory,
-                        userId: authUser!.id,
+                        userId: authUser!.authId,
                         status: true,
                         createdAt: DateTime.now(),
                         updatedAt: DateTime.now(),

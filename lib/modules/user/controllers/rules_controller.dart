@@ -22,7 +22,7 @@ class RulesController extends GetxController {
 
       final res = await SupabaseCrudService.read(
         table: SupabaseTable.categoryRules,
-        filters: {'user_id': authUser!.id},
+        filters: {'user_id': authUser?.authId},
       );
 
       rules
