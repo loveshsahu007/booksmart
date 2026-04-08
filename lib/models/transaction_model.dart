@@ -25,6 +25,8 @@ class TransactionModel {
   final String? bankAccountId;
   final String? plaidTransactionId;
 
+  final bool isAiVerified;
+
   TransactionModel({
     required this.id,
     required this.title,
@@ -42,6 +44,7 @@ class TransactionModel {
     this.bankId,
     this.bankAccountId,
     this.plaidTransactionId,
+    this.isAiVerified = true,
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) =>
@@ -65,6 +68,8 @@ class TransactionModel {
           json,
           'plaid_transaction_id',
         ),
+        isAiVerified:
+            handleResponseFromJson<bool?>(json, 'is_ai_verified') ?? true,
       );
 
   Map<String, dynamic> toJson() {
@@ -85,6 +90,7 @@ class TransactionModel {
       'bank_id': bankId,
       'bank_account_id': bankAccountId,
       'plaid_transaction_id': plaidTransactionId,
+      'is_ai_verified': isAiVerified,
     }..removeWhere((key, value) => value == null);
   }
 

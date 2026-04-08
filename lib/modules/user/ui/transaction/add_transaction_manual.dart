@@ -325,10 +325,20 @@ class _AddTransactionScreenManualState
             //   ),
             //   child:
             Card(
-              child: SwitchListTile(
-                title: const AppText("Deductible"),
-                value: deductible,
-                onChanged: (val) => setState(() => deductible = val),
+              margin: EdgeInsets.zero,
+              child: StatefulBuilder(
+                builder: (context, deductState) {
+                  return SwitchListTile(
+                    title: const AppText("Deductible"),
+                    value: deductible,
+                    onChanged: (val) => deductState(() => deductible = val),
+                    dense: true,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: const BorderSide(color: Colors.grey, width: 0.2),
+                    ),
+                  );
+                },
               ),
             ),
             // ),
