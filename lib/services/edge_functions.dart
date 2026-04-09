@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:developer';
 
+import 'package:booksmart/widgets/loading.dart';
 import 'package:get/get.dart';
 
 import '../utils/supabase.dart';
@@ -251,3 +252,58 @@ Future<String?> processCpaOrderPayment({
     return "Something went wrong while processing the payment.";
   }
 }
+
+Future<Map<String, dynamic>> aiCategorization() async {
+  final session = supabase.auth.currentSession;
+  if (session == null) throw Exception("User not logged in");
+
+  showLoading();
+  log("Start Time: ${DateTime.now().toIso8601String()}");
+
+  final response = await GetConnect(timeout: Duration(seconds: 60)).get(
+    'https://pvppwmkswnluidlwnnck.supabase.co/functions/v1/ai_categorization',
+    headers: {
+      'Authorization': 'Bearer ${supabase.auth.currentSession?.accessToken}',
+      'Content-Type': 'application/json',
+    },
+  );
+  log("End Time: ${DateTime.now().toIso8601String()}");
+
+  dismissLoadingWidget();
+
+  log(response.bodyString ?? "aiCategorization ::: null");
+
+  log("StatusCode: ${response.statusCode}");
+
+  return jsonDecode(response.bodyString ?? '{}') as Map<String, dynamic>;
+}
+
+var x = '''
+You are a financial transaction categorization assistant.
+
+STRICT RULES:
+- Always return valid JSON array
+- Never return null
+- Only use provided IDs
+- Do NOT guess randomly
+- You MUST choose the closest matching category even if not perfect
+- Never prefer generic categories over specific ones
+- Transportation, Taxi, Ride Share, Uber → Travel
+- Use Miscellaneous ONLY if no reasonable match exists
+
+Categories:
+[{"id":5,"name":"Other Expense","sub_categories":[{"id":78,"name":"Penalties & Settlements","category_id":5}]},{"id":6,"name":"Income","sub_categories":[{"id":80,"name":"Billable Expense Income","category_id":6},{"id":81,"name":"Discounts","category_id":6},{"id":82,"name":"Gross Receipts","category_id":6},{"id":83,"name":"Interest Earned","category_id":6},{"id":84,"name":"Refunds-Allowances","category_id":6},{"id":85,"name":"Sales","category_id":6},{"id":86,"name":"Shipping & Delivery Income","category_id":6},{"id":87,"name":"Uncategorized Income","category_id":6}]},{"id":7,"name":"Equity","sub_categories":[{"id":79,"name":"Retained Earnings","category_id":7}]},{"id":8,"name":"Cost of Goods Sold (COS)","sub_categories":[{"id":88,"name":"Cost of Labor – COS","category_id":8},{"id":89,"name":"Freight & Delivery – COS","category_id":8},{"id":90,"name":"Other Costs – COS","category_id":8},{"id":91,"name":"Purchases – COS","category_id":8},{"id":92,"name":"Subcontractors – COS","category_id":8},{"id":93,"name":"Supplies & Materials – COGS","category_id":8}]},{"id":9,"name":"Other Current Asset","sub_categories":[{"id":94,"name":"Prepaid Expenses","category_id":9},{"id":95,"name":"Uncategorized Asset","category_id":9},{"id":96,"name":"Undeposited Funds","category_id":9}]},{"id":4,"name":"Expense","sub_categories":[{"id":54,"name":"Advertising","category_id":4},{"id":55,"name":"Bad Debts","category_id":4},{"id":56,"name":"Bank Charges","category_id":4},{"id":57,"name":"Commissions & Fees","category_id":4},{"id":58,"name":"Cost of Labor – COS","category_id":4},{"id":59,"name":"Disposal Fees","category_id":4},{"id":60,"name":"Dues & Subscriptions","category_id":4},{"id":61,"name":"Freight & Delivery","category_id":4},{"id":62,"name":"Legal & Professional Fees","category_id":4},{"id":63,"name":"Meals and Entertainment","category_id":4},{"id":64,"name":"Miscellaneous","category_id":4},{"id":65,"name":"Office Expenses","category_id":4},{"id":66,"name":"Promotional","category_id":4},{"id":67,"name":"Rent or Lease","category_id":4},{"id":68,"name":"Repair & Maintenance","category_id":4},{"id":69,"name":"Shipping & Delivery Expense","category_id":4},{"id":70,"name":"Stationery & Printing","category_id":4},{"id":71,"name":"Subcontractors","category_id":4},{"id":72,"name":"Supplies","category_id":4},{"id":73,"name":"Taxes & Licenses","category_id":4},{"id":74,"name":"Tools","category_id":4},{"id":75,"name":"Travel","category_id":4},{"id":76,"name":"Travel Meals","category_id":4},{"id":77,"name":"Utilities","category_id":4}]}]
+
+Transactions:
+[{"id":124,"title":"McDonald's","description":"McDonald's | McDonald's | mcdonalds.com","plaid_category":{"primary":"FOOD_AND_DRINK","version":"v2","detailed":"FOOD_AND_DRINK_FAST_FOOD","confidence_level":"VERY_HIGH"}},{"id":125,"title":"Starbucks","description":"Starbucks | Starbucks | starbucks.com","plaid_category":{"primary":"FOOD_AND_DRINK","version":"v2","detailed":"FOOD_AND_DRINK_COFFEE","confidence_level":"VERY_HIGH"}},{"id":126,"title":"SparkFun","description":"SparkFun | FUN","plaid_category":{"primary":"ENTERTAINMENT","version":"v2","detailed":"ENTERTAINMENT_SPORTING_EVENTS_AMUSEMENT_PARKS_AND_MUSEUMS","confidence_level":"LOW"}},{"id":127,"title":"Uber 072515 SF**POOL**","description":"Uber 072515 SF**POOL** | Uber | uber.com","plaid_category":{"primary":"TRANSPORTATION","version":"v2","detailed":"TRANSPORTATION_TAXIS_AND_RIDE_SHARES","confidence_level":"VERY_HIGH"}},{"id":128,"title":"Uber 063015 SF**POOL**","description":"Uber 063015 SF**POOL** | Uber | uber.com","plaid_category":{"primary":"TRANSPORTATION","version":"v2","detailed":"TRANSPORTATION_TAXIS_AND_RIDE_SHARES","confidence_level":"VERY_HIGH"}},{"id":129,"title":"United Airlines","description":"United Airlines | United Airlines | united.com","plaid_category":{"primary":"TRAVEL","version":"v2","detailed":"TRAVEL_FLIGHTS","confidence_level":"VERY_HIGH"}},{"id":130,"title":"McDonald's","description":"McDonald's | McDonald's | mcdonalds.com","plaid_category":{"primary":"FOOD_AND_DRINK","version":"v2","detailed":"FOOD_AND_DRINK_FAST_FOOD","confidence_level":"VERY_HIGH"}},{"id":131,"title":"Starbucks","description":"Starbucks | Starbucks | starbucks.com","plaid_category":{"primary":"FOOD_AND_DRINK","version":"v2","detailed":"FOOD_AND_DRINK_COFFEE","confidence_level":"VERY_HIGH"}},{"id":132,"title":"SparkFun","description":"SparkFun | FUN","plaid_category":{"primary":"ENTERTAINMENT","version":"v2","detailed":"ENTERTAINMENT_SPORTING_EVENTS_AMUSEMENT_PARKS_AND_MUSEUMS","confidence_level":"LOW"}},{"id":133,"title":"Uber 072515 SF**POOL**","description":"Uber 072515 SF**POOL** | Uber | uber.com","plaid_category":{"primary":"TRANSPORTATION","version":"v2","detailed":"TRANSPORTATION_TAXIS_AND_RIDE_SHARES","confidence_level":"VERY_HIGH"}},{"id":134,"title":"Uber 063015 SF**POOL**","description":"Uber 063015 SF**POOL** | Uber | uber.com","plaid_category":{"primary":"TRANSPORTATION","version":"v2","detailed":"TRANSPORTATION_TAXIS_AND_RIDE_SHARES","confidence_level":"VERY_HIGH"}},{"id":135,"title":"United Airlines","description":"United Airlines | United Airlines | united.com","plaid_category":{"primary":"TRAVEL","version":"v2","detailed":"TRAVEL_FLIGHTS","confidence_level":"VERY_HIGH"}},{"id":140,"title":"Uber 072515 SF**POOL**","description":"Uber 072515 SF**POOL** | Uber | uber.com","plaid_category":{"primary":"TRANSPORTATION","version":"v2","detailed":"TRANSPORTATION_TAXIS_AND_RIDE_SHARES","confidence_level":"VERY_HIGH"}},{"id":4,"title":"Uber 063015 SF**POOL**","description":"Uber 063015 SF**POOL** | Uber | uber.com","plaid_category":{"primary":"TRANSPORTATION","version":"v2","detailed":"TRANSPORTATION_TAXIS_AND_RIDE_SHARES","confidence_level":"VERY_HIGH"}},{"id":5,"title":"United Airlines","description":"United Airlines | United Airlines | united.com","plaid_category":{"primary":"TRAVEL","version":"v2","detailed":"TRAVEL_FLIGHTS","confidence_level":"VERY_HIGH"}}]
+
+Return ONLY JSON array:
+[
+  {
+    "id": number,
+    "category_id": number,
+    "sub_category_id": number
+  }
+]
+
+''';

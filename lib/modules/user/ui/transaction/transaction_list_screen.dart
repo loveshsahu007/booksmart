@@ -7,8 +7,11 @@ import 'dart:async';
 import 'package:booksmart/modules/user/ui/bulk_review/bulk_review_screen.dart';
 import 'package:booksmart/modules/user/ui/transaction/add_transaction_manual.dart';
 import 'package:booksmart/widgets/date_range_picker.dart';
+import 'package:booksmart/widgets/snackbar.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:get/get.dart';
+import '../../../../services/edge_functions.dart';
+import '../../../../widgets/confirmation_dialog.dart';
 import '../../controllers/bank_controller.dart';
 import '../../controllers/organization_controller.dart';
 import '../../../../widgets/custom_drop_down.dart';
@@ -303,6 +306,23 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                   },
                 ),
               ),
+              IconButton(
+                icon: Icon(Icons.compass_calibration_outlined),
+                onPressed: () async {
+                  showConfirmationDialog(
+                    title: "AI Categorization",
+                    description:
+                        "It will now categorize your 10 transactions through AI",
+                    onYes: () async {
+                      Get.back();
+                      await aiCategorization().then((value) {
+                        showSnackBar(value.toString());
+                      });
+                    },
+                  );
+                },
+              ),
+
               IconButton(
                 icon: Badge(
                   isLabelVisible: isAnyActiveFilter,
