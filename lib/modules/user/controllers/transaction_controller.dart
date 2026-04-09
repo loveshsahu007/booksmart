@@ -5,6 +5,7 @@ import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:booksmart/utils/supabase.dart';
+import 'package:booksmart/widgets/loading.dart';
 import 'package:get/get.dart';
 
 TransactionController transactionControllerInstance =
@@ -35,8 +36,9 @@ class TransactionController extends GetxController {
     String? amountRange,
     DateTime? startDate,
     DateTime? endDate,
-    String?
-    bankAccountId, // Plaid account ID from BankAccountModel.plaidAccountId
+    String? bankAccountId, // Plaid account ID from BankAccountModel.plaidAccountId
+    bool? isAiVerified,
+    bool? isCategoryNotNull,
   }) async {
     try {
       if (isLoadMore) {
@@ -53,6 +55,16 @@ class TransactionController extends GetxController {
           .from(table)
           .select()
           .eq('org_id', getCurrentOrganization!.id);
+
+      // AI Verified filter
+      if (isAiVerified != null) {
+        query = query.eq('is_ai_verified', isAiVerified);
+      }
+
+      // Category Presence filter
+      if (isCategoryNotNull != null && isCategoryNotNull) {
+        query = query.not('category_id', 'is', null);
+      }
 
       // Search filter
       if (searchQuery != null && searchQuery.isNotEmpty) {
@@ -193,6 +205,37 @@ class TransactionController extends GetxController {
       somethingWentWrongSnackbar();
     }
     update();
+  }
+
+  Future<void> approveTransactions({
+    required List<int> ids,
+    bool isAiVerified = false,
+    bool isCategoryNotNull = true,
+  }) async {
+    try {
+      showLoading();
+      await supabase
+          .from(table)
+          .update({'is_ai_verified': true})
+          .filter('id', 'in', '(${ids.join(",")})');
+
+      dismissLoadingWidget();
+
+      // Refresh with the same filters used by Bulk Review
+      await getTransactions(
+        isAiVerified: isAiVerified,
+        isCategoryNotNull: isCategoryNotNull,
+      );
+
+      showSnackBar("Transactions approved successfully");
+    } catch (e, s) {
+      log("❌ approveTransactions ERROR: $e");
+      log(s.toString());
+      dismissLoadingWidget();
+      somethingWentWrongSnackbar();
+    } finally {
+      update();
+    }
   }
 
   Future<void> deleteTransaction(int id) async {

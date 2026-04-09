@@ -1,19 +1,21 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/modules/admin/controllers/category_controler.dart';
+import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
-import 'package:booksmart/widgets/date_range_picker.dart';
-import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:booksmart/helpers/currency_formatter.dart';
+import '../../../../../models/transaction_model.dart';
 
-
-import '../../../../widgets/custom_drop_down.dart';
-import 'package:booksmart/helpers/date_formatter.dart';
-
+// --- Navigation Helper ---
 void goToBulkReviewScreen({bool shouldCloseBefore = false}) {
+  // Safe registration check to prevent "Controller not found" error
+  if (!Get.isRegistered<TransactionController>()) {
+    Get.lazyPut(() => TransactionController());
+  }
+
   if (kIsWeb) {
-    if (shouldCloseBefore) {
-      Get.back(); // close previous dialog
-    }
+    if (shouldCloseBefore) Get.back();
     customDialog(
       child: const BulkReviewScreen(),
       title: 'Bulk Review',
@@ -36,353 +38,319 @@ class BulkReviewScreen extends StatefulWidget {
 }
 
 class _BulkReviewScreenState extends State<BulkReviewScreen> {
-  bool selectAll = false;
-  List<Map<String, dynamic>> transactions = [];
-  List<Map<String, dynamic>> filteredTransactions = [];
+  // Use Get.find to get the existing controller instance
+  late TransactionController txController;
 
+  List<TransactionModel> filteredTransactions = [];
+  Set<String> selectedIds = {};
   final TextEditingController searchController = TextEditingController();
-  String selectedSort = "Newest";
-  DateTimeRange? selectedDateRange;
 
   @override
   void initState() {
     super.initState();
 
-    // Dummy data
-    transactions = [
-      {
-        "merchant": "Amazon",
-        "category": "Internet Expenses",
-        "date": DateTime(2024, 4, 19),
-        "selected": true,
-      },
-      {
-        "merchant": "Hydro Pub",
-        "category": "Meals & Entertainment",
-        "date": DateTime(2024, 4, 19),
-        "selected": true,
-      },
-      {
-        "merchant": "Taxi",
-        "category": "Travel",
-        "date": DateTime(2024, 4, 17),
-        "selected": false,
-      },
-      {
-        "merchant": "Netflix",
-        "category": "Subscriptions",
-        "date": DateTime(2024, 4, 15),
-        "selected": false,
-      },
-    ];
+    // Safety: Find the controller, or put it if it's missing
+    txController = Get.isRegistered<TransactionController>()
+        ? Get.find<TransactionController>()
+        : Get.put(TransactionController());
 
-    filteredTransactions = List.from(transactions);
+    // Initial data load
+    _fetchTransactions();
+    searchController.addListener(_onSearchChanged);
   }
 
-  // 🔍 Search filter
-  void _filterTransactions() {
-    final query = searchController.text.toLowerCase();
-
-    List<Map<String, dynamic>> filtered = transactions.where((t) {
-      final name = t['merchant'].toString().toLowerCase();
-      final category = t['category'].toString().toLowerCase();
-
-      final matchesQuery =
-          query.isEmpty || name.contains(query) || category.contains(query);
-
-      final withinDateRange =
-          selectedDateRange == null ||
-          (t['date'].isAfter(selectedDateRange!.start) &&
-              t['date'].isBefore(selectedDateRange!.end));
-
-      return matchesQuery && withinDateRange;
-    }).toList();
-
-    _sortTransactions(filtered);
+  void _fetchTransactions() {
+    txController.getTransactions(
+      isAiVerified: false,
+      isCategoryNotNull: true,
+    );
   }
 
-  // 🧭 Sort logic
-  void _sortTransactions(List<Map<String, dynamic>> list) {
-    switch (selectedSort) {
-      case "Oldest":
-        list.sort((a, b) => a['date'].compareTo(b['date']));
-        break;
-      case "A–Z":
-        list.sort(
-          (a, b) =>
-              a['merchant'].toString().compareTo(b['merchant'].toString()),
-        );
-        break;
-      case "Z–A":
-        list.sort(
-          (a, b) =>
-              b['merchant'].toString().compareTo(a['merchant'].toString()),
-        );
-        break;
-      case "Highest Amount":
-      case "Lowest Amount":
-        // Placeholder for amount sorting if added later
-        break;
-      case "Newest":
-      default:
-        list.sort((a, b) => b['date'].compareTo(a['date']));
-    }
-
-    setState(() => filteredTransactions = list);
+  void _onSearchChanged() {
+    setState(() {
+      filteredTransactions = txController.transactions
+          .where(
+            (tx) => tx.title.toLowerCase().contains(
+              searchController.text.toLowerCase(),
+            ),
+          )
+          .toList();
+    });
   }
 
   void toggleSelectAll() {
     setState(() {
-      selectAll = !selectAll;
-      for (var t in filteredTransactions) {
-        t['selected'] = selectAll;
+      if (selectedIds.length == filteredTransactions.length) {
+        selectedIds.clear();
+      } else {
+        selectedIds = filteredTransactions.map((e) => e.id.toString()).toSet();
       }
     });
   }
 
-  final _sortDropDownKey = GlobalKey<DropdownSearchState<String>>();
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: kIsWeb ? null : AppBar(title: const Text("Bulk Review")),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 🔍 Search Bar
-                  AppTextField(
-                    hintText: "Search transactions",
-                    controller: searchController,
-                  ),
-                  // TextField(
-                  //   controller: searchController,
-                  //   onChanged: (_) => _filterTransactions(),
-                  //   decoration: InputDecoration(
-                  //     hintText: "Search transactions",
-                  //     prefixIcon: const Icon(Icons.search, color: orangeColor),
-                  //     filled: true,
-                  //     fillColor: isDark
-                  //         ? colorScheme.surface
-                  //         : Colors.grey.shade100,
-                  //     border: OutlineInputBorder(
-                  //       borderRadius: BorderRadius.circular(10),
-                  //       borderSide: BorderSide(
-                  //         color: colorScheme.secondary,
-                  //         width: 1,
-                  //       ),
-                  //     ),
-                  //     hintStyle: TextStyle(
-                  //       color: colorScheme.onSurface.withValues(alpha: 0.6),
-                  //     ),
-                  //   ),
-                  // ),
-                  const SizedBox(height: 16),
+    // Use Obx to make the screen reactive to the Controller's data
+    return Obx(() {
+      // Keep search and main list in sync
+      if (searchController.text.isEmpty) {
+        filteredTransactions = txController.transactions;
+      }
 
-                  // 🧭 Filters Row
-                  Row(
+      return Scaffold(
+        appBar: kIsWeb ? null : AppBar(title: const Text("Bulk Review")),
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    // 🔍 Search Bar
+                    AppTextField(
+                      hintText: "Search transactions",
+                      controller: searchController,
+                      prefixWidget: const Icon(Icons.search),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // ✅ Select All Bar
+                    _buildSelectAllBar(colorScheme),
+
+                    const SizedBox(height: 12),
+
+                    // ✅ Transaction List
+                    Expanded(
+                      child: txController.isLoading.value
+                          ? const Center(
+                              child: CircularProgressIndicator.adaptive(),
+                            )
+                          : filteredTransactions.isEmpty
+                              ? const Center(
+                                  child: AppText(
+                                    "No transactions found.",
+                                    fontSize: 14,
+                                  ),
+                                )
+                              : ListView.builder(
+                              itemCount: filteredTransactions.length,
+                              itemBuilder: (context, index) {
+                                final tx = filteredTransactions[index];
+                                return BulkTransactionCard(
+                                  transaction: tx,
+                                  isSelected: selectedIds.contains(
+                                    tx.id.toString(),
+                                  ),
+                                  onSelected: (val) {
+                                    setState(() {
+                                      if (val == true) {
+                                        selectedIds.add(tx.id.toString());
+                                      } else {
+                                        selectedIds.remove(tx.id.toString());
+                                      }
+                                    });
+                                  },
+                                );
+                              },
+                            ),
+                    ),
+
+                    // ✅ Action Footer
+                    if (selectedIds.isNotEmpty) _buildActionFooter(colorScheme),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildSelectAllBar(ColorScheme colorScheme) {
+    bool isAllSelected =
+        selectedIds.length == filteredTransactions.length &&
+        filteredTransactions.isNotEmpty;
+
+    return InkWell(
+      onTap: toggleSelectAll,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        child: Row(
+          children: [
+            Checkbox(
+              value: isAllSelected,
+              onChanged: (val) => toggleSelectAll(),
+              activeColor: colorScheme.primary,
+            ),
+            AppText(
+              isAllSelected
+                  ? "Deselect All"
+                  : "Select All (${filteredTransactions.length})",
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+            const Spacer(),
+            if (selectedIds.isNotEmpty)
+              AppText(
+                "${selectedIds.length} items selected",
+                fontSize: 12,
+                color: colorScheme.primary,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionFooter(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: orangeColor,
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () async {
+                if (selectedIds.isEmpty) return;
+                await txController.approveTransactions(
+                  ids: selectedIds.map((e) => int.parse(e)).toList(),
+                );
+                selectedIds.clear();
+                setState(() {});
+              },
+              child: const AppText(
+                "Approve Selected",
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: colorScheme.outline),
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () {},
+              child: const AppText("Reclassify", fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class BulkTransactionCard extends StatelessWidget {
+  final TransactionModel transaction;
+  final bool isSelected;
+  final ValueChanged<bool?> onSelected;
+
+  const BulkTransactionCard({
+    super.key,
+    required this.transaction,
+    required this.isSelected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final categoryController = Get.find<CategoryAdminController>();
+    final bool isPositive = transaction.amount >= 0;
+    final Color statusColor = isPositive ? Colors.green.shade600 : Colors.grey;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isSelected
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
+          width: 1.5,
+        ),
+      ),
+      color: Theme.of(
+        context,
+      ).colorScheme.surfaceVariant.withValues(alpha: 0.3),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => onSelected(!isSelected),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Checkbox(value: isSelected, onChanged: onSelected),
+              Container(width: 6, color: statusColor),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Sort Filter
-                      Expanded(
-                        child: CustomDropDownWidget<String>(
-                          dropDownKey: _sortDropDownKey,
-                          selectedItem: selectedSort,
-                          label: "Sort",
-                          items: const [
-                            "Newest",
-                            "Oldest",
-                            "A - Z",
-                            "Z - A",
-                            "Highest Amount",
-                            "Lowest Amount",
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-
-                      // Date Filter
-                      DateRangePickerWidget(
-                        onDateRangeSelected: (start, end) {
-                          selectedDateRange = DateTimeRange(
-                            start: start,
-                            end: end,
-                          );
-                          _filterTransactions();
-                        },
-                        initialText: "",
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ✅ Select All
-                  InkWell(
-                    onTap: toggleSelectAll,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: colorScheme.secondary),
-                      ),
-                      child: Row(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Checkbox(
-                            value: selectAll,
-                            onChanged: (val) => toggleSelectAll(),
-                            activeColor: colorScheme.secondary,
-                            checkColor: Colors.white,
+                          Expanded(
+                            child: AppText(
+                              transaction.title,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
                           ),
                           AppText(
-                            "Select All",
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.onSurface,
+                            "\$${formatNumber(transaction.amount.abs())}",
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // ✅ Transaction List
-                  Expanded(
-                    child: filteredTransactions.isEmpty
-                        ? Center(
-                            child: AppText(
-                              "No transactions found for selected filters.",
-
-                              color: colorScheme.onSurface.withValues(
-                                alpha: 0.6,
+                      const SizedBox(height: 4),
+                      AppText(
+                        transaction.category == null
+                            ? "Uncategorized"
+                            : categoryController.getCategoryName(
+                                transaction.category!,
                               ),
-                              fontSize: 14,
-                            ),
-                          )
-                        : ListView.builder(
-                            itemCount: filteredTransactions.length,
-                            itemBuilder: (context, index) {
-                              final t = filteredTransactions[index];
-                              final formattedDate = formatDate(t['date']);
-
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: colorScheme.surface,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: colorScheme.secondary,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Checkbox(
-                                      value: t['selected'],
-                                      onChanged: (val) {
-                                        setState(() {
-                                          t['selected'] = val!;
-                                        });
-                                      },
-                                      activeColor: colorScheme.secondary,
-                                      checkColor: Colors.white,
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          AppText(
-                                            t['merchant'],
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: greenColor,
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                            child: AppText(
-                                              t['category'],
-                                              fontSize: 12,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    AppText(
-                                      formattedDate,
-                                      fontSize: 14,
-                                      color: colorScheme.onSurface.withValues(
-                                        alpha: 0.6,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                  ),
-
-                  // ✅ Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: orangeColor,
-                            minimumSize: const Size.fromHeight(50),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onPressed: () {},
-                          child: const AppText(
-                            "Approve",
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.white),
-                            minimumSize: const Size.fromHeight(50),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onPressed: () {},
-                          child: const AppText(
-                            "Reclassify",
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
