@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:booksmart/helpers/currency_formatter.dart';
 import '../../../../../models/transaction_model.dart';
+import '../transaction/add_transaction_manual.dart';
 
 // --- Navigation Helper ---
 void goToBulkReviewScreen({bool shouldCloseBefore = false}) {
@@ -60,10 +61,7 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
   }
 
   void _fetchTransactions() {
-    txController.getTransactions(
-      isAiVerified: false,
-      isCategoryNotNull: true,
-    );
+    txController.getTransactions(isAiVerified: false, isCategoryNotNull: true);
   }
 
   void _onSearchChanged() {
@@ -137,13 +135,13 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
                               child: CircularProgressIndicator.adaptive(),
                             )
                           : filteredTransactions.isEmpty
-                              ? const Center(
-                                  child: AppText(
-                                    "No transactions found.",
-                                    fontSize: 14,
-                                  ),
-                                )
-                              : ListView.builder(
+                          ? const Center(
+                              child: AppText(
+                                "No transactions found.",
+                                fontSize: 14,
+                              ),
+                            )
+                          : ListView.builder(
                               itemCount: filteredTransactions.length,
                               itemBuilder: (context, index) {
                                 final tx = filteredTransactions[index];
@@ -226,7 +224,22 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: Row(
+        spacing: 20,
         children: [
+          Expanded(
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: colorScheme.outline),
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              onPressed: () {},
+              child: const AppText("Reclassify", fontWeight: FontWeight.bold),
+            ),
+          ),
+
           Expanded(
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -249,20 +262,6 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
                 color: Colors.black,
                 fontWeight: FontWeight.bold,
               ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colorScheme.outline),
-                minimumSize: const Size.fromHeight(50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () {},
-              child: const AppText("Reclassify", fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -345,6 +344,15 @@ class BulkTransactionCard extends StatelessWidget {
                               ),
                         fontSize: 12,
                         color: Colors.grey.shade600,
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      ElevatedButton(
+                        onPressed: () {
+                          goToAddTransactionScreen(transaction: transaction);
+                        },
+                        child: Text("Detail"),
                       ),
                     ],
                   ),

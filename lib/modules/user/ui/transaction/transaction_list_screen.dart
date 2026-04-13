@@ -422,11 +422,13 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                     Icons.category_outlined,
                     color: Colors.black,
                   ),
-                  label: const AppText(
+                  label: const FittedText(
                     "AI Categorization",
-                    color: Colors.black,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colorScheme.primary,
@@ -442,11 +444,13 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () => goToAddTransactionScreen(),
                   icon: const Icon(Icons.add, color: Colors.black),
-                  label: const AppText(
+                  label: const FittedText(
                     "Add Transaction",
-                    color: Colors.black,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: colorScheme.primary,

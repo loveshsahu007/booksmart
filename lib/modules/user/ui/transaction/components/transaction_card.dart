@@ -166,7 +166,7 @@ class TransactionCard extends StatelessWidget {
                               ),
                               if (transaction.deductible) ...[
                                 const SizedBox(width: 4),
-                                _buildBadge("Deductible", Colors.purple),
+                                _buildBadge("Deductible", Colors.grey),
                               ],
                             ],
                           ),

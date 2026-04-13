@@ -86,7 +86,7 @@ class _AddTransactionScreenManualState
 
   int? _selectedCategory;
   int? _selectedSubcategory;
-  bool deductible = false;
+  bool deductible = true;
   XFile? _selectedFile;
   String _selectedType = personalTransactionType;
   Uint8List? _selectedFileBytes;
@@ -124,8 +124,8 @@ class _AddTransactionScreenManualState
     _titleController.text = widget.transaction?.title ?? '';
     _amountController.text = widget.transaction?.amount.toString() ?? '';
     _descriptionController.text = widget.transaction?.description ?? '';
-    _selectedType = widget.transaction?.type ?? personalTransactionType;
-    deductible = widget.transaction?.deductible ?? false;
+    _selectedType = widget.transaction?.type ?? businessTransactionType;
+    deductible = widget.transaction?.deductible ?? true;
     _selectedCategory = widget.transaction?.category;
     _selectedSubcategory = widget.transaction?.subcategory;
   }

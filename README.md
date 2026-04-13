@@ -26,3 +26,17 @@ Plaid Test username.
 username: user_good
 password: pass_good
 
+
+1. inside the category drop-down add a thin divider/seperater line
+2. upload receipt dialog -> remove icons edit/trash-can -> remove color should be grey ... 
+3. iin Add-Transaction, if a person select a file, then he should has option to remove it
+4. yellow button always have black text
+5. if a transaction has some receipt attch to it, show it in the detail dialog
+
+
+New feature:
+- add transactions from bank statments -> also register the bank first ... 
+
+AI- Startegeiess:
+1. send user transaction and business data to AI to get them
+2. then for each stratgey, user can discuss with AI about it - just like gpt chating, but with a specific context  about this strategy ... 
