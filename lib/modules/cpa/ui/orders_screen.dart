@@ -112,7 +112,7 @@ class _OrdersScreenCPAState extends State<OrdersScreenCPA> {
             selectedFilter = selected ? status : null;
           });
         },
-        selectedColor: Theme.of(context).primaryColor.withOpacity(0.15),
+        selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.15),
         checkmarkColor: Theme.of(context).primaryColor,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),

@@ -176,7 +176,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           margin: const EdgeInsets.symmetric(vertical: 6),
                           elevation: 0,
                           color: isMe
-                              ? Colors.yellow.withOpacity(0.3)
+                              ? Colors.yellow.withValues(alpha: 0.3)
                               : colorScheme.surfaceVariant,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.only(

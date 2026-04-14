@@ -90,7 +90,7 @@ class _ReceiptScanningOutputScreenState
                           Icon(
                             Icons.receipt_long,
                             size: 50,
-                            color: colorScheme.onSurface.withOpacity(0.5),
+                            color: colorScheme.onSurface.withValues(alpha: 0.5),
                           ),
                           const SizedBox(height: 8),
                           const AppText("No receipt captured"),

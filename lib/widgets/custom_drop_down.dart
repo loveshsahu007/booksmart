@@ -71,12 +71,15 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
+        constraints: BoxConstraints(
+          maxHeight: widget.items.length < 5 ? widget.items.length * 45 : 300,
+        ),
 
         /// ✅ Search box styling
         searchFieldProps: TextFieldProps(
           decoration: InputDecoration(
             filled: true,
-            fillColor: colors.surfaceVariant,
+            fillColor: colors.surfaceContainerHighest,
             hintText: "Search...",
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             contentPadding: const EdgeInsets.symmetric(
@@ -92,34 +95,31 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
           // Determine divider color based on theme brightness
           final bool isDarkMode = theme.brightness == Brightness.dark;
           final Color dividerColor = isDarkMode
-              ? Colors.white.withOpacity(0.1) // Subtle white for dark mode
+              ? Colors.white.withValues(
+                  alpha: 0.1,
+                ) // Subtle white for dark mode
               : Colors.grey.shade300;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+              Material(
                 color: isSelected
-                    ? colors.primary.withOpacity(0.08)
+                    ? colors.primary.withValues(alpha: 0.08)
                     : colors.surface,
-                child: Text(
-                  text,
-                  // style: theme.textTheme.bodyMedium?.copyWith(
-                  //   color: isDisabled
-                  //       ? colors.onSurface.withOpacity(0.4)
-                  //       : colors.onSurface,
-                  // ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Text(text),
                 ),
               ),
               Divider(
                 height: 1,
                 thickness: 1,
                 color: dividerColor,
-                indent: 12,
-                endIndent: 12,
+                // indent: 12,
+                // endIndent: 12,
               ),
             ],
           );

@@ -48,7 +48,7 @@ class OrderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 6,
             offset: const Offset(0, 3),
           ),
@@ -75,7 +75,7 @@ class OrderCard extends StatelessWidget {
                       imgUrl: target?.imgUrl ?? "",
                       alternateText: target?.firstName ?? "U",
                       radius: 30,
-                      backgroundColor: scheme.primary.withOpacity(0.1),
+                      backgroundColor: scheme.primary.withValues(alpha: 0.1),
                     ),
                     const SizedBox(height: 5),
                     if (order.userReviewStars != null) ...[
@@ -147,10 +147,12 @@ class OrderCard extends StatelessWidget {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: scheme.primary.withOpacity(0.1),
+                                  color: scheme.primary.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                    color: scheme.primary.withOpacity(0.5),
+                                    color: scheme.primary.withValues(
+                                      alpha: 0.5,
+                                    ),
                                   ),
                                 ),
                                 child: Text(
@@ -180,7 +182,9 @@ class OrderCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: getStatusColor(order.status).withOpacity(0.15),
+                        color: getStatusColor(
+                          order.status,
+                        ).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(

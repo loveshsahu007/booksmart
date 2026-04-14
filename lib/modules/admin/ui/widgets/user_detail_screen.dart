@@ -55,10 +55,7 @@ void showUserDetailsDialog(PersonModel user) {
               // Basic Info
               _infoRow('Phone', user.phoneNumber),
               _infoRow('Role', user.role.name.toUpperCase()),
-              _infoRow(
-                'Joined',
-                formatDate(user.createdAt),
-              ),
+              _infoRow('Joined', formatDate(user.createdAt)),
 
               const SizedBox(height: 24),
 
@@ -108,7 +105,7 @@ void showUserDetailsDialog(PersonModel user) {
 
                     return Card(
                       elevation: 0,
-                      color: Colors.grey.withOpacity(0.05),
+                      color: Colors.grey.withValues(alpha: 0.05),
                       margin: const EdgeInsets.only(bottom: 8),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),

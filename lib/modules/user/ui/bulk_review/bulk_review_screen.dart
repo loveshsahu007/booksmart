@@ -305,13 +305,15 @@ class BulkTransactionCard extends StatelessWidget {
       ).colorScheme.surfaceVariant.withValues(alpha: 0.3),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => onSelected(!isSelected),
+        onTap: () {
+          goToAddTransactionScreen(transaction: transaction);
+        },
         child: IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Checkbox(value: isSelected, onChanged: onSelected),
-              Container(width: 6, color: statusColor),
+              Container(width: 4, color: statusColor),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.all(12.0),
@@ -345,15 +347,14 @@ class BulkTransactionCard extends StatelessWidget {
                         fontSize: 12,
                         color: Colors.grey.shade600,
                       ),
-
-                      const SizedBox(height: 4),
-
-                      ElevatedButton(
-                        onPressed: () {
-                          goToAddTransactionScreen(transaction: transaction);
-                        },
-                        child: Text("Detail"),
-                      ),
+                      if (transaction.category != null)
+                        AppText(
+                          categoryController.getSubCategoryName(
+                            transaction.subcategory,
+                          ),
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
                     ],
                   ),
                 ),

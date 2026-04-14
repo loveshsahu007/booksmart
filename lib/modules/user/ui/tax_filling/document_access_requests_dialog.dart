@@ -256,7 +256,7 @@ class _RequestTile extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     // Using red with low opacity for the background to match the "rejected" theme
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(

@@ -134,7 +134,7 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     // Determine divider color based on theme brightness
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final Color dividerColor = isDarkMode
-        ? Colors.white.withOpacity(0.1) // Subtle white for dark mode
+        ? Colors.white.withValues(alpha: 0.1) // Subtle white for dark mode
         : Colors.grey.shade300;
     return Card(
       margin: EdgeInsets.zero,
