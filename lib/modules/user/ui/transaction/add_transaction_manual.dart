@@ -276,6 +276,7 @@ class _AddTransactionScreenManualState
                 decimal: true,
               ),
               isEnabled: isTextFieldEnabled,
+
               fieldValidator: (v) => v == null || v.isEmpty ? "Required" : null,
             ),
             0.01.verticalSpace,
@@ -368,18 +369,12 @@ class _AddTransactionScreenManualState
                         fit: BoxFit.cover,
                       ),
               ),
-            OutlinedButton.icon(
+            OutlinedButton(
               onPressed: _attachReceipt,
-              icon: const Icon(Icons.camera_alt, color: orangeBttonColor),
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: orangeBttonColor),
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(10)),
-                ),
-              ),
-              label: const AppText(
+
+              child: const AppText(
                 "Attach Receipt",
-                color: orangeBttonColor,
+
                 fontWeight: FontWeight.w500,
                 fontSize: 15,
               ),

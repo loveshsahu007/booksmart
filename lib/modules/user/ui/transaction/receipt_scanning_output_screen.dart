@@ -5,7 +5,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
-// TODO: reduce the width of dialog
 Future<Map<String, dynamic>?> openReceiptScanner() async {
   if (kIsWeb) {
     return await Get.dialog(const ReceiptFilePickerDialog());
@@ -110,15 +109,15 @@ class _ReceiptScanningOutputScreenState
                 ),
                 const SizedBox(width: 16),
                 if (_selectedFileBytes != null)
-                  ElevatedButton.icon(
+                  ElevatedButton(
                     onPressed: () {
                       setState(() {
                         _selectedFile = null;
                         _selectedFileBytes = null;
                       });
                     },
-                    icon: const Icon(Icons.delete),
-                    label: const AppText("Remove"),
+
+                    child: const AppText("Remove"),
                   ),
               ],
             ),
@@ -222,6 +221,7 @@ class _ReceiptFilePickerDialogState extends State<ReceiptFilePickerDialog> {
       type: FileType.image,
       withData: true,
     );
+
     if (result != null && result.files.single.bytes != null) {
       setState(() {
         _selectedFileBytes = result.files.single.bytes;
@@ -233,66 +233,90 @@ class _ReceiptFilePickerDialogState extends State<ReceiptFilePickerDialog> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDesktop = MediaQuery.of(context).size.width > 600;
 
     return Dialog(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const AppText(
-              "Upload Receipt",
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
-            const SizedBox(height: 16),
-            InkWell(
-              onTap: _pickFile,
-              child: Container(
-                height: 180,
-                color: colorScheme.surfaceContainerHighest,
-                child: _selectedFileBytes == null
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(Icons.upload_file, size: 48),
-                            AppText("Select receipt image"),
-                          ],
-                        ),
-                      )
-                    : Image.memory(_selectedFileBytes!, fit: BoxFit.cover),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isDesktop ? 420 : double.infinity,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const AppText(
+                "Upload Receipt",
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (_selectedFileBytes != null)
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _selectedFile = null;
-                        _selectedFileBytes = null;
-                      });
-                    },
-                    icon: const Icon(Icons.delete),
-                    label: const AppText("Remove"),
+              const SizedBox(height: 16),
+
+              /// Upload Area
+              InkWell(
+                onTap: _pickFile,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  height: 180,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                const SizedBox(width: 16),
-                ElevatedButton.icon(
-                  onPressed: _selectedFileBytes == null
-                      ? null
-                      : () => Navigator.pop(context, {
-                          'imagePath': _selectedFile?.path,
-                          'fileBytes': _selectedFileBytes,
-                        }),
-                  icon: const Icon(Icons.check),
-                  label: const AppText("Attach"),
+                  child: _selectedFileBytes == null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.upload_file, size: 48),
+                              SizedBox(height: 8),
+                              AppText("Select receipt image"),
+                            ],
+                          ),
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.memory(
+                            _selectedFileBytes!,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                 ),
-              ],
-            ),
-          ],
+              ),
+
+              const SizedBox(height: 20),
+
+              /// Buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (_selectedFileBytes != null)
+                    OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedFile = null;
+                          _selectedFileBytes = null;
+                        });
+                      },
+                      child: const AppText("Remove"),
+                    ),
+
+                  if (_selectedFileBytes != null) const SizedBox(width: 12),
+
+                  ElevatedButton(
+                    onPressed: _selectedFileBytes == null
+                        ? null
+                        : () => Navigator.pop(context, {
+                            'imagePath': _selectedFile?.path,
+                            'fileBytes': _selectedFileBytes,
+                          }),
+                    child: const AppText("Attach Receipt"),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

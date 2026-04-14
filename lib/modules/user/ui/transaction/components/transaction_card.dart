@@ -2,6 +2,7 @@ import 'package:booksmart/constant/data.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:jiffy/jiffy.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../models/transaction_model.dart';
 import '../../../../admin/controllers/category_controler.dart';
@@ -75,13 +76,37 @@ class TransactionCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          Text(
-                            "$amountPrefix\$${formatNumber(transaction.amount.abs())}",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: statusColor,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                "$amountPrefix\$${formatNumber(transaction.amount.abs())}",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: statusColor,
+                                ),
+                              ),
+                              if (transaction.filePath != null &&
+                                  transaction.filePath!.isNotEmpty)
+                                IconButton(
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () {
+                                    print(transaction.filePath!);
+                                    launchUrl(
+                                      Uri.parse(transaction.filePath!),
+                                      mode: LaunchMode.externalApplication,
+                                    );
+                                  },
+                                  icon: const Icon(
+                                    Icons.description_outlined,
+                                    size: 18,
+                                    color: Colors.blueGrey,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                            ],
                           ),
                         ],
                       ),

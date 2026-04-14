@@ -89,20 +89,39 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
         /// ✅ FIXED itemBuilder signature
         itemBuilder: (context, item, isDisabled, isSelected) {
           final text = widget.itemAsString?.call(item) ?? item.toString();
-
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            color: isSelected
-                ? colors.primary.withOpacity(0.08)
-                : colors.surface,
-            child: Text(
-              text,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: isDisabled
-                    ? colors.onSurface.withOpacity(0.4)
-                    : colors.onSurface,
+          // Determine divider color based on theme brightness
+          final bool isDarkMode = theme.brightness == Brightness.dark;
+          final Color dividerColor = isDarkMode
+              ? Colors.white.withOpacity(0.1) // Subtle white for dark mode
+              : Colors.grey.shade300;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                color: isSelected
+                    ? colors.primary.withOpacity(0.08)
+                    : colors.surface,
+                child: Text(
+                  text,
+                  // style: theme.textTheme.bodyMedium?.copyWith(
+                  //   color: isDisabled
+                  //       ? colors.onSurface.withOpacity(0.4)
+                  //       : colors.onSurface,
+                  // ),
+                ),
               ),
-            ),
+              Divider(
+                height: 1,
+                thickness: 1,
+                color: dividerColor,
+                indent: 12,
+                endIndent: 12,
+              ),
+            ],
           );
         },
       ),

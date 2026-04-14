@@ -173,27 +173,31 @@ class _ChatScreenState extends State<ChatScreen> {
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
                         child: Card(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          elevation: 0,
+                          color: isMe
+                              ? Colors.yellow.withOpacity(0.3)
+                              : colorScheme.surfaceVariant,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(14),
+                              topRight: const Radius.circular(14),
+                              bottomLeft: isMe
+                                  ? const Radius.circular(14)
+                                  : const Radius.circular(0),
+                              bottomRight: isMe
+                                  ? const Radius.circular(0)
+                                  : const Radius.circular(14),
+                            ),
+                          ),
                           child: Container(
                             constraints: BoxConstraints(
                               maxWidth:
                                   MediaQuery.of(context).size.width * 0.75,
                             ),
-                            margin: const EdgeInsets.symmetric(vertical: 6),
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
                               vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(14),
-                                topRight: const Radius.circular(14),
-                                bottomLeft: isMe
-                                    ? const Radius.circular(14)
-                                    : const Radius.circular(0),
-                                bottomRight: isMe
-                                    ? const Radius.circular(0)
-                                    : const Radius.circular(14),
-                              ),
                             ),
                             child: Column(
                               crossAxisAlignment: isMe

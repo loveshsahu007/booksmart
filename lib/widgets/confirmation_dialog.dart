@@ -1,3 +1,4 @@
+import 'package:booksmart/constant/exports.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -59,7 +60,10 @@ Future<dynamic> showConfirmationDialog({
                   ),
                   const SizedBox(height: 20),
                 ],
-                ElevatedButton(onPressed: onYes, child: Text("Yes")),
+                ElevatedButton(
+                  onPressed: onYes,
+                  child: AppText("Yes", fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 20),
               ],
             ),

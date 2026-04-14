@@ -182,21 +182,22 @@ class _TransactionListScreenState extends State<TransactionListScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
+              OutlinedButton(
                 onPressed: () {
                   clearFilters();
                   _applyFilters();
                   Get.back();
                 },
-                child: AppText("Reset", color: Colors.red, fontSize: 14),
+                child: AppText("Reset"),
               ),
+
               const SizedBox(width: 10),
-              TextButton(
-                onPressed: () {
+              AppButton(
+                buttonText: " Apply ",
+                onTapFunction: () {
                   _applyFilters();
                   Get.back();
                 },
-                child: AppText("Apply", fontSize: 14),
               ),
             ],
           ),

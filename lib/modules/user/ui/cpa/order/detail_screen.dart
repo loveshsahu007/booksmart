@@ -660,7 +660,6 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
   }
 
   Widget _buildActionButtons(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final controller = Get.find<OrderController>();
     return Column(
       children: [
@@ -673,11 +672,11 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                     onPressed: () {
                       _showDeclineReasonDialog(context, controller);
                     },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: colorScheme.error,
-                      side: BorderSide(color: colorScheme.error),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                    // style: OutlinedButton.styleFrom(
+                    //   foregroundColor: colorScheme.error,
+                    //   side: BorderSide(color: colorScheme.error),
+                    //   padding: const EdgeInsets.symmetric(vertical: 14),
+                    // ),
                     child: const AppText("Decline Order", fontSize: 14),
                   ),
                 ),

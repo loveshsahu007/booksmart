@@ -131,6 +131,11 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
     required String categoryName,
     required ColorScheme colorScheme,
   }) {
+    // Determine divider color based on theme brightness
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final Color dividerColor = isDarkMode
+        ? Colors.white.withOpacity(0.1) // Subtle white for dark mode
+        : Colors.grey.shade300;
     return Card(
       margin: EdgeInsets.zero,
       child: ExpansionTile(
@@ -170,18 +175,29 @@ class _CategorySelectionScreenState extends State<CategorySelectionScreen> {
                 children: subs.map((sub) {
                   final isSelected = _selectedSubcategory == sub.name;
 
-                  return ListTile(
-                    leading: const SizedBox(width: 40),
-                    title: AppText(
-                      sub.name,
-                      fontSize: 14,
-                      color: isSelected ? colorScheme.primary : Colors.grey,
-                    ),
-                    trailing: isSelected
-                        ? Icon(Icons.check, color: colorScheme.primary)
-                        : null,
-                    dense: true,
-                    onTap: () => _selectSubcategory(categoryId, sub.id),
+                  return Column(
+                    children: [
+                      ListTile(
+                        leading: const SizedBox(width: 40),
+                        title: AppText(
+                          sub.name,
+                          fontSize: 14,
+                          color: isSelected ? colorScheme.primary : Colors.grey,
+                        ),
+                        trailing: isSelected
+                            ? Icon(Icons.check, color: colorScheme.primary)
+                            : null,
+                        dense: true,
+                        onTap: () => _selectSubcategory(categoryId, sub.id),
+                      ),
+                      Divider(
+                        height: 1,
+                        thickness: 1,
+                        color: dividerColor,
+                        indent: 12, // Optional: add padding to the line
+                        endIndent: 12,
+                      ),
+                    ],
                   );
                 }).toList(),
               );

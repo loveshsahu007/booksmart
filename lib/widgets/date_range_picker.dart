@@ -124,9 +124,9 @@ class _DateRangePickerWidgetState extends State<DateRangePickerWidget> {
           const SizedBox(width: 8),
           AppText(
             displayText,
-            //  color: colorScheme.secondary,
+            color: Colors.black,
             fontSize: 14,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.bold,
           ),
         ],
       ),
