@@ -126,7 +126,7 @@ class OrderCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       AppText(
-                        "Amount: \$${formatNumber(order.amount)}",
+                        "Amount: ${CurrencyUtils.format(order.amount)}",
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: scheme.primary,

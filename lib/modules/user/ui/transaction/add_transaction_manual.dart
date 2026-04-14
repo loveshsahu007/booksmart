@@ -13,6 +13,7 @@ import 'package:get/get.dart';
 import 'package:jiffy/jiffy.dart';
 
 import '../../../../constant/data.dart';
+import '../../../../helpers/currency_formatter.dart';
 import '../../../../utils/date_time_input.dart';
 import '../../../../widgets/custom_dialog.dart';
 import '../../../../widgets/custom_drop_down.dart';
@@ -122,7 +123,9 @@ class _AddTransactionScreenManualState
     ).yMMMdjm;
     _selectedDate = widget.transaction?.dateTime ?? DateTime.now();
     _titleController.text = widget.transaction?.title ?? '';
-    _amountController.text = widget.transaction?.amount.toString() ?? '';
+    _amountController.text = CurrencyUtils.format(
+      widget.transaction?.amount ?? 0,
+    );
     _descriptionController.text = widget.transaction?.description ?? '';
     _selectedType = widget.transaction?.type ?? businessTransactionType;
     deductible = widget.transaction?.deductible ?? true;
@@ -157,7 +160,13 @@ class _AddTransactionScreenManualState
   }
 
   void _saveTransaction() {
+    double amount = CurrencyUtils.parse(_amountController.text);
     if (!_formKey.currentState!.validate()) return;
+    if (amount <= 0) {
+      showSnackBar("Please enter a valid amount", isError: true);
+      return;
+    }
+
     if (_selectedCategory == null || _selectedSubcategory == null) {
       showSnackBar("Please select category & subcategory", isError: true);
       return;
@@ -165,7 +174,7 @@ class _AddTransactionScreenManualState
     final model = TransactionModel(
       id: widget.transaction?.id ?? 0,
       title: _titleController.text,
-      amount: double.tryParse(_amountController.text) ?? 0,
+      amount: amount,
       category: _selectedCategory!,
       subcategory: _selectedSubcategory!,
       type: _selectedType,
@@ -275,6 +284,7 @@ class _AddTransactionScreenManualState
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
+              inputFormatters: [CurrencyTextInputFormatter()],
               isEnabled: isTextFieldEnabled,
 
               fieldValidator: (v) => v == null || v.isEmpty ? "Required" : null,

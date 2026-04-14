@@ -80,7 +80,7 @@ class TransactionCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(
-                                "$amountPrefix\$${formatNumber(transaction.amount.abs())}",
+                                "$amountPrefix ${CurrencyUtils.format(transaction.amount.abs())}",
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,

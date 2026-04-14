@@ -6,6 +6,7 @@ import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/utils/supabase.dart';
 import 'package:get/get.dart';
+import '../../../helpers/currency_formatter.dart';
 import '../../../models/order_model.dart';
 import '../../common/controllers/chat_controller.dart';
 import 'package:booksmart/services/storage_service.dart';
@@ -50,9 +51,10 @@ class OrderController extends GetxController {
     required int userId,
     List<String>? deliverables,
   }) async {
+    double price = CurrencyUtils.parse(amountController.text);
     // Validation
     if (titleController.text.trim().isEmpty ||
-        amountController.text.trim().isEmpty ||
+        price <= 0 ||
         daysToCompleteController.text.trim().isEmpty ||
         expirationDate.value == null) {
       showSnackBar("Please fill in all required fields", isError: true);
@@ -73,7 +75,7 @@ class OrderController extends GetxController {
         'user_id': userId,
         'title': titleController.text.trim(),
         'description': descriptionController.text.trim(),
-        'amount': double.tryParse(amountController.text.trim()) ?? 0.0,
+        'amount': price,
         'status': OrderStatus.pending.name,
         'days_to_complete': int.tryParse(daysToCompleteController.text.trim()),
         'expiration_date': expirationDate.value?.toIso8601String(),

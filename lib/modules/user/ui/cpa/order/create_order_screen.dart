@@ -4,7 +4,7 @@ import 'package:booksmart/helpers/date_formatter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
-
+import '../../../../../helpers/currency_formatter.dart';
 import '../../../../../widgets/custom_dialog.dart';
 import 'package:booksmart/widgets/multiple_selection_dropdown_widget.dart';
 import 'package:dropdown_search/dropdown_search.dart';
@@ -92,6 +92,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               hintText: "Amount (\$)",
               labelText: "Amount",
               keyboardType: TextInputType.number,
+              inputFormatters: [CurrencyTextInputFormatter()],
             ),
 
             const SizedBox(height: 16),

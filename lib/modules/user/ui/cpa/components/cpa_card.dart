@@ -73,7 +73,7 @@ class CpaCard extends StatelessWidget {
                         fontSize: 12,
                       ),
                       AppText(
-                        "Pricing: \$${formatNumber(cpa.hourlyRate)}/hr",
+                        "Pricing: ${CurrencyUtils.format(cpa.hourlyRate)}/hr",
                         fontSize: 12,
                       ),
                       const SizedBox(height: 8),

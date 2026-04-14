@@ -329,7 +329,7 @@ class BulkTransactionCard extends StatelessWidget {
                             ),
                           ),
                           AppText(
-                            "\$${formatNumber(transaction.amount.abs())}",
+                            CurrencyUtils.format(transaction.amount.abs()),
                             fontWeight: FontWeight.bold,
                             color: statusColor,
                           ),

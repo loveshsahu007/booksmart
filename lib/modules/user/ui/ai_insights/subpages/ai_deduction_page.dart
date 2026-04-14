@@ -561,7 +561,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     );
   }
 
-  String _formatCurrency(double n) => '\$${formatNumber(n)}';
+  String _formatCurrency(double n) => CurrencyUtils.format(n);
   String _formatShortDate(DateTime d) {
     const months = [
       'Jan',

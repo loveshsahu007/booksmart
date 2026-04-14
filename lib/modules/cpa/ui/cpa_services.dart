@@ -170,7 +170,7 @@ class _CpaServicesScreenState extends State<CpaServicesScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     AppText(
-                      "\$${formatNumber(service.price)}",
+                      CurrencyUtils.format(service.price),
                       fontWeight: FontWeight.bold,
                     ),
                     const SizedBox(width: 8),

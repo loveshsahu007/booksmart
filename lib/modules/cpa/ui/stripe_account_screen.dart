@@ -115,7 +115,9 @@ class _CPAStripeAccountScreenState extends State<CPAStripeAccountScreen> {
               children: [
                 const Text("Available"),
                 Text(
-                  "\$${formatNumber(controller.formatAmount(controller.balanceAvailable))}",
+                  CurrencyUtils.format(
+                    controller.formatAmount(controller.balanceAvailable),
+                  ),
                   style: const TextStyle(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,
@@ -130,7 +132,9 @@ class _CPAStripeAccountScreenState extends State<CPAStripeAccountScreen> {
               children: [
                 const Text("Pending"),
                 Text(
-                  "\$${formatNumber(controller.formatAmount(controller.balancePending))}",
+                  CurrencyUtils.format(
+                    controller.formatAmount(controller.balancePending),
+                  ),
                   style: const TextStyle(
                     color: Colors.orange,
                     fontWeight: FontWeight.bold,

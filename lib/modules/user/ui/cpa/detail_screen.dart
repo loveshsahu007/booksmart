@@ -125,7 +125,7 @@ class _CpaDetailScreenState extends State<CpaDetailScreen> {
                   title: AppText(service.title, fontWeight: FontWeight.bold),
                   subtitle: AppText(service.description, fontSize: 12),
                   trailing: AppText(
-                    "\$${formatNumber(service.price)}",
+                    CurrencyUtils.format(service.price),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -225,7 +225,7 @@ class _CpaDetailScreenState extends State<CpaDetailScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: AppText(
-                        "Starting at \$${formatNumber(widget.cpa.hourlyRate)} for standard filing",
+                        "Starting at ${CurrencyUtils.format(widget.cpa.hourlyRate)} for standard filing",
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
