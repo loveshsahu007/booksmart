@@ -2,23 +2,24 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class CurrencyUtils {
-  static final NumberFormat _formatter = NumberFormat('#,##0.00', 'en_US');
+  static final NumberFormat _formatter = NumberFormat('#,##0.##', 'en_US');
 
   /// Format double → $1,234.56
+  /// If 0 → just "$"
   static String format(double amount) {
+    if (amount == 0) return '\$';
     return '\$${_formatter.format(amount)}';
   }
 
   /// Parse $1,234.56 → 1234.56
   static double parse(String text) {
-    if (text.isEmpty) return 0.0;
+    if (text.isEmpty || text == '\$') return 0.0;
 
     final cleaned = text.replaceAll('\$', '').replaceAll(',', '').trim();
-
     return double.tryParse(cleaned) ?? 0.0;
   }
 
-  /// Format integer part with commas (used by formatter)
+  /// Format integer part with commas
   static String formatInteger(String value) {
     return NumberFormat(
       '#,###',

@@ -364,7 +364,8 @@ class _AddTransactionScreenManualState
             ),
             0.01.verticalSpace,
 
-            if (_selectedFile != null || (_selectedFileBytes != null && kIsWeb))
+            if (_selectedFile != null ||
+                (_selectedFileBytes != null && kIsWeb)) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: kIsWeb
@@ -379,6 +380,8 @@ class _AddTransactionScreenManualState
                         fit: BoxFit.cover,
                       ),
               ),
+              0.01.verticalSpace,
+            ],
             OutlinedButton(
               onPressed: _attachReceipt,
 

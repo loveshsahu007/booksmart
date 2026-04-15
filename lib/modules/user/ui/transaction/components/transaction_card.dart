@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:booksmart/constant/data.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -92,7 +94,7 @@ class TransactionCard extends StatelessWidget {
                                 IconButton(
                                   visualDensity: VisualDensity.compact,
                                   onPressed: () {
-                                    print(transaction.filePath!);
+                                    log(transaction.filePath!);
                                     launchUrl(
                                       Uri.parse(transaction.filePath!),
                                       mode: LaunchMode.externalApplication,
