@@ -142,8 +142,32 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
                               ),
                             )
                           : ListView.builder(
-                              itemCount: filteredTransactions.length,
+                              itemCount: filteredTransactions.length +
+                                  (txController.hasMore ? 1 : 0),
                               itemBuilder: (context, index) {
+                                if (index == filteredTransactions.length) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 10),
+                                    child: txController.isLoadMoreLoading.value
+                                        ? const Center(
+                                            child: CircularProgressIndicator())
+                                        : ElevatedButton(
+                                            onPressed: () {
+                                              txController.getTransactions(
+                                                isLoadMore: true,
+                                                isAiVerified: false,
+                                                isCategoryNotNull: true,
+                                              );
+                                            },
+                                            child: const Text(
+                                              "Load More",
+                                              style: TextStyle(
+                                                  color: Colors.black),
+                                            ),
+                                          ),
+                                  );
+                                }
                                 final tx = filteredTransactions[index];
                                 return BulkTransactionCard(
                                   transaction: tx,
