@@ -18,9 +18,19 @@ class TransactionController extends GetxController {
   RxBool isLoading = false.obs;
   RxBool isLoadMoreLoading = false.obs;
   RxList<TransactionModel> transactions = <TransactionModel>[].obs;
+  RxList<TransactionModel> catagoriesTransactions = <TransactionModel>[].obs;
+
   bool hasMore = true;
   int _offset = 0;
   final int _limit = 10;
+
+  //-------------
+  RxBool isAiLoading = false.obs;
+  RxBool isAiLoadMoreLoading = false.obs;
+
+  bool hasMoreAi = true;
+  int _aiOffset = 0;
+  // reuse _limit (no need to create new one)
 
   @override
   void onInit() {
@@ -36,9 +46,10 @@ class TransactionController extends GetxController {
     String? amountRange,
     DateTime? startDate,
     DateTime? endDate,
-    String? bankAccountId, // Plaid account ID from BankAccountModel.plaidAccountId
-    bool? isAiVerified,
-    bool? isCategoryNotNull,
+    String?
+    bankAccountId, // Plaid account ID from BankAccountModel.plaidAccountId
+    // bool? isAiVerified,
+    // bool? isCategoryNotNull,
   }) async {
     try {
       if (isLoadMore) {
@@ -55,16 +66,6 @@ class TransactionController extends GetxController {
           .from(table)
           .select()
           .eq('org_id', getCurrentOrganization!.id);
-
-      // AI Verified filter
-      if (isAiVerified != null) {
-        query = query.eq('is_ai_verified', isAiVerified);
-      }
-
-      // Category Presence filter
-      if (isCategoryNotNull != null && isCategoryNotNull) {
-        query = query.not('category_id', 'is', null);
-      }
 
       // Search filter
       if (searchQuery != null && searchQuery.isNotEmpty) {
@@ -158,6 +159,71 @@ class TransactionController extends GetxController {
     }
   }
 
+  //-------- get ai trasections
+
+  Future<void> getAiCatagoriesTrasections({
+    bool isLoadMore = false,
+    bool isAiVerified = false,
+    bool isCategoryNotNull = true,
+  }) async {
+    try {
+      if (isLoadMore) {
+        if (!hasMoreAi || isAiLoadMoreLoading.value) return;
+        isAiLoadMoreLoading.value = true;
+      } else {
+        isAiLoading.value = true;
+        _aiOffset = 0;
+        hasMoreAi = true;
+        catagoriesTransactions.clear();
+      }
+
+      dynamic query = supabase
+          .from(table)
+          .select()
+          .eq('org_id', getCurrentOrganization!.id);
+
+      /// ✅ AI Verified filter
+      query = query.eq('is_ai_verified', isAiVerified);
+
+      /// ✅ Category not null filter
+      if (isCategoryNotNull) {
+        query = query.not('category_id', 'is', null);
+      }
+
+      /// ✅ Pagination
+      query = query
+          .order('date_time', ascending: false)
+          .range(_aiOffset, _aiOffset + _limit - 1);
+
+      final res = await query;
+
+      final List<TransactionModel> fetched = (res as List)
+          .map((e) => TransactionModel.fromJson(e))
+          .toList();
+
+      if (fetched.length < _limit) {
+        hasMoreAi = false;
+      }
+
+      if (isLoadMore) {
+        catagoriesTransactions.addAll(fetched);
+        _aiOffset += _limit;
+      } else {
+        catagoriesTransactions.value = fetched;
+        _aiOffset = _limit;
+      }
+    } catch (e, s) {
+      log("❌ aiCatagoriesTrasections ERROR");
+      log(e.toString());
+      log(s.toString());
+      somethingWentWrongSnackbar();
+    } finally {
+      isAiLoading.value = false;
+      isAiLoadMoreLoading.value = false;
+      update();
+    }
+  }
+
   /// Alias for backward compatibility if needed elsewhere
   Future<void> getAllTransactions() async => getTransactions();
 
@@ -220,12 +286,6 @@ class TransactionController extends GetxController {
           .filter('id', 'in', '(${ids.join(",")})');
 
       dismissLoadingWidget();
-
-      // Refresh with the same filters used by Bulk Review
-      await getTransactions(
-        isAiVerified: isAiVerified,
-        isCategoryNotNull: isCategoryNotNull,
-      );
 
       showSnackBar("Transactions approved successfully");
     } catch (e, s) {

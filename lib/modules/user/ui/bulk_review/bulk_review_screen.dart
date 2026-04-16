@@ -61,12 +61,15 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
   }
 
   void _fetchTransactions() {
-    txController.getTransactions(isAiVerified: false, isCategoryNotNull: true);
+    txController.getAiCatagoriesTrasections(
+      isAiVerified: false,
+      isCategoryNotNull: true,
+    );
   }
 
   void _onSearchChanged() {
     setState(() {
-      filteredTransactions = txController.transactions
+      filteredTransactions = txController.catagoriesTransactions
           .where(
             (tx) => tx.title.toLowerCase().contains(
               searchController.text.toLowerCase(),
@@ -100,7 +103,7 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
     return Obx(() {
       // Keep search and main list in sync
       if (searchController.text.isEmpty) {
-        filteredTransactions = txController.transactions;
+        filteredTransactions = txController.catagoriesTransactions;
       }
 
       return Scaffold(
@@ -130,7 +133,7 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
 
                     // ✅ Transaction List
                     Expanded(
-                      child: txController.isLoading.value
+                      child: txController.isAiLoading.value
                           ? const Center(
                               child: CircularProgressIndicator.adaptive(),
                             )
@@ -142,33 +145,41 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
                               ),
                             )
                           : ListView.builder(
-                              itemCount: filteredTransactions.length +
-                                  (txController.hasMore ? 1 : 0),
+                              itemCount:
+                                  filteredTransactions.length +
+                                  (txController.hasMoreAi ? 1 : 0),
                               itemBuilder: (context, index) {
                                 if (index == filteredTransactions.length) {
                                   return Padding(
                                     padding: const EdgeInsets.symmetric(
-                                        vertical: 10),
-                                    child: txController.isLoadMoreLoading.value
+                                      vertical: 10,
+                                    ),
+                                    child:
+                                        txController.isAiLoadMoreLoading.value
                                         ? const Center(
-                                            child: CircularProgressIndicator())
+                                            child: CircularProgressIndicator(),
+                                          )
                                         : ElevatedButton(
                                             onPressed: () {
-                                              txController.getTransactions(
-                                                isLoadMore: true,
-                                                isAiVerified: false,
-                                                isCategoryNotNull: true,
-                                              );
+                                              txController
+                                                  .getAiCatagoriesTrasections(
+                                                    isLoadMore: true,
+                                                    isAiVerified: false,
+                                                    isCategoryNotNull: true,
+                                                  );
                                             },
                                             child: const Text(
                                               "Load More",
                                               style: TextStyle(
-                                                  color: Colors.black),
+                                                color: Colors.black,
+                                              ),
                                             ),
                                           ),
                                   );
                                 }
+
                                 final tx = filteredTransactions[index];
+
                                 return BulkTransactionCard(
                                   transaction: tx,
                                   isSelected: selectedIds.contains(

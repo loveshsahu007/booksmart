@@ -18,6 +18,8 @@ import '../../../../utils/date_time_input.dart';
 import '../../../../widgets/custom_dialog.dart';
 import '../../../../widgets/custom_drop_down.dart';
 import 'receipt_scanning_output_screen.dart';
+import '../../../../services/storage_service.dart';
+import '../../../../supabase/buckets.dart';
 
 void goToAddTransactionScreen({
   TransactionModel? transaction,
@@ -91,6 +93,8 @@ class _AddTransactionScreenManualState
   XFile? _selectedFile;
   String _selectedType = personalTransactionType;
   Uint8List? _selectedFileBytes;
+  String? _existingReceiptUrl; // URL of the receipt already saved in DB
+  bool _receiptRemoved = false; // tracks if user explicitly removed the receipt
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
@@ -131,6 +135,7 @@ class _AddTransactionScreenManualState
     deductible = widget.transaction?.deductible ?? true;
     _selectedCategory = widget.transaction?.category;
     _selectedSubcategory = widget.transaction?.subcategory;
+    _existingReceiptUrl = widget.transaction?.filePath;
   }
 
   Future<void> _selectCategory() async {
@@ -159,7 +164,7 @@ class _AddTransactionScreenManualState
     }
   }
 
-  void _saveTransaction() {
+  Future<void> _saveTransaction() async {
     double amount = CurrencyUtils.parse(_amountController.text);
     if (!_formKey.currentState!.validate()) return;
     if (amount <= 0) {
@@ -171,6 +176,31 @@ class _AddTransactionScreenManualState
       showSnackBar("Please select category & subcategory", isError: true);
       return;
     }
+
+    // Upload new receipt to Supabase Storage if user selected one
+    String? effectiveFilePath;
+    if (_selectedFile != null) {
+      final uploadedUrl = await uploadFileToSupabaseStorage(
+        file: _selectedFile!,
+        bucketName: SupabaseStorageBucket.documents,
+      );
+      if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+        effectiveFilePath = uploadedUrl;
+        // Clear local selection now that upload is done
+        _selectedFile = null;
+        _selectedFileBytes = null;
+      } else {
+        showSnackBar("Failed to upload receipt. Please try again.",
+            isError: true);
+        return;
+      }
+    } else if (!_receiptRemoved && _existingReceiptUrl != null) {
+      // Keep the existing DB receipt URL unchanged
+      effectiveFilePath = _existingReceiptUrl;
+    }
+    // If _receiptRemoved == true and no new file, effectiveFilePath stays null
+    // → clears file_path in DB
+
     final model = TransactionModel(
       id: widget.transaction?.id ?? 0,
       title: _titleController.text,
@@ -181,7 +211,7 @@ class _AddTransactionScreenManualState
       deductible: deductible,
       description: _descriptionController.text,
       dateTime: _selectedDate!,
-      filePath: _selectedFile?.path,
+      filePath: effectiveFilePath,
       userId: authPerson!.id,
       orgId: getCurrentOrganization!.id,
     );
@@ -364,30 +394,127 @@ class _AddTransactionScreenManualState
             ),
             0.01.verticalSpace,
 
-            if (_selectedFile != null ||
-                (_selectedFileBytes != null && kIsWeb)) ...[
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: kIsWeb
+            // Determine which receipt image to show:
+            // 1. Newly selected file (web bytes or mobile path)
+            // 2. Existing receipt URL from DB (only when no new file picked and not removed)
+            Builder(builder: (context) {
+              final bool hasNewFile =
+                  _selectedFile != null ||
+                  (_selectedFileBytes != null && kIsWeb);
+              final bool hasExistingReceipt =
+                  !_receiptRemoved &&
+                  _existingReceiptUrl != null &&
+                  _existingReceiptUrl!.isNotEmpty;
+
+              if (!hasNewFile && !hasExistingReceipt) {
+                return const SizedBox.shrink();
+              }
+
+              Widget imageWidget;
+              if (hasNewFile) {
+                imageWidget = kIsWeb
                     ? Image.memory(
                         _selectedFileBytes!,
                         height: 200,
+                        width: double.infinity,
                         fit: BoxFit.cover,
                       )
                     : Image.file(
                         File(_selectedFile!.path),
                         height: 200,
+                        width: double.infinity,
                         fit: BoxFit.cover,
+                      );
+              } else {
+                // Show existing receipt stored in DB
+                imageWidget = Image.network(
+                  _existingReceiptUrl!,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return SizedBox(
+                      height: 200,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
                       ),
-              ),
-              0.01.verticalSpace,
-            ],
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 200,
+                      color: Colors.grey.shade200,
+                      child: const Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.broken_image_outlined,
+                                size: 48, color: Colors.grey),
+                            SizedBox(height: 8),
+                            Text('Failed to load receipt',
+                                style: TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              }
+
+              return Column(
+                children: [
+                  Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: imageWidget,
+                      ),
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              if (hasNewFile) {
+                                // Remove locally selected file
+                                _selectedFile = null;
+                                _selectedFileBytes = null;
+                              } else {
+                                // Mark existing DB receipt as removed
+                                _receiptRemoved = true;
+                              }
+                            });
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(6),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              );
+            }),
             OutlinedButton(
               onPressed: _attachReceipt,
-
               child: const AppText(
                 "Attach Receipt",
-
                 fontWeight: FontWeight.w500,
                 fontSize: 15,
               ),
