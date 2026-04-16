@@ -9,6 +9,9 @@ import 'package:get/get.dart';
 
 import 'package:flutter/material.dart';
 
+import 'package:booksmart/modules/user/controllers/financial_report_controller.dart';
+import 'package:booksmart/modules/user/controllers/organization_controller.dart';
+
 import 'subpages/financial_dashboard_tab.dart';
 
 class FinincialTabController extends GetxController
@@ -52,26 +55,31 @@ class _FinancialReportScreenState extends State<FinancialReportScreen> {
   FinincialTabController finincialTabController = Get.put(
     FinincialTabController(),
   );
+
+  @override
+  void initState() {
+    super.initState();
+    if (!Get.isRegistered<FinancialReportController>(tag: getCurrentOrganization!.id.toString())) {
+      Get.put(FinancialReportController(), tag: getCurrentOrganization!.id.toString());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isNarrow = MediaQuery.sizeOf(context).width <= 1024;
+
     return Scaffold(
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TabBar(
+            isScrollable: isNarrow,
+            tabAlignment: isNarrow ? TabAlignment.start : TabAlignment.fill,
             controller: finincialTabController.tabController,
             dividerColor: Colors.transparent,
             labelPadding: const EdgeInsets.symmetric(horizontal: 5),
-            indicatorColor: Get.theme.colorScheme.primary,
-            indicatorWeight: 2.5,
-            labelStyle: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-            unselectedLabelStyle: TextStyle(
-              fontWeight: FontWeight.normal,
-              fontSize: 12,
-            ),
+            labelColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
+            unselectedLabelColor: Theme.of(context).brightness == Brightness.dark ? Colors.white38 : Colors.black45,
             tabs: const [
               Tab(text: 'Dashboard'),
               Tab(text: 'Transactions'),

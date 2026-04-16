@@ -196,7 +196,7 @@ class _DocumentRepositoryScreenState extends State<DocumentRepositoryScreen> {
             child: _filteredDocuments.isEmpty
                 ? Center(
                     child: AppText(
-                      'No documents found',
+                      'Documents will appear here',
                       color: colorScheme.onSurfaceVariant,
                       fontSize: 16,
                     ),

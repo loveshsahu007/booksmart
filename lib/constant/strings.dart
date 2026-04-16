@@ -40,13 +40,18 @@ class Strings {
 
   // Month abbreviations
   static const List<String> months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
     "Sep",
     "Oct",
     "Nov",
     "Dec",
-    "Jan",
-    "Feb",
-    "Mar",
   ];
 
   // strings.dart - Add these to your existing Strings class

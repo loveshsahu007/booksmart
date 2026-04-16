@@ -8,6 +8,7 @@ class UserDocument {
   final int? fileSize; // bytes
   final String? mimeType;
   final DateTime createdAt;
+  final Map<String, dynamic>? parsedData;
 
   final int? cpaId;
   final int? orderId;
@@ -22,6 +23,7 @@ class UserDocument {
     this.fileSize,
     this.mimeType,
     required this.createdAt,
+    this.parsedData,
     this.cpaId,
     this.orderId,
   });
@@ -37,6 +39,9 @@ class UserDocument {
       fileSize: json['file_size'] as int?,
       mimeType: json['mime_type'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
+      parsedData: json['parsed_data'] == null
+          ? null
+          : Map<String, dynamic>.from(json['parsed_data']),
       cpaId: json['cpa_id'] as int?,
       orderId: json['order_id'] as int?,
     );
@@ -52,6 +57,7 @@ class UserDocument {
     if (mimeType != null) 'mime_type': mimeType,
     if (cpaId != null) 'cpa_id': cpaId,
     if (orderId != null) 'order_id': orderId,
+    if (parsedData != null) 'parsed_data': parsedData,
   };
 
   /// Human-readable file size (e.g. "2.34 MB").

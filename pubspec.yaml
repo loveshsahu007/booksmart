@@ -65,6 +65,12 @@ dependencies:
   flutter_stripe: ^12.3.0
   flutter_stripe_web: ^7.3.0
   flutter_dotenv: ^6.0.0
+  csv: 
+  excel: ^4.0.6
+  syncfusion_flutter_pdf: ^30.2.7
+  google_generative_ai: ^0.4.7
+  screenshot: ^3.0.0
+  universal_html: ^2.3.0
 
 dev_dependencies:
   flutter_test:

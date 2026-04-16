@@ -52,8 +52,9 @@ class _CustomMultiDropDownWidgetState<T>
   }
 
   void _notifyParent() {
-    if (widget.onChanged != null)
+    if (widget.onChanged != null) {
       widget.onChanged!(List<T>.from(_selectedItems));
+    }
   }
 
   @override

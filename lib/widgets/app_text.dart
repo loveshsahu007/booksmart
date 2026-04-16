@@ -12,7 +12,8 @@ class AppText extends StatelessWidget {
   final TextStyle? themeStyle;
   final int? maxLines;
   final TextOverflow? overflow;
-  final bool isUnderline; // ✅ NEW
+  final bool isUnderline;
+  final bool disableFormat; // ✅ Added to prevent auto-capitalization
 
   const AppText(
     this.text, {
@@ -26,7 +27,8 @@ class AppText extends StatelessWidget {
     this.themeStyle,
     this.maxLines,
     this.overflow,
-    this.isUnderline = false, // ✅ Default: false
+    this.isUnderline = false,
+    this.disableFormat = false, // ✅ Default: false
   });
 
   String _formatText(String input) {
@@ -49,7 +51,7 @@ class AppText extends StatelessWidget {
         color ??
         (theme.brightness == Brightness.dark ? Colors.white : Colors.black);
 
-    final processedText = _formatText(text);
+    final processedText = disableFormat ? text : _formatText(text);
 
     return Text(
       processedText,

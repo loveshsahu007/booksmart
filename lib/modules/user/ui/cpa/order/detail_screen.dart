@@ -67,8 +67,9 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
 
   Future<void> _fetchDeliveryDocs() async {
     if (_currentOrder.deliveryFiles == null ||
-        _currentOrder.deliveryFiles!.isEmpty)
+        _currentOrder.deliveryFiles!.isEmpty) {
       return;
+    }
     try {
       setState(() => _isFetchingDocs = true);
       final result = await supabase
@@ -352,8 +353,9 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
     if (_currentOrder.status == OrderStatus.completed) {
       statusColor = Colors.green;
     }
-    if (_currentOrder.status == OrderStatus.pending)
+    if (_currentOrder.status == OrderStatus.pending) {
       statusColor = Colors.orange;
+    }
     if (_currentOrder.status == OrderStatus.rejected ||
         _currentOrder.status == OrderStatus.cancelled) {
       statusColor = Colors.red;
