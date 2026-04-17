@@ -9,28 +9,33 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../../widgets/custom_drop_down.dart';
+import '../transaction/tax_onboarding/tax_screen_1_legal_identity.dart';
 
-void goToAddOrganizationScreen({bool shouldCloseBefore = false}) {
+void goToAddOrganizationScreen({
+  bool shouldCloseBefore = false,
+  OrganizationModel? organization,
+}) {
   if (kIsWeb) {
     if (shouldCloseBefore) {
       Get.back();
     }
     customDialog(
-      child: const AddOrganizationScreen(),
-      title: 'Add Organization',
+      child: AddOrganizationScreen(organization: organization),
+      title: organization != null ? 'Edit Organization' : 'Add Organization',
       barrierDismissible: true,
     );
   } else {
     if (shouldCloseBefore) {
-      Get.off(() => const AddOrganizationScreen());
+      Get.off(() => AddOrganizationScreen(organization: organization));
     } else {
-      Get.to(() => const AddOrganizationScreen());
+      Get.to(() => AddOrganizationScreen(organization: organization));
     }
   }
 }
 
 class AddOrganizationScreen extends StatefulWidget {
-  const AddOrganizationScreen({super.key});
+  final OrganizationModel? organization;
+  const AddOrganizationScreen({super.key, this.organization});
 
   @override
   State<AddOrganizationScreen> createState() => _AddOrganizationScreenState();
@@ -111,6 +116,21 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
       .toList();
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.organization != null) {
+      nameController.text = widget.organization!.name;
+      websiteController.text = widget.organization!.website ?? '';
+      einController.text = widget.organization!.einTin;
+      streetController.text = widget.organization!.street;
+      cityController.text = widget.organization!.city;
+      zipController.text = widget.organization!.zip;
+      phoneController.text = widget.organization!.phone ?? '';
+      emailController.text = widget.organization!.email ?? '';
+    }
+  }
+
+  @override
   void dispose() {
     _scrollController.dispose();
     nameController.dispose();
@@ -183,6 +203,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                       label: "Type of Organization *",
                       items: _orgTypes,
                       dropDownKey: orgDropdownKey,
+                      selectedItem: widget.organization?.orgType,
                     ),
                     0.02.verticalSpace,
 
@@ -190,6 +211,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                       label: "Industry *",
                       items: _industries,
                       dropDownKey: industryDropdownKey,
+                      selectedItem: widget.organization?.industry,
                     ),
                     0.02.verticalSpace,
 
@@ -197,6 +219,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                       label: "State / Territory *",
                       items: _states,
                       dropDownKey: stateDropdownKey,
+                      selectedItem: widget.organization?.state,
                     ),
                     0.02.verticalSpace,
 
@@ -239,7 +262,9 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                       children: [
                         Expanded(
                           child: AppButton(
-                            buttonText: "Add Organization",
+                            buttonText: widget.organization != null
+                                ? "Update Organization"
+                                : "Add Organization",
                             onTapFunction: _saveOrganization,
                           ),
                         ),
@@ -269,6 +294,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
     required String label,
     required List<String> items,
     required GlobalKey<DropdownSearchState<String>> dropDownKey,
+    String? selectedItem,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,12 +306,13 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
           label: label,
           hint: "Select $label",
           items: items,
+          selectedItem: selectedItem,
         ),
       ],
     );
   }
 
-  void _saveOrganization() {
+  Future<void> _saveOrganization() async {
     if (!_formKey.currentState!.validate()) return;
 
     final orgType = orgDropdownKey.currentState?.getSelectedItem;
@@ -298,7 +325,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
     }
 
     final model = OrganizationModel(
-      id: 0,
+      id: widget.organization?.id ?? 0,
       name: nameController.text.trim(),
       website: websiteController.text.trim(),
       einTin: einController.text.trim(),
@@ -313,6 +340,19 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
       ownerId: authPerson!.id,
     );
 
-    controller.addOrganization(model);
+    if (widget.organization != null) {
+      await controller.updateOrganization(id: model.id, data: model.toJson());
+      // Navigate to onboarding after update
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        goToTaxScreen1(organizationId: model.id);
+      });
+    } else {
+      final newId = await controller.addOrganizationAndReturnId(model);
+      if (newId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          goToTaxScreen1(organizationId: newId);
+        });
+      }
+    }
   }
 }

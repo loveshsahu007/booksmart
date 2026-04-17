@@ -3,6 +3,7 @@ import 'package:booksmart/models/organization_model.dart';
 import 'package:booksmart/modules/user/providers/organization_provider.dart';
 import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';
+import 'package:booksmart/utils/supabase.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:get/get.dart';
 
@@ -76,6 +77,27 @@ class OrganizationController extends GetxController {
     }
   }
 
+  /// Like [addOrganization] but returns the newly created row's ID.
+  Future<int?> addOrganizationAndReturnId(OrganizationModel model) async {
+    try {
+      Map<String, dynamic> json = model.toJson();
+      json.remove("id");
+      // Use direct supabase call to get the returned ID
+      final res =
+          await supabase.from(table).insert(json).select('id').single();
+      refreshOrganizations();
+      Get.back();
+      showSnackBar("Organization added successfully");
+      return res['id'] as int?;
+    } catch (e, s) {
+      log("❌ addOrganizationAndReturnId ERROR");
+      log(e.toString());
+      log(s.toString());
+      somethingWentWrongSnackbar();
+      return null;
+    }
+  }
+
   // ===============================
   // UPDATE ORGANIZATION
   // ===============================
@@ -84,18 +106,41 @@ class OrganizationController extends GetxController {
     required Map<String, dynamic> data,
   }) async {
     try {
+      data.remove('id');
       await SupabaseCrudService.update(
         table: table,
         data: data,
         filters: {'id': id},
       );
       refreshOrganizations();
+      Get.back();
       showSnackBar("Organization updated successfully");
     } catch (e, s) {
       log("❌ updateOrganization ERROR");
       log(e.toString());
       log(s.toString());
       showSnackBar(e.toString(), isError: true);
+    }
+  }
+
+  /// Update only tax onboarding columns for an organization
+  Future<void> updateTaxProfile({
+    required int organizationId,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      data.remove('id'); // Safety
+      await SupabaseCrudService.update(
+        table: table,
+        data: data,
+        filters: {'id': organizationId},
+      );
+      // Optional: refresh if we show these fields on the detail page
+      refreshOrganizations();
+    } catch (e, s) {
+      log("❌ updateTaxProfile ERROR");
+      log(e.toString());
+      log(s.toString());
     }
   }
 

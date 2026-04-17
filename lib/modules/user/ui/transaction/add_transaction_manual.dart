@@ -20,6 +20,7 @@ import '../../../../widgets/custom_drop_down.dart';
 import 'receipt_scanning_output_screen.dart';
 import '../../../../services/storage_service.dart';
 import '../../../../supabase/buckets.dart';
+import 'tax_onboarding/tax_screen_1_legal_identity.dart';
 
 void goToAddTransactionScreen({
   TransactionModel? transaction,
@@ -219,12 +220,24 @@ class _AddTransactionScreenManualState
     );
 
     if (widget.transaction == null) {
-      transactionC.addTransaction(model);
+      // ── ADD new transaction ──────────────────────────────────────────────
+      // We need the newly created ID to pass to the tax onboarding screens.
+      // The controller's addTransaction calls Get.back() internally, so we
+      // capture the ID and navigate to Screen 1 in a post-frame callback.
+      await transactionC.addTransactionAndReturnId(model).then((newId) {
+        if (newId != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            goToTaxScreen1();
+          });
+        }
+      });
     } else {
-      transactionC.updateTransaction(
-        data: model,
-        id: widget.transaction?.id ?? 0,
-      );
+      // ── UPDATE existing transaction ──────────────────────────────────────
+      final existingId = widget.transaction!.id;
+      await transactionC.updateTransaction(data: model, id: existingId);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        goToTaxScreen1();
+      });
     }
   }
 

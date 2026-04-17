@@ -60,7 +60,7 @@ class OrganizationListScreen extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.grey),
                         onPressed: () {
-                          // TODO: open edit org screen
+                          goToAddOrganizationScreen(organization: org);
                         },
                       ),
                       IconButton(

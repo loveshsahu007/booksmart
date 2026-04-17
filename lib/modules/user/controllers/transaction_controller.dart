@@ -247,6 +247,30 @@ class TransactionController extends GetxController {
     update();
   }
 
+  /// Like [addTransaction] but returns the newly created row's ID so callers
+  /// can navigate to the tax onboarding flow with the real transaction ID.
+  Future<int?> addTransactionAndReturnId(TransactionModel transaction) async {
+    try {
+      Map<String, dynamic> json = transaction.toJson();
+      json.remove("id");
+      showLoading();
+      final res = await supabase.from(table).insert(json).select('id').single();
+      dismissLoadingWidget();
+      getAllTransactions();
+      Get.back();
+      showSnackBar("Transaction added successfully");
+      return res['id'] as int?;
+    } catch (e, s) {
+      dismissLoadingWidget();
+      log(e.toString());
+      log(s.toString());
+      somethingWentWrongSnackbar();
+      return null;
+    } finally {
+      update();
+    }
+  }
+
   Future<void> updateTransaction({
     required int id,
     required TransactionModel data,
@@ -312,4 +336,30 @@ class TransactionController extends GetxController {
       update();
     }
   }
+
+  /// Updates only the tax strategy onboarding fields for a given transaction.
+  /// All fields are optional — only non-null keys in [data] are sent.
+  Future<void> updateTaxProfile({
+    required int transactionId,
+    required Map<String, dynamic> data,
+  }) async {
+    try {
+      // Remove null values so we don't accidentally overwrite existing data
+      final payload = Map<String, dynamic>.from(data)
+        ..removeWhere((_, v) => v == null);
+      if (payload.isEmpty) return;
+      await SupabaseCrudService.update(
+        table: table,
+        data: payload,
+        filters: {'id': transactionId},
+        isShowLoading: false,
+      );
+    } catch (e, s) {
+      log("❌ updateTaxProfile ERROR");
+      log(e.toString());
+      log(s.toString());
+      somethingWentWrongSnackbar();
+    }
+  }
 }
+

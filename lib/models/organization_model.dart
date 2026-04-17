@@ -15,6 +15,32 @@ class OrganizationModel {
   /// User.id
   final int ownerId;
 
+  // 🇺🇸 US Tax Strategy Fields (Added for Onboarding)
+  final String? filingStatus;
+  final String? primaryState;
+  final String? residencyStatus;
+  final bool? multiStateActivity;
+  final List<String>? primaryIncomeTypes;
+  final String? industryNiche;
+  final List<String>? passiveIncome;
+  final List<String>? teamStructure;
+  final String? accountingMethod;
+  final bool? majorEquipment;
+  final String? vehicleOwnership;
+  final String? vehicleUsage;
+  final bool? vehicleOver6kLbs;
+  final String? homeOfficeType;
+  final String? homeStatus;
+  final List<String>? techUsage;
+  final List<String>? realEstateInterests;
+  final bool? hostsBusinessMeetings;
+  final String? healthInsurance;
+  final List<String>? healthSavings;
+  final List<String>? familyEducation;
+  final String? taxGoal;
+  final List<String>? retirementCurrent;
+  final String? auditAppetite;
+
   OrganizationModel({
     required this.id,
     required this.name,
@@ -29,6 +55,30 @@ class OrganizationModel {
     this.phone,
     this.email,
     required this.ownerId,
+    this.filingStatus,
+    this.primaryState,
+    this.residencyStatus,
+    this.multiStateActivity,
+    this.primaryIncomeTypes,
+    this.industryNiche,
+    this.passiveIncome,
+    this.teamStructure,
+    this.accountingMethod,
+    this.majorEquipment,
+    this.vehicleOwnership,
+    this.vehicleUsage,
+    this.vehicleOver6kLbs,
+    this.homeOfficeType,
+    this.homeStatus,
+    this.techUsage,
+    this.realEstateInterests,
+    this.hostsBusinessMeetings,
+    this.healthInsurance,
+    this.healthSavings,
+    this.familyEducation,
+    this.taxGoal,
+    this.retirementCurrent,
+    this.auditAppetite,
   });
 
   factory OrganizationModel.fromJson(Map<String, dynamic> json) {
@@ -46,6 +96,30 @@ class OrganizationModel {
       phone: json['phone'],
       email: json['email'],
       ownerId: json['owner_id'],
+      filingStatus: json['filing_status'],
+      primaryState: json['primary_state'],
+      residencyStatus: json['residency_status'],
+      multiStateActivity: json['multi_state_activity'],
+      primaryIncomeTypes: _parseList(json['primary_income_types']),
+      industryNiche: json['industry_niche'],
+      passiveIncome: _parseList(json['passive_income']),
+      teamStructure: _parseList(json['team_structure']),
+      accountingMethod: json['accounting_method'],
+      majorEquipment: json['major_equipment'],
+      vehicleOwnership: json['vehicle_ownership'],
+      vehicleUsage: json['vehicle_usage'],
+      vehicleOver6kLbs: json['vehicle_over_6k_lbs'],
+      homeOfficeType: json['home_office_type'],
+      homeStatus: json['home_status'],
+      techUsage: _parseList(json['tech_usage']),
+      realEstateInterests: _parseList(json['real_estate_interests']),
+      hostsBusinessMeetings: json['hosts_business_meetings'],
+      healthInsurance: json['health_insurance'],
+      healthSavings: _parseList(json['health_savings']),
+      familyEducation: _parseList(json['family_education']),
+      taxGoal: json['tax_goal'],
+      retirementCurrent: _parseList(json['retirement_current']),
+      auditAppetite: json['audit_appetite'],
     );
   }
 
@@ -64,6 +138,36 @@ class OrganizationModel {
       'phone': phone,
       'email': email,
       'owner_id': ownerId,
+      'filing_status': filingStatus,
+      'primary_state': primaryState,
+      'residency_status': residencyStatus,
+      'multi_state_activity': multiStateActivity,
+      'primary_income_types': primaryIncomeTypes,
+      'industry_niche': industryNiche,
+      'passive_income': passiveIncome,
+      'team_structure': teamStructure,
+      'accounting_method': accountingMethod,
+      'major_equipment': majorEquipment,
+      'vehicle_ownership': vehicleOwnership,
+      'vehicle_usage': vehicleUsage,
+      'vehicle_over_6k_lbs': vehicleOver6kLbs,
+      'home_office_type': homeOfficeType,
+      'home_status': homeStatus,
+      'tech_usage': techUsage,
+      'real_estate_interests': realEstateInterests,
+      'hosts_business_meetings': hostsBusinessMeetings,
+      'health_insurance': healthInsurance,
+      'health_savings': healthSavings,
+      'family_education': familyEducation,
+      'tax_goal': taxGoal,
+      'retirement_current': retirementCurrent,
+      'audit_appetite': auditAppetite,
     };
+  }
+
+  static List<String>? _parseList(dynamic data) {
+    if (data == null) return null;
+    if (data is List) return data.map((e) => e.toString()).toList();
+    return null;
   }
 }
