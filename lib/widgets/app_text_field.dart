@@ -17,6 +17,7 @@ class AppTextField extends StatelessWidget {
   final int? maxLines;
   final String? Function(String?)? fieldValidator;
   final TextCapitalization textCapitalization;
+  final EdgeInsetsGeometry? padding;
 
   const AppTextField({
     super.key,
@@ -36,6 +37,7 @@ class AppTextField extends StatelessWidget {
     this.maxLines,
     this.fieldValidator,
     this.textCapitalization = TextCapitalization.sentences,
+    this.padding,
   });
 
   @override
@@ -46,7 +48,7 @@ class AppTextField extends StatelessWidget {
         : Colors.black87;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
+      padding: padding ?? const EdgeInsets.symmetric(vertical: 3),
       child: TextFormField(
         controller: controller,
         onChanged: onChanged,

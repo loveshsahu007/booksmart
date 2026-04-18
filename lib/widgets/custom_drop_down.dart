@@ -1,6 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:dropdown_search/dropdown_search.dart';
-import 'package:flutter/material.dart';
 
 class CustomDropDownWidget<T> extends StatefulWidget {
   const CustomDropDownWidget({
@@ -51,18 +50,43 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
           filled: true,
           fillColor: colors.surface,
           isDense: true,
-          labelText: widget.label,
-          hintText: widget.hint,
-          hintStyle: theme.textTheme.bodyMedium?.copyWith(
-            color: colors.onSurfaceVariant,
-          ),
+          label: widget.label == null
+              ? null
+              : FittedText(
+                  widget.label ?? "-",
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+
+          hint: widget.hint == null
+              ? null
+              : FittedText(
+                  widget.hint ?? "-",
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
+            horizontal: 8,
             vertical: 12,
           ),
         ),
       ),
+
+      dropdownBuilder: (context, selectedItem) {
+        if (selectedItem == null) {
+          return SizedBox();
+        }
+        return FittedText(
+          widget.itemAsString?.call(selectedItem) ?? selectedItem.toString(),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
+        );
+      },
 
       /// ✅ POPUP STYLE (Dark/Light Fix)
       popupProps: PopupProps.menu(
@@ -73,10 +97,12 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
+          clipBehavior: Clip.hardEdge,
         ),
         constraints: BoxConstraints(
-          maxHeight: widget.items.length < 5 ? widget.items.length * 45 : 300,
+          maxHeight: widget.items.length < 5 ? widget.items.length * 45 : 230,
         ),
+        showSelectedItems: true,
 
         /// ✅ Search box styling
         searchFieldProps: TextFieldProps(
@@ -102,6 +128,7 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
                   alpha: 0.1,
                 ) // Subtle white for dark mode
               : Colors.grey.shade300;
+          final isLast = widget.items.last == item;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -109,21 +136,17 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
                 color: isSelected
                     ? colors.primary.withValues(alpha: 0.08)
                     : colors.surface,
-                child: Padding(
+                child: Container(
+                  width: double.infinity,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
                   ),
-                  child: Text(text),
+                  child: FittedText(text),
                 ),
               ),
-              Divider(
-                height: 1,
-                thickness: 1,
-                color: dividerColor,
-                // indent: 12,
-                // endIndent: 12,
-              ),
+              if (!isLast)
+                Divider(height: 1, thickness: 1, color: dividerColor),
             ],
           );
         },

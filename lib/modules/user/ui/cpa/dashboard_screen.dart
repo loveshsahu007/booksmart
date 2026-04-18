@@ -40,39 +40,35 @@ class _CpaNetworkScreenState extends State<CpaNetworkScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const AppText(
-                  "Active Orders",
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+                Expanded(
+                  child: const AppText(
+                    "Active Orders",
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
 
-                /// 🔽 Filter Icon
-                IconButton(
-                  icon: const Icon(Icons.filter_list),
-                  onPressed: () {
-                    _filterKey.currentState?.openDropDownSearch();
-                  },
+                /// 🔽 Dropdown Filter
+                SizedBox(
+                  width: 130,
+                  child: CustomDropDownWidget<OrderStatus?>(
+                    dropDownKey: _filterKey,
+                    label: "Filter Orders",
+                    hint: "Filter by status",
+                    selectedItem: selectedFilter,
+                    items: [null, ...OrderStatus.values],
+                    itemAsString: (status) {
+                      if (status == null) return "All";
+                      return status.name.capitalizeFirst!;
+                    },
+                    onChanged: (value) {
+                      setState(() {
+                        selectedFilter = value;
+                      });
+                    },
+                  ),
                 ),
               ],
-            ),
-
-            const SizedBox(height: 10),
-
-            /// 🔽 Dropdown Filter
-            CustomDropDownWidget<OrderStatus?>(
-              dropDownKey: _filterKey,
-              hint: "Filter by status",
-              selectedItem: selectedFilter,
-              items: [null, ...OrderStatus.values],
-              itemAsString: (status) {
-                if (status == null) return "All";
-                return status.name.capitalizeFirst!;
-              },
-              onChanged: (value) {
-                setState(() {
-                  selectedFilter = value;
-                });
-              },
             ),
 
             const SizedBox(height: 20),
@@ -113,12 +109,7 @@ class _CpaNetworkScreenState extends State<CpaNetworkScreen> {
 
                 return Column(
                   children: filteredOrders
-                      .map(
-                        (order) => Padding(
-                          padding: const EdgeInsets.only(bottom: 15),
-                          child: OrderCard(order: order),
-                        ),
-                      )
+                      .map((order) => OrderCard(order: order))
                       .toList(),
                 );
               },

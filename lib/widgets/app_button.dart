@@ -97,22 +97,34 @@ class AppButton extends StatelessWidget {
   }
 }
 
-Widget outlineButton(String text, {required VoidCallback onPressed}) {
+Widget outlineButton(
+  String text, {
+  required VoidCallback onPressed,
+  EdgeInsetsGeometry? padding = const EdgeInsets.symmetric(
+    horizontal: 20,
+    vertical: 10,
+  ),
+}) {
   return InkWell(
     onTap: onPressed,
     borderRadius: BorderRadius.circular(12),
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: padding,
       decoration: BoxDecoration(
         border: Border.all(color: orangeColor, width: 1.2),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Center(
-        child: AppText(
-          text.toUpperCase(),
-          color: orangeColor,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            text.toUpperCase(),
+            style: TextStyle(
+              color: orangeColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ),
     ),

@@ -74,8 +74,8 @@ class _CustomMultiDropDownWidgetState<T>
 
       decoratorProps: DropDownDecoratorProps(
         decoration: InputDecoration(
-          hintText: widget.hint,
-          labelText: widget.label,
+          // hintText: widget.hint,
+          // labelText: widget.label,
         ),
       ),
 

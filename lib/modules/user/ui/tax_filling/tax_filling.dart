@@ -74,53 +74,44 @@ class _TaxFillingScreenState extends State<TaxFillingScreen> {
         child: Column(
           children: [
             // ── Search + Upload ──────────────────────────────────────────
-            Row(
-              spacing: 10,
-              children: [
-                Expanded(
-                  flex: 5,
-                  child: AppTextField(
-                    hintText: 'Search documents…',
-                    keyboardType: TextInputType.text,
-                    suffixWidget: const Icon(Icons.search),
-                    onChanged: (v) => setState(() => _search = v),
+            SizedBox(
+              height: 35,
+              width: Get.width,
+              child: Row(
+                spacing: 7,
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: AppTextField(
+                      hintText: 'Search documents…',
+                      keyboardType: TextInputType.text,
+                      suffixWidget: const Icon(Icons.search),
+                      onChanged: (v) => setState(() => _search = v),
+                      padding: EdgeInsets.zero,
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: outlineButton(
-                    'Upload',
-                    onPressed: showUploadTaxDocumentDialog,
+                  Expanded(
+                    child: outlineButton(
+                      'Upload',
+                      onPressed: showUploadTaxDocumentDialog,
+                      padding: EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 3,
+                      ),
+                    ),
                   ),
-
-                  // AppButton(
-                  //   radius: 8,
-                  //   buttonText: 'Upload',
-                  //   fontSize: 16,
-                  //   padding: const EdgeInsets.symmetric(
-                  //     vertical: 18,
-                  //     horizontal: 6,
-                  //   ),
-                  //   onTapFunction: showUploadTaxDocumentDialog,
-                  // ),
-                ),
-                Expanded(
-                  child: outlineButton(
-                    'Accessible to',
-                    onPressed: showDocumentAccessRequestsDialog,
+                  Expanded(
+                    child: outlineButton(
+                      'Access',
+                      onPressed: showDocumentAccessRequestsDialog,
+                      padding: EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 3,
+                      ),
+                    ),
                   ),
-
-                  //  AppButton(
-                  //   radius: 8,
-                  //   buttonText: 'Accessible to',
-                  //   fontSize: 16,
-                  //   padding: const EdgeInsets.symmetric(
-                  //     vertical: 18,
-                  //     horizontal: 6,
-                  //   ),
-                  //   onTapFunction: showDocumentAccessRequestsDialog,
-                  // ),
-                ),
-              ],
+                ],
+              ),
             ),
 
             const SizedBox(height: 10),

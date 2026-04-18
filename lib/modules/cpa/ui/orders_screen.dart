@@ -2,9 +2,10 @@ import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/models/order_model.dart';
 import 'package:booksmart/modules/user/controllers/order_controller.dart';
 import 'package:booksmart/modules/user/ui/cpa/components/cpa_order_card.dart';
-import 'package:booksmart/widgets/multiple_selection_dropdown_widget.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:get/get.dart';
+
+import '../../../widgets/custom_drop_down.dart';
 
 class OrdersScreenCPA extends StatefulWidget {
   const OrdersScreenCPA({super.key});
@@ -14,11 +15,12 @@ class OrdersScreenCPA extends StatefulWidget {
 }
 
 class _OrdersScreenCPAState extends State<OrdersScreenCPA> {
-  /// Multi Select Filter
-  final GlobalKey<DropdownSearchState<OrderStatus>> _dropdownKey =
-      GlobalKey<DropdownSearchState<OrderStatus>>();
+  /// Selected filter
+  OrderStatus? selectedFilter;
 
-  List<OrderStatus> selectedFilters = [];
+  /// Dropdown key
+  final GlobalKey<DropdownSearchState<OrderStatus?>> _filterKey =
+      GlobalKey<DropdownSearchState<OrderStatus?>>();
 
   @override
   void initState() {
@@ -39,28 +41,38 @@ class _OrdersScreenCPAState extends State<OrdersScreenCPA> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: AppText("Orders", fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-
-          /// ✅ MULTI SELECT FILTER DROPDOWN
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: CustomMultiDropDownWidget<OrderStatus>(
-              dropDownKey: _dropdownKey,
-              label: "Filter Orders",
-              hint: "Select status",
-              items: OrderStatus.values,
-              selectedItems: selectedFilters,
-              showSearchBox: false,
-              itemAsString: (status) =>
-                  status.name.capitalizeFirst ?? status.name,
-              onChanged: (List<OrderStatus> values) {
-                setState(() {
-                  selectedFilters = values;
-                });
-              },
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: AppText(
+                    "Orders",
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+
+                SizedBox(
+                  width: 130,
+                  child: CustomDropDownWidget<OrderStatus?>(
+                    dropDownKey: _filterKey,
+                    label: "Filter Orders",
+                    hint: "Filter by status",
+                    selectedItem: selectedFilter,
+                    items: [null, ...OrderStatus.values],
+                    itemAsString: (status) {
+                      if (status == null) return "All";
+                      return status.name.capitalizeFirst!;
+                    },
+                    onChanged: (value) {
+                      setState(() {
+                        selectedFilter = value;
+                      });
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -75,14 +87,13 @@ class _OrdersScreenCPAState extends State<OrdersScreenCPA> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  /// ✅ FILTER LOGIC (MULTI SELECT)
-                  final filteredOrders = selectedFilters.isEmpty
+                  final filteredOrders = selectedFilter == null
                       ? controller.activeOrders
                       : controller.activeOrders.where((order) {
-                          final orderStatus = OrderStatus.fromString(
+                          final orderStatusEnum = OrderStatus.fromString(
                             order.status.name,
                           );
-                          return selectedFilters.contains(orderStatus);
+                          return orderStatusEnum == selectedFilter;
                         }).toList();
 
                   if (filteredOrders.isEmpty) {
@@ -94,10 +105,9 @@ class _OrdersScreenCPAState extends State<OrdersScreenCPA> {
                     );
                   }
 
-                  return ListView.separated(
+                  return ListView.builder(
                     padding: const EdgeInsets.only(bottom: 20),
                     itemCount: filteredOrders.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 15),
                     itemBuilder: (context, index) {
                       final order = filteredOrders[index];
                       return OrderCard(order: order);
