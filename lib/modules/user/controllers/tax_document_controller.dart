@@ -1,4 +1,5 @@
 import 'dart:developer';
+import 'package:path/path.dart' as p;
 
 import 'package:booksmart/models/user_document_model.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
@@ -93,7 +94,7 @@ class TaxDocumentController extends GetxController {
             name: platformFile.name,
           );
         } else if (platformFile.path != null) {
-          pickedFile = XFile(platformFile.path!);
+          pickedFile = XFile(platformFile.path!, name: platformFile.name);
         }
         update(); // refresh dialog UI
       }
@@ -129,13 +130,22 @@ class TaxDocumentController extends GetxController {
       return null;
     }
 
+    // Ensure name has the correct extension
+    String finalName = name.trim();
+    final extension = p.extension(fileToUpload.name).toLowerCase();
+    if (extension.isNotEmpty && !finalName.toLowerCase().endsWith(extension)) {
+      finalName = '$finalName$extension';
+    }
+
     try {
       isUploading.value = true;
 
       // 1. Upload to Storage
+      final mimeType = _guessMime(fileToUpload.name);
       final fileUrl = await uploadFileToSupabaseStorage(
         file: fileToUpload,
         bucketName: SupabaseStorageBucket.documents,
+        contentType: mimeType,
       );
 
       if (fileUrl == null || fileUrl.isEmpty) {
@@ -153,14 +163,14 @@ class TaxDocumentController extends GetxController {
       // 3. Insert DB row
       final payload = <String, dynamic>{
         'user_id': effectiveUserId,
-        'name': name.trim(),
+        'name': finalName,
         'file_url': fileUrl,
         if (taxYear != null && taxYear.isNotEmpty) 'tax_year': taxYear,
         if (category != null && category.isNotEmpty) 'category': category,
         if (fileSize != null) 'file_size': fileSize,
         if (orderId != null) 'order_id': orderId,
         if (cpaId != null) 'cpa_id': cpaId,
-        'mime_type': _guessMime(fileToUpload.name),
+        'mime_type': mimeType,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
       };

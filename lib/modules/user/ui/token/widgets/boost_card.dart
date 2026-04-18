@@ -1,6 +1,4 @@
-import 'package:flutter/material.dart';
-
-import '../../../../../widgets/app_text.dart';
+import 'package:booksmart/constant/exports.dart';
 
 class BoostCard extends StatelessWidget {
   final String title, subtitle, price, reward;
@@ -96,22 +94,7 @@ class BoostCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-              fixedSize: const Size(80, 32),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              padding: EdgeInsets.zero,
-            ),
-            child: FittedText(
-              price,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-          ),
+          Column(children: [outlineButton(price, onPressed: () {})]),
         ],
       ),
     );

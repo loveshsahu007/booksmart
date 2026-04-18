@@ -2,6 +2,7 @@ import 'dart:developer';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/utils/supabase.dart';
 import 'package:booksmart/supabase/tables.dart';
+import 'package:booksmart/modules/user/controllers/order_controller.dart';
 import 'package:get/get.dart';
 import 'package:jiffy/jiffy.dart';
 import '../../../models/lead_model.dart';
@@ -17,6 +18,13 @@ class LeadsController extends GetxController {
     // Fetch leads only if current user is CPA
     if (Get.find<AuthController>().person?.role == UserRole.cpa) {
       fetchLeads();
+      
+      // Ensure OrderController is registered and listen to changes
+      final orderCtrl = Get.isRegistered<OrderController>() 
+          ? Get.find<OrderController>() 
+          : Get.put(OrderController());
+          
+      ever(orderCtrl.allOrders, (_) => _updateChartData());
     }
   }
 
@@ -68,11 +76,16 @@ class LeadsController extends GetxController {
             l.createdAt.month == monthDate.month;
       }).length;
 
+      final orderController = Get.find<OrderController>();
+      final ordersCount = orderController.allOrders.where((o) {
+        return o.createdAt.year == monthDate.year &&
+            o.createdAt.month == monthDate.month;
+      }).length;
+
       data.add({
         'month': monthName,
         'leads': count.toDouble(),
-        'orders':
-            0.0, // Placeholder for orders if we don't have OrderController integrated here
+        'orders': ordersCount.toDouble(),
       });
     }
     chartData.assignAll(data);

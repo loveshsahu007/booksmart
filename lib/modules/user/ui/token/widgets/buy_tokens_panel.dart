@@ -1,3 +1,4 @@
+import 'package:booksmart/constant/app_colors.dart';
 import 'package:flutter/material.dart';
 
 class BuyTokensPanel extends StatelessWidget {
@@ -33,14 +34,16 @@ class BuyTokensPanel extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: colorScheme.primary,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
+
+                /// ✅ OUTLINE INSTEAD OF FILL
+                border: Border.all(color: orangeColor, width: 1.2),
               ),
               child: const Center(
                 child: Text(
                   "Buy Tokens",
                   style: TextStyle(
-                    color: Colors.white,
+                    color: orangeBttonColor,
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),

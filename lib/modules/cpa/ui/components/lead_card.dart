@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:jiffy/jiffy.dart';
 import 'package:get/get.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
-import '../../../../widgets/app_button.dart';
 
 class LeadCard extends StatefulWidget {
   const LeadCard({super.key, required this.lead});
@@ -86,6 +85,8 @@ class _LeadCardState extends State<LeadCard> {
   }
 
   void _showUserDetailDialog(BuildContext context, Map<String, dynamic>? user) {
+    const Color orangeColor = Color(0xFFF5C542);
+
     customDialog(
       title: 'User Details',
       child: Padding(
@@ -115,14 +116,22 @@ class _LeadCardState extends State<LeadCard> {
               const AppText("Unknown User"),
               const SizedBox(height: 24),
             ],
+
+            /// 🔽 ROW 1
             Row(
               children: [
                 Expanded(
-                  child: AppButton(
+                  child: OutlinedButton(
                     key: const Key('chat_btn'),
-                    buttonText: "Chat",
-                    fontSize: 12,
-                    onTapFunction: () {
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: orangeColor),
+                      foregroundColor: orangeColor,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
                       if (user != null) {
                         Get.back();
                         final personData = Map<String, dynamic>.from(user);
@@ -130,31 +139,51 @@ class _LeadCardState extends State<LeadCard> {
                         goToChatScreen(person);
                       }
                     },
+                    child: const Text("Chat", style: TextStyle(fontSize: 12)),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: AppButton(
+                  child: OutlinedButton(
                     key: const Key('documents_btn'),
-                    buttonText: "Documents",
-                    fontSize: 12,
-                    onTapFunction: () {
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: orangeColor),
+                      foregroundColor: orangeColor,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
                       Get.back();
                       showUserDocumentsDialog(lead: widget.lead);
                     },
+                    child: const Text(
+                      "Documents",
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                 ),
               ],
             ),
+
             const SizedBox(height: 10),
+
+            /// 🔽 ROW 2
             Row(
               children: [
                 Expanded(
-                  child: AppButton(
+                  child: OutlinedButton(
                     key: const Key('send_order_request_btn'),
-                    buttonText: "Send Order Request",
-                    fontSize: 12,
-                    onTapFunction: () {
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: orangeColor),
+                      foregroundColor: orangeColor,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () {
                       final userName = user != null
                           ? "${user['first_name']} ${user['last_name']}"
                           : "Unknown User";
@@ -164,6 +193,10 @@ class _LeadCardState extends State<LeadCard> {
                         userName: userName,
                       );
                     },
+                    child: const Text(
+                      "Send Order Request",
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ),
                 ),
               ],

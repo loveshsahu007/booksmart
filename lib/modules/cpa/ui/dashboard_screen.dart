@@ -1,4 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/models/order_model.dart';
+import 'package:booksmart/modules/user/controllers/order_controller.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:get/get.dart';
 import '../../common/controllers/chat_controller.dart';
@@ -15,6 +17,9 @@ class DashboardScreenCPA extends StatefulWidget {
 class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
   final chatController = Get.put(ChatController());
   final leadsController = Get.put(LeadsController());
+  final orderController = Get.isRegistered<OrderController>()
+      ? Get.find<OrderController>()
+      : Get.put(OrderController());
 
   @override
   Widget build(BuildContext context) {
@@ -56,28 +61,46 @@ class _DashboardScreenCPAState extends State<DashboardScreenCPA> {
                         Icons.leaderboard,
                       ),
                     ),
-
-                    // TODO: navigate to the order-screen
-                    // implement onclick for _buildStatCard, so that we can it for others as well, wrap it with material and inkwell so that it have ink effect on hovering and clicking
-                    _buildStatCard(
-                      'Orders',
-                      '4',
-                      Colors.teal,
-                      Icons.shopping_cart,
+                    Obx(
+                      () => _buildStatCard(
+                        'Orders',
+                        '${orderController.allOrders.length}',
+                        Colors.teal,
+                        Icons.shopping_cart,
+                      ),
                     ),
-                    _buildStatCard(
-                      'Accepted Clients',
-                      '8',
-                      Colors.green,
-                      Icons.verified_user,
-                    ),
+                    Obx(() {
+                      final acceptedClients = orderController.allOrders
+                          .where(
+                            (o) =>
+                                o.status != OrderStatus.pending &&
+                                o.status != OrderStatus.rejected &&
+                                o.status != OrderStatus.cancelled,
+                          )
+                          .map((o) => o.userId)
+                          .toSet()
+                          .length;
+                      return _buildStatCard(
+                        'Accepted Clients',
+                        '$acceptedClients',
+                        Colors.green,
+                        Icons.verified_user,
+                      );
+                    }),
                     // orders/leads ratio
-                    _buildStatCard(
-                      'Conversion Rate',
-                      '53%',
-                      Colors.blue,
-                      Icons.percent,
-                    ),
+                    Obx(() {
+                      final totalLeads = leadsController.leads.length;
+                      final totalOrders = orderController.allOrders.length;
+                      final conversionRate = totalLeads == 0
+                          ? 0
+                          : (totalOrders / totalLeads * 100).toInt();
+                      return _buildStatCard(
+                        'Conversion Rate',
+                        '$conversionRate%',
+                        Colors.blue,
+                        Icons.percent,
+                      );
+                    }),
                   ],
                 );
               },

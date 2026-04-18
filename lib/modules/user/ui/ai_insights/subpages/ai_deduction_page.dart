@@ -282,6 +282,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            height: 70,
             child: Row(
               children: [
                 Expanded(

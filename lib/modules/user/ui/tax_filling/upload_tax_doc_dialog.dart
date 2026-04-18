@@ -248,14 +248,12 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
                 spacing: 10,
                 children: [
                   Expanded(
-                    child: AppButton(
-                      buttonText: 'Cancel',
-                      onTapFunction: ctrl.isUploading.value
-                          ? null
-                          : () {
-                              ctrl.pickedFile = null;
-                              Get.back();
-                            },
+                    child: outlineButton(
+                      "Cancel",
+                      onPressed: () {
+                        ctrl.pickedFile = null;
+                        Get.back();
+                      },
                     ),
                   ),
                   Expanded(

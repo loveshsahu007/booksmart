@@ -290,6 +290,7 @@ class _BulkReviewScreenState extends State<BulkReviewScreen> {
                   ids: selectedIds.map((e) => int.parse(e)).toList(),
                 );
                 selectedIds.clear();
+                _fetchTransactions();
                 setState(() {});
               },
               child: const AppText(

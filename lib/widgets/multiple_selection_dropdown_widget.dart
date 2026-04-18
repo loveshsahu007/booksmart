@@ -16,6 +16,7 @@ class CustomMultiDropDownWidget<T> extends StatefulWidget {
     this.itemAsString,
     this.showSearchBox = false,
     this.onChanged,
+    this.compareFn, // ✅ NEW (optional override)
   });
 
   final GlobalKey<DropdownSearchState<T>> dropDownKey;
@@ -26,6 +27,9 @@ class CustomMultiDropDownWidget<T> extends StatefulWidget {
   final String Function(T)? itemAsString;
   final bool showSearchBox;
   final ValueChanged<List<T>>? onChanged;
+
+  /// ✅ Allow custom comparison (optional)
+  final bool Function(T, T)? compareFn;
 
   @override
   State<CustomMultiDropDownWidget<T>> createState() =>
@@ -45,16 +49,13 @@ class _CustomMultiDropDownWidgetState<T>
   @override
   void didUpdateWidget(covariant CustomMultiDropDownWidget<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // If parent provides a different selectedItems list, sync it
     if (oldWidget.selectedItems != widget.selectedItems) {
       _selectedItems = List<T>.from(widget.selectedItems);
     }
   }
 
   void _notifyParent() {
-    if (widget.onChanged != null) {
-      widget.onChanged!(List<T>.from(_selectedItems));
-    }
+    widget.onChanged?.call(List<T>.from(_selectedItems));
   }
 
   @override
@@ -63,21 +64,26 @@ class _CustomMultiDropDownWidgetState<T>
       key: widget.dropDownKey,
       selectedItems: _selectedItems,
       itemAsString: widget.itemAsString,
+
+      /// ✅ FIX: Required for custom types like enums/models
+      compareFn:
+          widget.compareFn ??
+          (item1, item2) => item1.toString() == item2.toString(),
+
       items: (filter, infiniteScrollProps) => widget.items,
+
       decoratorProps: DropDownDecoratorProps(
         decoration: InputDecoration(
           hintText: widget.hint,
           labelText: widget.label,
-          isDense: false,
-        ),
-      ),
-      suffixProps: DropdownSuffixProps(
-        dropdownButtonProps: DropdownButtonProps(
-          padding: EdgeInsetsGeometry.zero,
         ),
       ),
 
-      // When dropdown_search notifies of changes, update internal list and propagate
+      suffixProps: const DropdownSuffixProps(
+        dropdownButtonProps: DropdownButtonProps(padding: EdgeInsets.zero),
+      ),
+
+      /// ✅ Handle selection
       onChanged: (List<T> selected) {
         setState(() {
           _selectedItems = List<T>.from(selected);
@@ -90,12 +96,14 @@ class _CustomMultiDropDownWidgetState<T>
         showSearchBox: widget.showSearchBox,
         showSelectedItems: true,
         searchDelay: const Duration(milliseconds: 100),
+
         searchFieldProps: const TextFieldProps(
           decoration: InputDecoration(
             border: OutlineInputBorder(),
             labelText: "Search here ...",
           ),
         ),
+
         menuProps: MenuProps(
           backgroundColor: Get.isDarkMode
               ? AppColorsDark.surface
@@ -104,14 +112,17 @@ class _CustomMultiDropDownWidgetState<T>
             borderRadius: BorderRadius.circular(10),
           ),
         ),
+
         itemBuilder: (context, item, isDisabled, isSelected) {
           final text = widget.itemAsString?.call(item) ?? item.toString();
+
           Color? textColor;
           if (isDisabled) {
             textColor = Colors.grey;
           } else if (isSelected) {
             textColor = Get.theme.primaryColor;
           }
+
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Text(text, style: TextStyle(color: textColor)),
@@ -119,10 +130,20 @@ class _CustomMultiDropDownWidgetState<T>
         },
       ),
 
-      // Build the selected items display using internal _selectedItems
+      /// ✅ Selected chips UI
       dropdownBuilder: (context, selected) {
-        // `selected` is provided by the package too, but we prefer our internal source-of-truth.
         final chips = _selectedItems;
+
+        if (chips.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              widget.hint ?? "Select",
+              style: TextStyle(color: Colors.grey.shade500),
+            ),
+          );
+        }
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 5),
           child: Wrap(
@@ -130,6 +151,7 @@ class _CustomMultiDropDownWidgetState<T>
             runSpacing: 7,
             children: chips.map((item) {
               final label = widget.itemAsString?.call(item) ?? item.toString();
+
               return Material(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(5),
@@ -137,27 +159,26 @@ class _CustomMultiDropDownWidgetState<T>
                 color: Get.theme.scaffoldBackgroundColor,
                 child: InkWell(
                   onTap: () {
-                    // remove item from DropdownSearch internal selection
                     widget.dropDownKey.currentState?.removeItem(item);
-                    // also update our internal copy and notify parent
+
                     setState(() {
                       _selectedItems.remove(item);
                     });
+
                     _notifyParent();
                   },
                   borderRadius: BorderRadius.circular(5),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 3,
+                      horizontal: 6,
+                      vertical: 4,
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         AppText(label, fontSize: 13),
                         const SizedBox(width: 4),
-                        const Icon(Icons.cancel, size: 10),
+                        const Icon(Icons.cancel, size: 12),
                       ],
                     ),
                   ),

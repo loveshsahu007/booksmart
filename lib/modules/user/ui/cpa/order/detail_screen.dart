@@ -183,7 +183,7 @@ class _CpaOrderDetailScreenState extends State<CpaOrderDetailScreen> {
                         );
                       },
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
+                        foregroundColor: Colors.white,
                         side: const BorderSide(color: Colors.red),
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),

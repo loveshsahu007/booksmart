@@ -224,7 +224,7 @@ class _MetadataDialogContentState extends State<_MetadataDialogContent> {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text('Cancel'),
+                  child: const AppText('Cancel', color: Colors.white),
                 ),
               ),
               const SizedBox(width: 12),

@@ -61,7 +61,11 @@ Future<dynamic> showConfirmationDialog({
                 ],
                 ElevatedButton(
                   onPressed: onYes,
-                  child: AppText("Yes", fontWeight: FontWeight.bold),
+                  child: AppText(
+                    "Yes",
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
                 ),
                 const SizedBox(height: 20),
               ],

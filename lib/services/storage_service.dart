@@ -1,7 +1,6 @@
 import 'dart:developer';
 
 import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as path;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -11,6 +10,7 @@ Future<String?> uploadFileToSupabaseStorage({
   required XFile file,
   required String bucketName,
   bool isPublic = true,
+  String? contentType,
 }) async {
   final user = supabase.auth.currentUser;
   if (user == null) return null;
@@ -18,14 +18,14 @@ Future<String?> uploadFileToSupabaseStorage({
   try {
     final fileBytes = await file.readAsBytes();
 
-    final filePath = '${user.id}/${Uuid().v4()}_${path.basename(file.path)}';
+    final filePath = '${user.id}/${Uuid().v4()}_${file.name}';
 
     await supabase.storage
         .from(bucketName)
         .uploadBinary(
           filePath,
           fileBytes,
-          fileOptions: FileOptions(upsert: false),
+          fileOptions: FileOptions(upsert: false, contentType: contentType),
         );
 
     if (isPublic) {

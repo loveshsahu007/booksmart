@@ -1,7 +1,9 @@
 import 'package:booksmart/constant/exports.dart';
-import 'package:booksmart/models/order_model.dart'; // Ensure OrderStatus is here
+import 'package:booksmart/models/order_model.dart';
 import 'package:booksmart/modules/user/controllers/order_controller.dart';
 import 'package:booksmart/modules/user/ui/cpa/components/cpa_order_card.dart';
+import 'package:booksmart/widgets/multiple_selection_dropdown_widget.dart';
+import 'package:dropdown_search/dropdown_search.dart';
 import 'package:get/get.dart';
 
 class OrdersScreenCPA extends StatefulWidget {
@@ -12,16 +14,20 @@ class OrdersScreenCPA extends StatefulWidget {
 }
 
 class _OrdersScreenCPAState extends State<OrdersScreenCPA> {
-  // State variable for filtering
-  OrderStatus? selectedFilter;
+  /// Multi Select Filter
+  final GlobalKey<DropdownSearchState<OrderStatus>> _dropdownKey =
+      GlobalKey<DropdownSearchState<OrderStatus>>();
+
+  List<OrderStatus> selectedFilters = [];
 
   @override
   void initState() {
     super.initState();
+
     if (!Get.isRegistered<OrderController>()) {
       Get.put(OrderController(), permanent: true);
     }
-    // Fetch orders when screen opens
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Get.find<OrderController>().fetchActiveOrders();
     });
@@ -38,21 +44,27 @@ class _OrdersScreenCPAState extends State<OrdersScreenCPA> {
             child: AppText("Orders", fontSize: 18, fontWeight: FontWeight.bold),
           ),
 
-          // --- FILTER TOP BAR ---
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                _buildFilterChip(null, "All"),
-                ...OrderStatus.values.map((status) {
-                  return _buildFilterChip(status, status.name.capitalizeFirst!);
-                }),
-              ],
+          /// ✅ MULTI SELECT FILTER DROPDOWN
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: CustomMultiDropDownWidget<OrderStatus>(
+              dropDownKey: _dropdownKey,
+              label: "Filter Orders",
+              hint: "Select status",
+              items: OrderStatus.values,
+              selectedItems: selectedFilters,
+              showSearchBox: false,
+              itemAsString: (status) =>
+                  status.name.capitalizeFirst ?? status.name,
+              onChanged: (List<OrderStatus> values) {
+                setState(() {
+                  selectedFilters = values;
+                });
+              },
             ),
           ),
 
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
 
           Expanded(
             child: Container(
@@ -63,12 +75,14 @@ class _OrdersScreenCPAState extends State<OrdersScreenCPA> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  // Apply Type-safe Filtering logic
-                  final filteredOrders = selectedFilter == null
+                  /// ✅ FILTER LOGIC (MULTI SELECT)
+                  final filteredOrders = selectedFilters.isEmpty
                       ? controller.activeOrders
                       : controller.activeOrders.where((order) {
-                          return OrderStatus.fromString(order.status.name) ==
-                              selectedFilter;
+                          final orderStatus = OrderStatus.fromString(
+                            order.status.name,
+                          );
+                          return selectedFilters.contains(orderStatus);
                         }).toList();
 
                   if (filteredOrders.isEmpty) {
@@ -94,39 +108,6 @@ class _OrdersScreenCPAState extends State<OrdersScreenCPA> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  /// Helper widget to build the Filter Chips (consistent with CpaNetworkScreen)
-  Widget _buildFilterChip(OrderStatus? status, String label) {
-    final bool isSelected = selectedFilter == status;
-
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (bool selected) {
-          setState(() {
-            selectedFilter = selected ? status : null;
-          });
-        },
-        selectedColor: Theme.of(context).primaryColor.withValues(alpha: 0.15),
-        checkmarkColor: Theme.of(context).primaryColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: isSelected
-                ? Theme.of(context).primaryColor
-                : Colors.grey.shade300,
-          ),
-        ),
-        labelStyle: TextStyle(
-          color: isSelected ? Theme.of(context).primaryColor : Colors.white,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          fontSize: 13,
-        ),
       ),
     );
   }

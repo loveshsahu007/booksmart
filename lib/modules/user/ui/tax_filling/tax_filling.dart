@@ -6,6 +6,7 @@ import 'package:booksmart/modules/user/ui/tax_filling/upload_tax_doc_dialog.dart
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../widgets/custom_drop_down.dart';
 
@@ -86,28 +87,38 @@ class _TaxFillingScreenState extends State<TaxFillingScreen> {
                   ),
                 ),
                 Expanded(
-                  child: AppButton(
-                    radius: 8,
-                    buttonText: 'Upload',
-                    fontSize: 16,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 18,
-                      horizontal: 6,
-                    ),
-                    onTapFunction: showUploadTaxDocumentDialog,
+                  child: outlineButton(
+                    'Upload',
+                    onPressed: showUploadTaxDocumentDialog,
                   ),
+
+                  // AppButton(
+                  //   radius: 8,
+                  //   buttonText: 'Upload',
+                  //   fontSize: 16,
+                  //   padding: const EdgeInsets.symmetric(
+                  //     vertical: 18,
+                  //     horizontal: 6,
+                  //   ),
+                  //   onTapFunction: showUploadTaxDocumentDialog,
+                  // ),
                 ),
                 Expanded(
-                  child: AppButton(
-                    radius: 8,
-                    buttonText: 'Accessible to',
-                    fontSize: 16,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 18,
-                      horizontal: 6,
-                    ),
-                    onTapFunction: showDocumentAccessRequestsDialog,
+                  child: outlineButton(
+                    'Accessible to',
+                    onPressed: showDocumentAccessRequestsDialog,
                   ),
+
+                  //  AppButton(
+                  //   radius: 8,
+                  //   buttonText: 'Accessible to',
+                  //   fontSize: 16,
+                  //   padding: const EdgeInsets.symmetric(
+                  //     vertical: 18,
+                  //     horizontal: 6,
+                  //   ),
+                  //   onTapFunction: showDocumentAccessRequestsDialog,
+                  // ),
                 ),
               ],
             ),
@@ -222,38 +233,48 @@ class TaxDocumentCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: Icon(TaxDocumentController.iconForMime(doc.mimeType)),
-        title: Text(doc.name, style: TextStyle(color: textColor)),
-        subtitle: Text(
-          [
-            if (doc.fileSizeLabel.isNotEmpty) doc.fileSizeLabel,
-            if (doc.category != null) doc.category!,
-          ].join(' · '),
-          style: TextStyle(color: subTextColor, fontSize: 12),
-        ),
-        visualDensity: VisualDensity.compact,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (doc.taxYear != null)
-              Text(
-                doc.taxYear!,
-                style: TextStyle(
-                  color: subTextColor,
-                  fontWeight: FontWeight.w500,
+      child: InkWell(
+        onTap: () {
+          if (doc.fileUrl.isNotEmpty) {
+            final uri = Uri.tryParse(doc.fileUrl);
+            if (uri != null) {
+              launchUrl(uri, mode: LaunchMode.externalApplication);
+            }
+          }
+        },
+        child: ListTile(
+          leading: Icon(TaxDocumentController.iconForMime(doc.mimeType)),
+          title: Text(doc.name, style: TextStyle(color: textColor)),
+          subtitle: Text(
+            [
+              if (doc.fileSizeLabel.isNotEmpty) doc.fileSizeLabel,
+              if (doc.category != null) doc.category!,
+            ].join(' · '),
+            style: TextStyle(color: subTextColor, fontSize: 12),
+          ),
+          visualDensity: VisualDensity.compact,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (doc.taxYear != null)
+                Text(
+                  doc.taxYear!,
+                  style: TextStyle(
+                    color: subTextColor,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert),
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'Delete', child: Text('Delete')),
+                ],
+                onSelected: (val) {
+                  if (val == 'Delete') onDelete();
+                },
               ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'Delete', child: Text('Delete')),
-              ],
-              onSelected: (val) {
-                if (val == 'Delete') onDelete();
-              },
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

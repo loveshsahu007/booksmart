@@ -1,6 +1,4 @@
-import 'package:booksmart/widgets/app_text.dart';
-import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:booksmart/constant/exports.dart';
 
 class StrategyCard extends StatelessWidget {
   final String title, subtitle, price, buttonText;
@@ -136,27 +134,28 @@ class StrategyCard extends StatelessWidget {
                   ),
                 ],
               ),
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Get.theme.colorScheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                ),
-                child: Text(
-                  buttonText,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
+              outlineButton(buttonText, onPressed: () {}),
+              // ElevatedButton(
+              //   onPressed: () {},
+              //   style: ElevatedButton.styleFrom(
+              //     backgroundColor: Get.theme.colorScheme.primary,
+              //     foregroundColor: Colors.white,
+              //     shape: RoundedRectangleBorder(
+              //       borderRadius: BorderRadius.circular(8),
+              //     ),
+              //     padding: const EdgeInsets.symmetric(
+              //       horizontal: 16,
+              //       vertical: 8,
+              //     ),
+              //   ),
+              //   child: Text(
+              //     buttonText,
+              //     style: const TextStyle(
+              //       fontWeight: FontWeight.bold,
+              //       fontSize: 13,
+              //     ),
+              //   ),
+              // ),
             ],
           ),
         ],

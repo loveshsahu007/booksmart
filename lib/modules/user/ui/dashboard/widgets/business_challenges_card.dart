@@ -83,6 +83,7 @@ class BusinessChallengesCard extends StatelessWidget {
                           ),
                           child: const AppText(
                             'Fix This',
+                            color: Colors.black,
                             fontWeight: FontWeight.bold,
                           ),
                         ),

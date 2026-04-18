@@ -30,11 +30,18 @@ class OrderController extends GetxController {
   final selectedServices = <String>[].obs;
 
   final activeOrders = <OrderModel>[].obs;
+  final allOrders = <OrderModel>[].obs;
 
   @override
   void onInit() {
     super.onInit();
-    fetchActiveOrders();
+    final person = Get.find<AuthController>().person;
+    if (person != null) {
+      fetchActiveOrders();
+      if (person.role == UserRole.cpa) {
+        fetchAllOrders();
+      }
+    }
   }
 
   @override
@@ -158,6 +165,25 @@ class OrderController extends GetxController {
       // Optional: showSnackBar("Failed to load orders", isError: true);
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> fetchAllOrders() async {
+    try {
+      final person = Get.find<AuthController>().person;
+      if (person == null || person.role != UserRole.cpa) return;
+
+      final result = await supabase
+          .from(SupabaseTable.orders)
+          .select('*, user:user_id(*)')
+          .eq('cpa_id', person.id)
+          .order('created_at', ascending: false);
+
+      allOrders.value = (result as List)
+          .map((e) => OrderModel.fromJson(e))
+          .toList();
+    } catch (e) {
+      log("Error fetching all orders: $e");
     }
   }
 
