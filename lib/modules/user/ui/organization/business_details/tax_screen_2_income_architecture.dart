@@ -2,29 +2,28 @@ import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/constant/data.dart';
 import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
-import 'package:booksmart/widgets/custom_drop_down.dart';
 import 'package:booksmart/widgets/multiple_selection_dropdown_widget.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
-import 'tax_onboarding_widgets.dart';
-import 'tax_screen_4_vehicle.dart';
+import 'business_details_widgets.dart';
+import 'tax_screen_3_business_operations.dart';
 
-void goToTaxScreen3({int? transactionId, int? organizationId}) {
+void goToTaxScreen2({int? transactionId, int? organizationId}) {
   if (kIsWeb) {
     customDialog(
-      child: TaxScreen3BusinessOperations(
+      child: TaxScreen2IncomeArchitecture(
         transactionId: transactionId,
         organizationId: organizationId,
       ),
-      title: 'Tax Strategy — Step 3 of 8',
+      title: 'Tax Strategy — Step 2 of 8',
       barrierDismissible: false,
     );
   } else {
     Get.to(
-      () => TaxScreen3BusinessOperations(
+      () => TaxScreen2IncomeArchitecture(
         transactionId: transactionId,
         organizationId: organizationId,
       ),
@@ -32,34 +31,38 @@ void goToTaxScreen3({int? transactionId, int? organizationId}) {
   }
 }
 
-class TaxScreen3BusinessOperations extends StatefulWidget {
+class TaxScreen2IncomeArchitecture extends StatefulWidget {
   final int? transactionId;
   final int? organizationId;
-  const TaxScreen3BusinessOperations({
+  const TaxScreen2IncomeArchitecture({
     super.key,
     this.transactionId,
     this.organizationId,
   });
 
   @override
-  State<TaxScreen3BusinessOperations> createState() =>
-      _TaxScreen3BusinessOperationsState();
+  State<TaxScreen2IncomeArchitecture> createState() =>
+      _TaxScreen2IncomeArchitectureState();
 }
 
-class _TaxScreen3BusinessOperationsState
-    extends State<TaxScreen3BusinessOperations> {
-  final _teamKey = GlobalKey<DropdownSearchState<String>>();
-  final _methodKey = GlobalKey<DropdownSearchState<String>>();
+class _TaxScreen2IncomeArchitectureState
+    extends State<TaxScreen2IncomeArchitecture> {
+  final _industryController = TextEditingController();
+  final _incomeKey = GlobalKey<DropdownSearchState<String>>();
+  final _passiveKey = GlobalKey<DropdownSearchState<String>>();
 
-  List<String> _teamStructure = [];
-  String? _accountingMethod;
-  bool? _majorEquipment;
+  List<String> _primaryIncomeTypes = [];
+  List<String> _passiveIncome = [];
 
   Future<void> _saveAndNext() async {
     final data = {
-      'team_structure': _teamStructure.isEmpty ? null : _teamStructure,
-      'accounting_method': _accountingMethod,
-      'major_equipment': _majorEquipment,
+      'primary_income_types': _primaryIncomeTypes.isEmpty
+          ? null
+          : _primaryIncomeTypes,
+      'industry_niche': _industryController.text.trim().isEmpty
+          ? null
+          : _industryController.text.trim(),
+      'passive_income': _passiveIncome.isEmpty ? null : _passiveIncome,
     };
 
     if (widget.transactionId != null) {
@@ -80,16 +83,24 @@ class _TaxScreen3BusinessOperationsState
   void _navigateNext() {
     if (kIsWeb) {
       Get.back();
-      goToTaxScreen4(
+      goToTaxScreen3(
         transactionId: widget.transactionId,
         organizationId: widget.organizationId,
       );
     } else {
-      Get.off(() => TaxScreen4Vehicle(
-            transactionId: widget.transactionId,
-            organizationId: widget.organizationId,
-          ));
+      Get.off(
+        () => TaxScreen3BusinessOperations(
+          transactionId: widget.transactionId,
+          organizationId: widget.organizationId,
+        ),
+      );
     }
+  }
+
+  @override
+  void dispose() {
+    _industryController.dispose();
+    super.dispose();
   }
 
   @override
@@ -97,21 +108,24 @@ class _TaxScreen3BusinessOperationsState
     return Scaffold(
       appBar: kIsWeb
           ? null
-          : AppBar(title: const Text('Tax Strategy — Step 3 of 8')),
+          : AppBar(title: const Text('Tax Strategy — Step 2 of 8')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          TaxProgressBar(current: 3),
+          TaxProgressBar(current: 2),
           const SizedBox(height: 20),
           TaxSectionTitle(
-            icon: Icons.business_center_rounded,
-            title: 'Operational Footprint',
-            subtitle:
-                'Audit-proof your business by documenting your team & accounting setup.',
+            icon: Icons.account_balance_wallet_rounded,
+            title: 'Income Streams & Entity Structure',
+            subtitle: 'Tell us how you earn to unlock entity-level strategies.',
           ),
           const SizedBox(height: 24),
 
-          AppText('Team & Payroll', fontSize: 14, fontWeight: FontWeight.w600),
+          AppText(
+            'Primary Income Type',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
           const SizedBox(height: 4),
           AppText(
             'Select all that apply',
@@ -120,44 +134,41 @@ class _TaxScreen3BusinessOperationsState
           ),
           const SizedBox(height: 8),
           CustomMultiDropDownWidget<String>(
-            dropDownKey: _teamKey,
-            hint: 'Select team structure',
-            items: teamStructureOptions,
-            selectedItems: _teamStructure,
-            onChanged: (v) => setState(() => _teamStructure = v),
+            dropDownKey: _incomeKey,
+            hint: 'Select income types',
+            items: incomeTypeOptions,
+            selectedItems: _primaryIncomeTypes,
+            onChanged: (v) => setState(() => _primaryIncomeTypes = v),
           ),
           const SizedBox(height: 16),
 
           AppText(
-            'Accounting Method',
+            'Industry / Niche',
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
           const SizedBox(height: 8),
-          CustomDropDownWidget<String>(
-            dropDownKey: _methodKey,
-            hint: 'Select accounting method',
-            items: accountingMethodOptions,
-            selectedItem: _accountingMethod,
-            onChanged: (v) => setState(() => _accountingMethod = v),
+          AppTextField(
+            controller: _industryController,
+            hintText: 'e.g. Software, Construction, Real Estate',
+            maxLines: 1,
           ),
           const SizedBox(height: 16),
 
-          AppText('Major Equipment', fontSize: 14, fontWeight: FontWeight.w600),
+          AppText('Passive Income', fontSize: 14, fontWeight: FontWeight.w600),
           const SizedBox(height: 4),
           AppText(
-            'Did you purchase machinery, heavy tech, or equipment over \$2,500 this year?',
-            fontSize: 13,
+            'Select all that apply',
+            fontSize: 12,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 8),
-          YesNoToggle(
-            value: _majorEquipment,
-            onChanged: (v) => setState(() => _majorEquipment = v),
-          ),
-          TaxInsightChip(
-            text:
-                'AI Insight: This triggers Section 179 or Bonus Depreciation strategies.',
+          CustomMultiDropDownWidget<String>(
+            dropDownKey: _passiveKey,
+            hint: 'Select passive income sources',
+            items: passiveIncomeOptions,
+            selectedItems: _passiveIncome,
+            onChanged: (v) => setState(() => _passiveIncome = v),
           ),
           const SizedBox(height: 32),
 

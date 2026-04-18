@@ -20,7 +20,7 @@ import '../../../../widgets/custom_drop_down.dart';
 import 'receipt_scanning_output_screen.dart';
 import '../../../../services/storage_service.dart';
 import '../../../../supabase/buckets.dart';
-import 'tax_onboarding/tax_screen_1_legal_identity.dart';
+import '../organization/business_details/tax_screen_1_legal_identity.dart';
 
 void goToAddTransactionScreen({
   TransactionModel? transaction,

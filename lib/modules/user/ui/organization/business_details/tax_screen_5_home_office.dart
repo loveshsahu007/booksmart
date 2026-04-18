@@ -9,56 +9,56 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
-import 'tax_onboarding_widgets.dart';
-import 'tax_screen_8_future_goals.dart';
+import 'business_details_widgets.dart';
+import 'tax_screen_6_real_estate.dart';
 
-void goToTaxScreen7({int? transactionId, int? organizationId}) {
+void goToTaxScreen5({int? transactionId, int? organizationId}) {
   if (kIsWeb) {
     customDialog(
-      child: TaxScreen7FamilyHealth(
+      child: TaxScreen5HomeOffice(
         transactionId: transactionId,
         organizationId: organizationId,
       ),
-      title: 'Tax Strategy — Step 7 of 8',
+      title: 'Tax Strategy — Step 5 of 8',
       barrierDismissible: false,
     );
   } else {
-    Get.to(() => TaxScreen7FamilyHealth(
-          transactionId: transactionId,
-          organizationId: organizationId,
-        ));
+    Get.to(
+      () => TaxScreen5HomeOffice(
+        transactionId: transactionId,
+        organizationId: organizationId,
+      ),
+    );
   }
 }
 
-class TaxScreen7FamilyHealth extends StatefulWidget {
+class TaxScreen5HomeOffice extends StatefulWidget {
   final int? transactionId;
   final int? organizationId;
-  const TaxScreen7FamilyHealth({
+  const TaxScreen5HomeOffice({
     super.key,
     this.transactionId,
     this.organizationId,
   });
 
   @override
-  State<TaxScreen7FamilyHealth> createState() =>
-      _TaxScreen7FamilyHealthState();
+  State<TaxScreen5HomeOffice> createState() => _TaxScreen5HomeOfficeState();
 }
 
-class _TaxScreen7FamilyHealthState extends State<TaxScreen7FamilyHealth> {
-  final _insuranceKey = GlobalKey<DropdownSearchState<String>>();
-  final _savingsKey = GlobalKey<DropdownSearchState<String>>();
-  final _educationKey = GlobalKey<DropdownSearchState<String>>();
+class _TaxScreen5HomeOfficeState extends State<TaxScreen5HomeOffice> {
+  final _officeKey = GlobalKey<DropdownSearchState<String>>();
+  final _homeKey = GlobalKey<DropdownSearchState<String>>();
+  final _techKey = GlobalKey<DropdownSearchState<String>>();
 
-  String? _healthInsurance;
-  List<String> _healthSavings = [];
-  List<String> _familyEducation = [];
+  String? _homeOfficeType;
+  String? _homeStatus;
+  List<String> _techUsage = [];
 
   Future<void> _saveAndNext() async {
     final data = {
-      'health_insurance': _healthInsurance,
-      'health_savings': _healthSavings.isEmpty ? null : _healthSavings,
-      'family_education':
-          _familyEducation.isEmpty ? null : _familyEducation,
+      'home_office_type': _homeOfficeType,
+      'home_status': _homeStatus,
+      'tech_usage': _techUsage.isEmpty ? null : _techUsage,
     };
 
     if (widget.transactionId != null) {
@@ -79,15 +79,17 @@ class _TaxScreen7FamilyHealthState extends State<TaxScreen7FamilyHealth> {
   void _navigateNext() {
     if (kIsWeb) {
       Get.back();
-      goToTaxScreen8(
+      goToTaxScreen6(
         transactionId: widget.transactionId,
         organizationId: widget.organizationId,
       );
     } else {
-      Get.off(() => TaxScreen8FutureGoals(
-            transactionId: widget.transactionId,
-            organizationId: widget.organizationId,
-          ));
+      Get.off(
+        () => TaxScreen6RealEstate(
+          transactionId: widget.transactionId,
+          organizationId: widget.organizationId,
+        ),
+      );
     }
   }
 
@@ -96,54 +98,52 @@ class _TaxScreen7FamilyHealthState extends State<TaxScreen7FamilyHealth> {
     return Scaffold(
       appBar: kIsWeb
           ? null
-          : AppBar(title: const Text('Tax Strategy — Step 7 of 8')),
+          : AppBar(title: const Text('Tax Strategy — Step 5 of 8')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          TaxProgressBar(current: 7),
+          TaxProgressBar(current: 5),
           const SizedBox(height: 20),
           TaxSectionTitle(
-            icon: Icons.favorite_rounded,
-            title: 'Household & Benefits',
+            icon: Icons.home_work_rounded,
+            title: 'Workspace & Infrastructure',
             subtitle:
-                'Health and family expenses often hide significant tax opportunities.',
+                'Your home office and tech setup could be fully deductible.',
           ),
           const SizedBox(height: 24),
 
           AppText(
-            'Health Insurance Type',
+            'Home Office Setup',
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
           const SizedBox(height: 8),
           CustomDropDownWidget<String>(
-            dropDownKey: _insuranceKey,
-            hint: 'Select health insurance type',
-            items: healthInsuranceOptions,
-            selectedItem: _healthInsurance,
-            onChanged: (v) => setState(() => _healthInsurance = v),
+            dropDownKey: _officeKey,
+            hint: 'Select home office type',
+            items: homeOfficeTypeOptions,
+            selectedItem: _homeOfficeType,
+            onChanged: (v) => setState(() => _homeOfficeType = v),
           ),
           const SizedBox(height: 16),
 
-          AppText('Health Savings', fontSize: 14, fontWeight: FontWeight.w600),
-          const SizedBox(height: 4),
           AppText(
-            'Select all that apply',
-            fontSize: 12,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            'Home Ownership Status',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
           const SizedBox(height: 8),
-          CustomMultiDropDownWidget<String>(
-            dropDownKey: _savingsKey,
-            hint: 'Select health savings accounts',
-            items: healthSavingsOptions,
-            selectedItems: _healthSavings,
-            onChanged: (v) => setState(() => _healthSavings = v),
+          CustomDropDownWidget<String>(
+            dropDownKey: _homeKey,
+            hint: 'Select home status',
+            items: homeStatusOptions,
+            selectedItem: _homeStatus,
+            onChanged: (v) => setState(() => _homeStatus = v),
           ),
           const SizedBox(height: 16),
 
           AppText(
-            'Education & Family',
+            'Tech & Digital Usage',
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -155,11 +155,11 @@ class _TaxScreen7FamilyHealthState extends State<TaxScreen7FamilyHealth> {
           ),
           const SizedBox(height: 8),
           CustomMultiDropDownWidget<String>(
-            dropDownKey: _educationKey,
-            hint: 'Select education & family expenses',
-            items: familyEducationOptions,
-            selectedItems: _familyEducation,
-            onChanged: (v) => setState(() => _familyEducation = v),
+            dropDownKey: _techKey,
+            hint: 'Select tech usage',
+            items: techUsageOptions,
+            selectedItems: _techUsage,
+            onChanged: (v) => setState(() => _techUsage = v),
           ),
           const SizedBox(height: 32),
 

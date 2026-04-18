@@ -4,6 +4,7 @@ import 'package:booksmart/widgets/confirmation_dialog.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'business_details/tax_screen_1_legal_identity.dart';
 import 'add_organization_screen.dart';
 
 void goToOrganizationListScreen({bool shouldCloseBefore = false}) {
@@ -58,13 +59,22 @@ class OrganizationListScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
+                        icon: const Icon(Icons.edit_note, color: Colors.grey),
+                        tooltip: "Business Details",
+                        onPressed: () {
+                          goToTaxScreen1(organizationId: org.id);
+                        },
+                      ),
+                      IconButton(
                         icon: const Icon(Icons.edit, color: Colors.grey),
+                        tooltip: "Edit Organization",
                         onPressed: () {
                           goToAddOrganizationScreen(organization: org);
                         },
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.grey),
+                        tooltip: "Delete Organization",
                         onPressed: () {
                           showConfirmationDialog(
                             title: "Delete Organization",

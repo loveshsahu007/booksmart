@@ -1,7 +1,6 @@
 import 'package:booksmart/modules/admin/ui/widgets/category_dialogs.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/widgets/app_text.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -28,9 +27,13 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: kIsWeb ? null : AppBar(title: const Text("Categories")),
+      appBar: AppBar(title: const Text("Categories")),
       body: GetBuilder<CategoryAdminController>(
         builder: (controller) {
+          if (controller.isLoading) {
+            return const Center(child: CircularProgressIndicator.adaptive());
+          }
+
           if (controller.categories.isEmpty) {
             return const Center(child: AppText('No categories found'));
           }

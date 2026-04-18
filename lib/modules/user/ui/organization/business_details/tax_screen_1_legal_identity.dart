@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
-import 'tax_onboarding_widgets.dart';
+import 'business_details_widgets.dart';
 import 'tax_screen_2_income_architecture.dart';
 
 void goToTaxScreen1({int? transactionId, int? organizationId}) {
@@ -22,10 +22,12 @@ void goToTaxScreen1({int? transactionId, int? organizationId}) {
       barrierDismissible: false,
     );
   } else {
-    Get.to(() => TaxScreen1LegalIdentity(
-          transactionId: transactionId,
-          organizationId: organizationId,
-        ));
+    Get.to(
+      () => TaxScreen1LegalIdentity(
+        transactionId: transactionId,
+        organizationId: organizationId,
+      ),
+    );
   }
 }
 
@@ -55,10 +57,9 @@ class _TaxScreen1LegalIdentityState extends State<TaxScreen1LegalIdentity> {
   Future<void> _saveAndNext() async {
     final data = {
       'filing_status': _filingStatus,
-      'primary_state':
-          _stateController.text.trim().isEmpty
-              ? null
-              : _stateController.text.trim(),
+      'primary_state': _stateController.text.trim().isEmpty
+          ? null
+          : _stateController.text.trim(),
       'residency_status': _residencyStatus,
       'multi_state_activity': _multiStateActivity,
     };
@@ -86,10 +87,12 @@ class _TaxScreen1LegalIdentityState extends State<TaxScreen1LegalIdentity> {
         organizationId: widget.organizationId,
       );
     } else {
-      Get.off(() => TaxScreen2IncomeArchitecture(
-            transactionId: widget.transactionId,
-            organizationId: widget.organizationId,
-          ));
+      Get.off(
+        () => TaxScreen2IncomeArchitecture(
+          transactionId: widget.transactionId,
+          organizationId: widget.organizationId,
+        ),
+      );
     }
   }
 

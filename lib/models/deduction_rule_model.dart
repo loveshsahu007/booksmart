@@ -1,14 +1,11 @@
 import '../helpers/json_helper.dart';
 
-enum JurisdictionType { federal, state }
-
 enum RuleType { percentage, fixed }
 
 class DeductionRuleModel {
   final int id;
 
-  final JurisdictionType jurisdictionType;
-
+  // if state-id is null then it is for FEDERAL
   final int? stateId;
 
   final int categoryId;
@@ -24,7 +21,6 @@ class DeductionRuleModel {
 
   DeductionRuleModel({
     required this.id,
-    required this.jurisdictionType,
     required this.ruleType,
     required this.value,
     required this.createdAt,
@@ -37,10 +33,7 @@ class DeductionRuleModel {
   factory DeductionRuleModel.fromJson(Map<String, dynamic> json) {
     return DeductionRuleModel(
       id: handleResponseFromJson<int>(json, 'id') ?? 0,
-      jurisdictionType: JurisdictionType.values.byName(
-        handleResponseFromJson<String?>(json, 'jurisdiction_type') ??
-            JurisdictionType.federal.name,
-      ),
+
       ruleType: RuleType.values.byName(
         handleResponseFromJson<String?>(json, 'rule_type') ??
             RuleType.percentage.name,
@@ -66,7 +59,6 @@ class DeductionRuleModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'jurisdiction_type': jurisdictionType.name,
       'rule_type': ruleType.name,
       'value': value,
       'state_id': stateId,

@@ -10,7 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
-import 'tax_onboarding_widgets.dart';
+import 'business_details_widgets.dart';
 
 void goToTaxScreen8({int? transactionId, int? organizationId}) {
   if (kIsWeb) {
@@ -23,10 +23,12 @@ void goToTaxScreen8({int? transactionId, int? organizationId}) {
       barrierDismissible: false,
     );
   } else {
-    Get.to(() => TaxScreen8FutureGoals(
-          transactionId: transactionId,
-          organizationId: organizationId,
-        ));
+    Get.to(
+      () => TaxScreen8FutureGoals(
+        transactionId: transactionId,
+        organizationId: organizationId,
+      ),
+    );
   }
 }
 
@@ -55,8 +57,9 @@ class _TaxScreen8FutureGoalsState extends State<TaxScreen8FutureGoals> {
   Future<void> _saveAndFinish() async {
     final data = {
       'tax_goal': _taxGoal,
-      'retirement_current':
-          _retirementCurrent.isEmpty ? null : _retirementCurrent,
+      'retirement_current': _retirementCurrent.isEmpty
+          ? null
+          : _retirementCurrent,
       'audit_appetite': _auditAppetite,
     };
 
@@ -76,9 +79,7 @@ class _TaxScreen8FutureGoalsState extends State<TaxScreen8FutureGoals> {
   }
 
   void _finish() {
-    showSnackBar(
-      'Tax profile saved! Your AI strategy is being tailored. 🎯',
-    );
+    showSnackBar('Tax profile saved! Your AI strategy is being tailored. 🎯');
 
     Future.delayed(const Duration(milliseconds: 500), () {
       if (kIsWeb) {

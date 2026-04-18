@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
-import 'tax_onboarding_widgets.dart';
+import 'business_details_widgets.dart';
 import 'tax_screen_7_family_health.dart';
 
 void goToTaxScreen6({int? transactionId, int? organizationId}) {
@@ -22,10 +22,12 @@ void goToTaxScreen6({int? transactionId, int? organizationId}) {
       barrierDismissible: false,
     );
   } else {
-    Get.to(() => TaxScreen6RealEstate(
-          transactionId: transactionId,
-          organizationId: organizationId,
-        ));
+    Get.to(
+      () => TaxScreen6RealEstate(
+        transactionId: transactionId,
+        organizationId: organizationId,
+      ),
+    );
   }
 }
 
@@ -50,8 +52,9 @@ class _TaxScreen6RealEstateState extends State<TaxScreen6RealEstate> {
 
   Future<void> _saveAndNext() async {
     final data = {
-      'real_estate_interests':
-          _realEstateInterests.isEmpty ? null : _realEstateInterests,
+      'real_estate_interests': _realEstateInterests.isEmpty
+          ? null
+          : _realEstateInterests,
       'hosts_business_meetings': _hostsBusinessMeetings,
     };
 
@@ -78,10 +81,12 @@ class _TaxScreen6RealEstateState extends State<TaxScreen6RealEstate> {
         organizationId: widget.organizationId,
       );
     } else {
-      Get.off(() => TaxScreen7FamilyHealth(
-            transactionId: widget.transactionId,
-            organizationId: widget.organizationId,
-          ));
+      Get.off(
+        () => TaxScreen7FamilyHealth(
+          transactionId: widget.transactionId,
+          organizationId: widget.organizationId,
+        ),
+      );
     }
   }
 
@@ -125,7 +130,11 @@ class _TaxScreen6RealEstateState extends State<TaxScreen6RealEstate> {
           ),
           const SizedBox(height: 16),
 
-          AppText('Meeting Strategy', fontSize: 14, fontWeight: FontWeight.w600),
+          AppText(
+            'Meeting Strategy',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
           const SizedBox(height: 4),
           AppText(
             'Do you host business meetings or "Corporate Minutes" at your home?',

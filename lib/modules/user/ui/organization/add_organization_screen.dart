@@ -9,7 +9,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../../widgets/custom_drop_down.dart';
-import '../transaction/tax_onboarding/tax_screen_1_legal_identity.dart';
+import 'business_details/tax_screen_1_legal_identity.dart';
 
 void goToAddOrganizationScreen({
   bool shouldCloseBefore = false,
@@ -342,10 +342,6 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
 
     if (widget.organization != null) {
       await controller.updateOrganization(id: model.id, data: model.toJson());
-      // Navigate to onboarding after update
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        goToTaxScreen1(organizationId: model.id);
-      });
     } else {
       final newId = await controller.addOrganizationAndReturnId(model);
       if (newId != null) {

@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
-import 'tax_onboarding_widgets.dart';
+import 'business_details_widgets.dart';
 import 'tax_screen_5_home_office.dart';
 
 void goToTaxScreen4({int? transactionId, int? organizationId}) {
@@ -22,21 +22,19 @@ void goToTaxScreen4({int? transactionId, int? organizationId}) {
       barrierDismissible: false,
     );
   } else {
-    Get.to(() => TaxScreen4Vehicle(
-          transactionId: transactionId,
-          organizationId: organizationId,
-        ));
+    Get.to(
+      () => TaxScreen4Vehicle(
+        transactionId: transactionId,
+        organizationId: organizationId,
+      ),
+    );
   }
 }
 
 class TaxScreen4Vehicle extends StatefulWidget {
   final int? transactionId;
   final int? organizationId;
-  const TaxScreen4Vehicle({
-    super.key,
-    this.transactionId,
-    this.organizationId,
-  });
+  const TaxScreen4Vehicle({super.key, this.transactionId, this.organizationId});
 
   @override
   State<TaxScreen4Vehicle> createState() => _TaxScreen4VehicleState();
@@ -80,10 +78,12 @@ class _TaxScreen4VehicleState extends State<TaxScreen4Vehicle> {
         organizationId: widget.organizationId,
       );
     } else {
-      Get.off(() => TaxScreen5HomeOffice(
-            transactionId: widget.transactionId,
-            organizationId: widget.organizationId,
-          ));
+      Get.off(
+        () => TaxScreen5HomeOffice(
+          transactionId: widget.transactionId,
+          organizationId: widget.organizationId,
+        ),
+      );
     }
   }
 
