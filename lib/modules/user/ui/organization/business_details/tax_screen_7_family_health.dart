@@ -94,6 +94,32 @@ class _TaxScreen7FamilyHealthState extends State<TaxScreen7FamilyHealth> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _preFillData();
+  }
+
+  void _preFillData() {
+    if (widget.organizationId != null) {
+      final org = organizationControllerInstance.organizations
+          .firstWhereOrNull((e) => e.id == widget.organizationId);
+      if (org != null) {
+        _healthInsurance = org.healthInsurance;
+        _healthSavings = org.healthSavings ?? [];
+        _familyEducation = org.familyEducation ?? [];
+      }
+    } else if (widget.transactionId != null) {
+      final tx = transactionControllerInstance.transactions
+          .firstWhereOrNull((e) => e.id == widget.transactionId);
+      if (tx != null) {
+        _healthInsurance = tx.healthInsurance;
+        _healthSavings = tx.healthSavings ?? [];
+        _familyEducation = tx.familyEducation ?? [];
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: kIsWeb

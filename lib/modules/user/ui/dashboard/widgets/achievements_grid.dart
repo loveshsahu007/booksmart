@@ -29,19 +29,19 @@ class AchievementsGrid extends StatelessWidget {
                   icon: Icons.monetization_on,
                   iconColor: Colors.amber,
                   title: 'First \$10K Month',
-                  xp: '30. At Least Mong', // Dummy text from image
+                  // xp: '30. At Least Mong', // Dummy text from image
                 ),
                 _buildAchievementItem(
                   icon: Icons.local_fire_department,
                   iconColor: Colors.orange,
                   title: '30-Day Profit Streak',
-                  xp: '32. 0u XP', // Dummy text from image
+                  //   xp: '32. 0u XP', // Dummy text from image
                 ),
                 _buildAchievementItem(
                   icon: Icons.shield,
                   iconColor: Colors.blueAccent,
                   title: 'Debt Slayer',
-                  xp: '20. At Least 100 XP', // Dummy text from image
+                  // xp: '20. At Least 100 XP', // Dummy text from image
                 ),
               ],
             ),
@@ -55,7 +55,7 @@ class AchievementsGrid extends StatelessWidget {
     required IconData icon,
     required Color iconColor,
     required String title,
-    required String xp,
+    // required String xp,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -86,8 +86,8 @@ class AchievementsGrid extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 4),
-                AppText(xp, fontSize: 12, color: Colors.grey[400]),
+                // const SizedBox(height: 4),
+                // AppText(xp, fontSize: 12, color: Colors.grey[400]),
               ],
             ),
           ),

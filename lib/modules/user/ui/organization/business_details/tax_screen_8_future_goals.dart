@@ -91,6 +91,32 @@ class _TaxScreen8FutureGoalsState extends State<TaxScreen8FutureGoals> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _preFillData();
+  }
+
+  void _preFillData() {
+    if (widget.organizationId != null) {
+      final org = organizationControllerInstance.organizations
+          .firstWhereOrNull((e) => e.id == widget.organizationId);
+      if (org != null) {
+        _taxGoal = org.taxGoal;
+        _retirementCurrent = org.retirementCurrent ?? [];
+        _auditAppetite = org.auditAppetite;
+      }
+    } else if (widget.transactionId != null) {
+      final tx = transactionControllerInstance.transactions
+          .firstWhereOrNull((e) => e.id == widget.transactionId);
+      if (tx != null) {
+        _taxGoal = tx.taxGoal;
+        _retirementCurrent = tx.retirementCurrent ?? [];
+        _auditAppetite = tx.auditAppetite;
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(

@@ -42,6 +42,9 @@ class _CustomDropDownWidgetState<T> extends State<CustomDropDownWidget<T>> {
       items: (filter, infiniteScrollProps) => widget.items,
       onChanged: widget.onChanged,
 
+      /// ✅ FIX (REQUIRED FOR ENUM / OBJECT)
+      compareFn: (item, selectedItem) => item == selectedItem,
+
       /// ✅ INPUT FIELD STYLE
       decoratorProps: DropDownDecoratorProps(
         decoration: InputDecoration(

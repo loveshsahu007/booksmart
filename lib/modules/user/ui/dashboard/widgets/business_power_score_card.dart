@@ -118,18 +118,18 @@ class BusinessPowerScoreCard extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                GaugeAnnotation(
-                                  angle: 90,
-                                  positionFactor: 0.8,
-                                  widget: AppText(
-                                    '\$ 4725.0004',
-                                    fontSize: 12,
-                                    color: colorScheme.onSurface.withValues(
-                                      alpha: 0.3,
-                                    ),
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
+                                // GaugeAnnotation(
+                                //   angle: 90,
+                                //   positionFactor: 0.8,
+                                //   widget: AppText(
+                                //     '\$ 4725.0004',
+                                //     fontSize: 12,
+                                //     color: colorScheme.onSurface.withValues(
+                                //       alpha: 0.3,
+                                //     ),
+                                //     fontFamily: 'monospace',
+                                //   ),
+                                // ),
                               ],
                             ),
                           ],
@@ -169,24 +169,6 @@ class BusinessPowerScoreCard extends StatelessWidget {
                           ),
                           // const Spacer(),
                           const Icon(Icons.star, color: Colors.amber, size: 18),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.wallet,
-                            color: Colors.amber,
-                            size: 18,
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: FittedText(
-                              'Eforei',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: colorScheme.onSurface.withValues(
-                                  alpha: 0.7,
-                                ),
-                              ),
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 12),

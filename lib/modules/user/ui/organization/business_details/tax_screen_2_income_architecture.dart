@@ -98,6 +98,32 @@ class _TaxScreen2IncomeArchitectureState
   }
 
   @override
+  void initState() {
+    super.initState();
+    _preFillData();
+  }
+
+  void _preFillData() {
+    if (widget.organizationId != null) {
+      final org = organizationControllerInstance.organizations
+          .firstWhereOrNull((e) => e.id == widget.organizationId);
+      if (org != null) {
+        _primaryIncomeTypes = org.primaryIncomeTypes ?? [];
+        _industryController.text = org.industryNiche ?? '';
+        _passiveIncome = org.passiveIncome ?? [];
+      }
+    } else if (widget.transactionId != null) {
+      final tx = transactionControllerInstance.transactions
+          .firstWhereOrNull((e) => e.id == widget.transactionId);
+      if (tx != null) {
+        _primaryIncomeTypes = tx.primaryIncomeTypes ?? [];
+        _industryController.text = tx.industryNiche ?? '';
+        _passiveIncome = tx.passiveIncome ?? [];
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _industryController.dispose();
     super.dispose();

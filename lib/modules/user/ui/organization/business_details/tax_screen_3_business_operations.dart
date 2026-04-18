@@ -95,6 +95,32 @@ class _TaxScreen3BusinessOperationsState
   }
 
   @override
+  void initState() {
+    super.initState();
+    _preFillData();
+  }
+
+  void _preFillData() {
+    if (widget.organizationId != null) {
+      final org = organizationControllerInstance.organizations
+          .firstWhereOrNull((e) => e.id == widget.organizationId);
+      if (org != null) {
+        _teamStructure = org.teamStructure ?? [];
+        _accountingMethod = org.accountingMethod;
+        _majorEquipment = org.majorEquipment;
+      }
+    } else if (widget.transactionId != null) {
+      final tx = transactionControllerInstance.transactions
+          .firstWhereOrNull((e) => e.id == widget.transactionId);
+      if (tx != null) {
+        _teamStructure = tx.teamStructure ?? [];
+        _accountingMethod = tx.accountingMethod;
+        _majorEquipment = tx.majorEquipment;
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: kIsWeb

@@ -97,6 +97,34 @@ class _TaxScreen1LegalIdentityState extends State<TaxScreen1LegalIdentity> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _preFillData();
+  }
+
+  void _preFillData() {
+    if (widget.organizationId != null) {
+      final org = organizationControllerInstance.organizations
+          .firstWhereOrNull((e) => e.id == widget.organizationId);
+      if (org != null) {
+        _filingStatus = org.filingStatus;
+        _stateController.text = org.primaryState ?? '';
+        _residencyStatus = org.residencyStatus;
+        _multiStateActivity = org.multiStateActivity;
+      }
+    } else if (widget.transactionId != null) {
+      final tx = transactionControllerInstance.transactions
+          .firstWhereOrNull((e) => e.id == widget.transactionId);
+      if (tx != null) {
+        _filingStatus = tx.filingStatus;
+        _stateController.text = tx.primaryState ?? '';
+        _residencyStatus = tx.residencyStatus;
+        _multiStateActivity = tx.multiStateActivity;
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _stateController.dispose();
     super.dispose();

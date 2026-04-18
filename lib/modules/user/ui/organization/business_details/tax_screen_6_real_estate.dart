@@ -91,6 +91,30 @@ class _TaxScreen6RealEstateState extends State<TaxScreen6RealEstate> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _preFillData();
+  }
+
+  void _preFillData() {
+    if (widget.organizationId != null) {
+      final org = organizationControllerInstance.organizations
+          .firstWhereOrNull((e) => e.id == widget.organizationId);
+      if (org != null) {
+        _realEstateInterests = org.realEstateInterests ?? [];
+        _hostsBusinessMeetings = org.hostsBusinessMeetings;
+      }
+    } else if (widget.transactionId != null) {
+      final tx = transactionControllerInstance.transactions
+          .firstWhereOrNull((e) => e.id == widget.transactionId);
+      if (tx != null) {
+        _realEstateInterests = tx.realEstateInterests ?? [];
+        _hostsBusinessMeetings = tx.hostsBusinessMeetings;
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: kIsWeb

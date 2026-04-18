@@ -94,6 +94,32 @@ class _TaxScreen5HomeOfficeState extends State<TaxScreen5HomeOffice> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _preFillData();
+  }
+
+  void _preFillData() {
+    if (widget.organizationId != null) {
+      final org = organizationControllerInstance.organizations
+          .firstWhereOrNull((e) => e.id == widget.organizationId);
+      if (org != null) {
+        _homeOfficeType = org.homeOfficeType;
+        _homeStatus = org.homeStatus;
+        _techUsage = org.techUsage ?? [];
+      }
+    } else if (widget.transactionId != null) {
+      final tx = transactionControllerInstance.transactions
+          .firstWhereOrNull((e) => e.id == widget.transactionId);
+      if (tx != null) {
+        _homeOfficeType = tx.homeOfficeType;
+        _homeStatus = tx.homeStatus;
+        _techUsage = tx.techUsage ?? [];
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: kIsWeb

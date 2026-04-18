@@ -88,6 +88,32 @@ class _TaxScreen4VehicleState extends State<TaxScreen4Vehicle> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _preFillData();
+  }
+
+  void _preFillData() {
+    if (widget.organizationId != null) {
+      final org = organizationControllerInstance.organizations
+          .firstWhereOrNull((e) => e.id == widget.organizationId);
+      if (org != null) {
+        _vehicleOwnership = org.vehicleOwnership;
+        _vehicleUsage = org.vehicleUsage;
+        _vehicleOver6kLbs = org.vehicleOver6kLbs;
+      }
+    } else if (widget.transactionId != null) {
+      final tx = transactionControllerInstance.transactions
+          .firstWhereOrNull((e) => e.id == widget.transactionId);
+      if (tx != null) {
+        _vehicleOwnership = tx.vehicleOwnership;
+        _vehicleUsage = tx.vehicleUsage;
+        _vehicleOver6kLbs = tx.vehicleOver6kLbs;
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: kIsWeb
