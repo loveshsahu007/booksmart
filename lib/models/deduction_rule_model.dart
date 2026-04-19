@@ -9,7 +9,7 @@ class DeductionRuleModel {
   final int? stateId;
 
   final int categoryId;
-  final int subCategoryId;
+  final int? subCategoryId;
 
   final RuleType ruleType;
 
@@ -41,7 +41,7 @@ class DeductionRuleModel {
       value: (handleResponseFromJson<num>(json, 'value') ?? 0).toDouble(),
       stateId: handleResponseFromJson<int>(json, 'state_id'),
       categoryId: handleResponseFromJson<int>(json, 'category_id') ?? -1,
-      subCategoryId: handleResponseFromJson<int>(json, 'sub_category_id') ?? -1,
+      subCategoryId: handleResponseFromJson<int>(json, 'sub_category_id'),
       createdAt:
           DateTime.tryParse(
             handleResponseFromJson<String>(json, 'created_at') ?? '',
