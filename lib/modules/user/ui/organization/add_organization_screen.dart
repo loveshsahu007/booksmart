@@ -164,6 +164,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
               child: Form(
                 key: _formKey,
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     AppText(
                       "Set Up Your Organization Profile",
@@ -172,6 +173,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                       textAlign: TextAlign.center,
                     ),
                     0.05.verticalSpace,
+                    AppText("Organization Name *", fontWeight: FontWeight.w600),
 
                     AppTextField(
                       controller: nameController,
@@ -181,14 +183,14 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                           v == null || v.isEmpty ? "Required" : null,
                     ),
                     0.02.verticalSpace,
-
+                    AppText("Website", fontWeight: FontWeight.w600),
                     AppTextField(
                       controller: websiteController,
                       labelText: "Website",
                       hintText: "Website",
                     ),
                     0.02.verticalSpace,
-
+                    AppText("EIN/TIN  *", fontWeight: FontWeight.w600),
                     AppTextField(
                       controller: einController,
                       labelText: "EIN/TIN *",
@@ -222,35 +224,35 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                       selectedItem: widget.organization?.state,
                     ),
                     0.02.verticalSpace,
-
+                    AppText("Street Address", fontWeight: FontWeight.w600),
                     AppTextField(
                       controller: streetController,
                       labelText: "Street Address",
                       hintText: "Street Address",
                     ),
                     0.02.verticalSpace,
-
+                    AppText("City", fontWeight: FontWeight.w600),
                     AppTextField(
                       controller: cityController,
                       labelText: "City",
                       hintText: "City",
                     ),
                     0.02.verticalSpace,
-
+                    AppText("ZIP Code", fontWeight: FontWeight.w600),
                     AppTextField(
                       controller: zipController,
                       labelText: "ZIP Code",
                       hintText: "ZIP Code",
                     ),
                     0.02.verticalSpace,
-
+                    AppText("Phone Number", fontWeight: FontWeight.w600),
                     AppTextField(
                       controller: phoneController,
                       labelText: "Phone Number",
                       hintText: "Phone Number",
                     ),
                     0.02.verticalSpace,
-
+                    AppText("Email", fontWeight: FontWeight.w600),
                     AppTextField(
                       controller: emailController,
                       labelText: "Business Email",
@@ -303,7 +305,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
         const SizedBox(height: 8),
         CustomDropDownWidget<String>(
           dropDownKey: dropDownKey,
-          label: label,
+          // label: label,
           hint: "Select $label",
           items: items,
           selectedItem: selectedItem,
