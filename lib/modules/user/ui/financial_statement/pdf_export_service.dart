@@ -36,12 +36,24 @@ class CashFlowPdfData {
     required this.netChange,
     required this.beginningCash,
     required this.endingCash,
+    this.operatingTotal,
+    this.investingTotal,
+    this.financingTotal,
+    this.netChangeTotal,
+    this.beginningCashTotal,
+    this.endingCashTotal,
   });
 
   final List<CashFlowPdfSectionData> sections;
   final List<double> netChange;
   final List<double> beginningCash;
   final List<double> endingCash;
+  final double? operatingTotal;
+  final double? investingTotal;
+  final double? financingTotal;
+  final double? netChangeTotal;
+  final double? beginningCashTotal;
+  final double? endingCashTotal;
 }
 
 class CashFlowPdfSectionData {
@@ -56,11 +68,13 @@ class CashFlowPdfRowData {
     required this.label,
     required this.values,
     this.isTotal = false,
+    this.periodTotalOverride,
   });
 
   final String label;
   final List<double> values;
   final bool isTotal;
+  final double? periodTotalOverride;
 }
 
 class PnlPdfData {
@@ -526,13 +540,13 @@ class PdfExportService {
     required _CashFlowStatementDummy statement,
   }) {
     final grid = pdf_gen.PdfGrid();
-    final colCount = labels.length + 1;
+    final colCount = labels.length + 2; // Description + period buckets + period total
     grid.columns.add(count: colCount);
 
     final totalWidth = page.getClientSize().width - 68;
-    final descriptionWidth = totalWidth * 0.58;
+    final descriptionWidth = totalWidth * 0.50;
     grid.columns[0].width = descriptionWidth;
-    final dataColWidth = (totalWidth - descriptionWidth) / labels.length;
+    final dataColWidth = (totalWidth - descriptionWidth) / (labels.length + 1);
     for (var i = 1; i < colCount; i++) {
       grid.columns[i].width = dataColWidth;
     }
@@ -542,6 +556,7 @@ class PdfExportService {
     for (var i = 0; i < labels.length; i++) {
       header.cells[i + 1].value = labels[i];
     }
+    header.cells[colCount - 1].value = 'Period Total';
     header.style = pdf_gen.PdfGridRowStyle(
       font: bodyBold,
       textBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(70, 70, 70)),
@@ -584,8 +599,11 @@ class PdfExportService {
       for (final row in section.rows) {
         final dataRow = grid.rows.add();
         dataRow.cells[0].value = row.label;
+        double rowTotal = 0;
         for (var i = 0; i < labels.length; i++) {
-          dataRow.cells[i + 1].value = _money(row.values[i]);
+          final v = row.values[i];
+          rowTotal += v;
+          dataRow.cells[i + 1].value = _money(v);
           dataRow.cells[i + 1].style = pdf_gen.PdfGridCellStyle(
             format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
             borders: pdf_gen.PdfBorders(
@@ -596,6 +614,17 @@ class PdfExportService {
             ),
           );
         }
+        dataRow.cells[colCount - 1].value =
+            _money(row.periodTotalOverride ?? rowTotal);
+        dataRow.cells[colCount - 1].style = pdf_gen.PdfGridCellStyle(
+          format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
+          borders: pdf_gen.PdfBorders(
+            bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(226, 226, 226), width: 0.8),
+            left: pdf_gen.PdfPens.transparent,
+            right: pdf_gen.PdfPens.transparent,
+            top: pdf_gen.PdfPens.transparent,
+          ),
+        );
 
         dataRow.cells[0].style = pdf_gen.PdfGridCellStyle(
           borders: pdf_gen.PdfBorders(
@@ -955,6 +984,7 @@ class PdfExportService {
                     label: row.label,
                     values: fit(row.values),
                     isTotal: row.isTotal,
+                    periodTotalOverride: row.periodTotalOverride,
                   ),
                 )
                 .toList(),
@@ -970,6 +1000,7 @@ class PdfExportService {
             label: 'Change in Cash (A + B + C)',
             values: fit(data.netChange),
             isTotal: true,
+            periodTotalOverride: data.netChangeTotal,
           ),
         ],
       ),
@@ -981,6 +1012,7 @@ class PdfExportService {
           _CashFlowRowDummy(
             label: 'Cash and Cash Equivalents at Beginning',
             values: fit(data.beginningCash),
+            periodTotalOverride: data.beginningCashTotal,
           ),
         ],
       ),
@@ -993,6 +1025,7 @@ class PdfExportService {
             label: 'Cash and Cash Equivalents at End',
             values: fit(data.endingCash),
             isTotal: true,
+            periodTotalOverride: data.endingCashTotal,
           ),
         ],
       ),
@@ -1083,9 +1116,11 @@ class _CashFlowRowDummy {
     required this.label,
     required this.values,
     this.isTotal = false,
+    this.periodTotalOverride,
   });
 
   final String label;
   final List<double> values;
   final bool isTotal;
+  final double? periodTotalOverride;
 }

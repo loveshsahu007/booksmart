@@ -8,15 +8,20 @@ import 'package:booksmart/modules/user/controllers/financial_report_controller.d
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/export_modal_widget.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/pdf_export_service.dart';
+import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:booksmart/modules/user/ui/tax_filling/upload_tax_doc_dialog.dart';
 import 'package:booksmart/widgets/recent_documents_widget.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart' as pdf_gen;
 import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:booksmart/widgets/snackbar.dart';
+import 'dart:ui' as ui;
 import 'package:booksmart/utils/downloader.dart';
 import 'package:excel/excel.dart' as excel_lib;
+import 'package:archive/archive.dart';
+import 'package:xml/xml.dart';
 import 'dart:math' as math;
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/supabase/tables.dart';
@@ -259,6 +264,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
   }
 
   Widget _buildYearDropdown(FinancialReportController controller) {
+    final isDark = Get.isDarkMode;
     final int currentYear = DateTime.now().year;
     final List<int> years = List.generate(5, (index) => currentYear - index);
     final bool isSelected = _selectedFilterIdx == 4;
@@ -420,18 +426,479 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     );
   }
 
+  Future<void> _exportPDF(FinancialReportController controller) async {
+    try {
+      if (_startDate == null || _endDate == null) {
+        showSnackBar('Please select a valid date range.', isError: true);
+        return;
+      }
+      final pdf_gen.PdfDocument document = pdf_gen.PdfDocument();
+      document.pageSettings.margins.all = 0; // Modern look
+
+      // [1. Determine Periodicity and Columns BEFORE adding any page]
+      final int totalMonths =
+          (_endDate!.year - _startDate!.year) * 12 +
+          _endDate!.month -
+          _startDate!.month +
+          1;
+      final bool useYearly = totalMonths > 12;
+
+      List<String> periodKeys = [];
+      List<String> periodLabels = [];
+
+      if (useYearly) {
+        for (int y = _startDate!.year; y <= _endDate!.year; y++) {
+          periodKeys.add(y.toString());
+          periodLabels.add(y.toString());
+        }
+      } else {
+        DateTime current = DateTime(_startDate!.year, _startDate!.month, 1);
+        final end = DateTime(_endDate!.year, _endDate!.month, 1);
+        while (current.isBefore(end) || current.isAtSameMomentAs(end)) {
+          periodKeys.add(DateFormat('yyyy-MM').format(current));
+          periodLabels.add(DateFormat('MMM yyyy').format(current));
+          current = DateTime(current.year, current.month + 1, 1);
+        }
+      }
+      final exportData = await _buildPnlExportData(_startDate!, _endDate!);
+
+      // Set orientation BEFORE adding the first page to avoid a blank portrait page
+      if (periodKeys.length > 3) {
+        document.pageSettings.orientation =
+            pdf_gen.PdfPageOrientation.landscape;
+      }
+
+      pdf_gen.PdfPage page = document.pages.add();
+      pdf_gen.PdfGraphics graphics = page.graphics;
+      ui.Size size = page.getClientSize();
+
+      // [Colors and Fonts]
+      final pdf_gen.PdfColor navyColor = pdf_gen.PdfColor(15, 30, 55);
+      final pdf_gen.PdfColor blueHeaderBg = pdf_gen.PdfColor(214, 230, 248);
+      final pdf_gen.PdfColor tableHeaderBg = pdf_gen.PdfColor(240, 242, 245);
+      final pdf_gen.PdfColor textSecondaryColor = pdf_gen.PdfColor(
+        100,
+        100,
+        100,
+      );
+
+      final pdf_gen.PdfFont titleFont = pdf_gen.PdfStandardFont(
+        pdf_gen.PdfFontFamily.helvetica,
+        18,
+        style: pdf_gen.PdfFontStyle.bold,
+      );
+      final pdf_gen.PdfFont headerFont = pdf_gen.PdfStandardFont(
+        pdf_gen.PdfFontFamily.helvetica,
+        10,
+        style: pdf_gen.PdfFontStyle.bold,
+      );
+      final pdf_gen.PdfFont boldFont = pdf_gen.PdfStandardFont(
+        pdf_gen.PdfFontFamily.helvetica,
+        9,
+        style: pdf_gen.PdfFontStyle.bold,
+      );
+      final pdf_gen.PdfFont regularFont = pdf_gen.PdfStandardFont(
+        pdf_gen.PdfFontFamily.helvetica,
+        9,
+      );
+      final pdf_gen.PdfFont smallFont = pdf_gen.PdfStandardFont(
+        pdf_gen.PdfFontFamily.helvetica,
+        8,
+      );
+
+      // [1. Header Area]
+      graphics.drawRectangle(
+        brush: pdf_gen.PdfSolidBrush(blueHeaderBg),
+        bounds: Rect.fromLTWH(0, 0, size.width, 85),
+      );
+
+      graphics.drawString(
+        'Profit & Loss Statement',
+        titleFont,
+        bounds: Rect.fromLTWH(size.width - 250, 10, 230, 30),
+        format: pdf_gen.PdfStringFormat(
+          alignment: pdf_gen.PdfTextAlignment.right,
+        ),
+      );
+
+      void drawHeaderField(String label, String value, double x, double y) {
+        graphics.drawString(
+          label.toUpperCase(),
+          smallFont,
+          brush: pdf_gen.PdfSolidBrush(textSecondaryColor),
+          bounds: Rect.fromLTWH(x, y, 100, 12),
+        );
+        graphics.drawRectangle(
+          brush: pdf_gen.PdfBrushes.white,
+          bounds: Rect.fromLTWH(x, y + 10, 180, 14),
+        );
+        graphics.drawString(
+          value,
+          regularFont,
+          bounds: Rect.fromLTWH(x + 5, y + 10, 170, 14),
+          format: pdf_gen.PdfStringFormat(
+            lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
+          ),
+        );
+      }
+
+      final String orgName =
+          getCurrentOrganization?.name ?? 'Organization Name';
+      final String periodStr =
+          "${DateFormat('MM/dd/yyyy').format(_startDate ?? DateTime.now())} to ${DateFormat('MM/dd/yyyy').format(_endDate ?? DateTime.now())}";
+      final String preparedBy =
+          "${authPerson?.firstName ?? 'Admin'} ${authPerson?.lastName ?? ''}"
+              .trim();
+      final String datePrepared = DateFormat(
+        'MM/dd/yyyy',
+      ).format(DateTime.now());
+
+      drawHeaderField('Organization Name', orgName, 140, 38);
+      drawHeaderField('Period Covered', periodStr, 340, 38);
+      drawHeaderField('Prepared By', preparedBy, 140, 62);
+      drawHeaderField('Date Prepared', datePrepared, 340, 62);
+
+      graphics.drawRectangle(
+        brush: pdf_gen.PdfSolidBrush(navyColor),
+        bounds: Rect.fromLTWH(30, 20, 60, 60),
+      );
+      graphics.drawString(
+        'BS',
+        titleFont,
+        brush: pdf_gen.PdfBrushes.white,
+        bounds: Rect.fromLTWH(30, 20, 60, 60),
+        format: pdf_gen.PdfStringFormat(
+          alignment: pdf_gen.PdfTextAlignment.center,
+          lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
+        ),
+      );
+
+      double currentY = 100;
+      final money = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+      String fmtMoney(double v) => money.format(v);
+
+      // Helper to aggregate data by year if needed
+      Map<String, double> getPeriodicData(
+        Map<String, Map<String, double>> periodicMap,
+        String periodKey,
+        String category,
+      ) {
+        if (useYearly) {
+          double total = 0;
+          periodicMap.forEach((mKey, categories) {
+            if (mKey.startsWith(periodKey)) total += categories[category] ?? 0;
+          });
+          return {category: total};
+        } else {
+          return {category: periodicMap[periodKey]?[category] ?? 0};
+        }
+      }
+
+      // [2. INCOME Table]
+      final incomeGrid = pdf_gen.PdfGrid();
+      int colCount = 1 + periodKeys.length + 1; // Description + Periods + Total
+      incomeGrid.columns.add(count: colCount);
+      incomeGrid.columns[0].width = 180;
+      for (int i = 1; i < colCount; i++) {
+        incomeGrid.columns[i].width = (size.width - 220) / (colCount - 1);
+      }
+
+      final incHeaderRow = incomeGrid.rows.add();
+      incHeaderRow.cells[0].value = 'INCOME';
+      incHeaderRow.cells[0].columnSpan = colCount;
+      incHeaderRow.style = pdf_gen.PdfGridCellStyle(
+        backgroundBrush: pdf_gen.PdfSolidBrush(navyColor),
+        textBrush: pdf_gen.PdfBrushes.white,
+        font: headerFont,
+      );
+
+      final incHeadRow = incomeGrid.rows.add();
+      incHeadRow.cells[0].value = 'Description';
+      for (int i = 0; i < periodLabels.length; i++) {
+        incHeadRow.cells[i + 1].value = periodLabels[i];
+      }
+      incHeadRow.cells[colCount - 1].value = 'TOTAL';
+      for (int i = 0; i < colCount; i++) {
+        incHeadRow.cells[i].style = pdf_gen.PdfGridCellStyle(
+          backgroundBrush: pdf_gen.PdfSolidBrush(tableHeaderBg),
+          font: boldFont,
+        );
+      }
+
+      exportData.incomeBreakdown.keys.toList().forEach((title) {
+        final row = incomeGrid.rows.add();
+        row.cells[0].value = title;
+        double rowTotal = 0;
+        for (int i = 0; i < periodKeys.length; i++) {
+          double val = getPeriodicData(
+            exportData.periodicIncomeBreakdown,
+            periodKeys[i],
+            title,
+          ).values.first;
+          row.cells[i + 1].value = fmtMoney(val);
+          row.cells[i + 1].style = pdf_gen.PdfGridCellStyle(
+            format: pdf_gen.PdfStringFormat(
+              alignment: pdf_gen.PdfTextAlignment.right,
+            ),
+          );
+          rowTotal += val;
+        }
+        row.cells[colCount - 1].value = fmtMoney(rowTotal);
+        row.cells[colCount - 1].style = pdf_gen.PdfGridCellStyle(
+          font: boldFont,
+          format: pdf_gen.PdfStringFormat(
+            alignment: pdf_gen.PdfTextAlignment.right,
+          ),
+        );
+      });
+
+      final totalIncRow = incomeGrid.rows.add();
+      totalIncRow.cells[0].value = 'Total Income';
+      totalIncRow.cells[0].style = pdf_gen.PdfGridCellStyle(font: boldFont);
+      for (int i = 0; i < periodKeys.length; i++) {
+        double pTotal = 0;
+        if (useYearly) {
+          exportData.periodicIncomeBreakdown.forEach((mKey, cats) {
+            if (mKey.startsWith(periodKeys[i]))
+              cats.values.forEach((v) => pTotal += v);
+          });
+        } else {
+          exportData.periodicIncomeBreakdown[periodKeys[i]]?.values.forEach(
+            (v) => pTotal += v,
+          );
+        }
+        totalIncRow.cells[i + 1].value = fmtMoney(pTotal);
+        totalIncRow.cells[i + 1].style = pdf_gen.PdfGridCellStyle(
+          font: boldFont,
+          format: pdf_gen.PdfStringFormat(
+            alignment: pdf_gen.PdfTextAlignment.right,
+          ),
+        );
+      }
+      totalIncRow.cells[colCount - 1].value = fmtMoney(
+        exportData.totalIncome,
+      );
+      totalIncRow.cells[colCount - 1].style = pdf_gen.PdfGridCellStyle(
+        font: boldFont,
+        format: pdf_gen.PdfStringFormat(
+          alignment: pdf_gen.PdfTextAlignment.right,
+        ),
+      );
+
+      var result = incomeGrid.draw(
+        page: page,
+        bounds: Rect.fromLTWH(20, currentY, size.width - 40, 0),
+      )!;
+      page = result.page;
+      graphics = page.graphics;
+      currentY = result.bounds.bottom + 20;
+
+      // [3. EXPENSES Table]
+      final expGrid = pdf_gen.PdfGrid();
+      expGrid.columns.add(count: colCount);
+      expGrid.columns[0].width = 180;
+      for (int i = 1; i < colCount; i++) {
+        expGrid.columns[i].width = (size.width - 220) / (colCount - 1);
+      }
+
+      final expHeaderRow = expGrid.rows.add();
+      expHeaderRow.cells[0].value = 'EXPENSES';
+      expHeaderRow.cells[0].columnSpan = colCount;
+      expHeaderRow.style = pdf_gen.PdfGridCellStyle(
+        backgroundBrush: pdf_gen.PdfSolidBrush(navyColor),
+        textBrush: pdf_gen.PdfBrushes.white,
+        font: headerFont,
+      );
+
+      final expHeadRow = expGrid.rows.add();
+      expHeadRow.cells[0].value = 'Description';
+      for (int i = 0; i < periodLabels.length; i++) {
+        expHeadRow.cells[i + 1].value = periodLabels[i];
+      }
+      expHeadRow.cells[colCount - 1].value = 'TOTAL';
+      for (int i = 0; i < colCount; i++) {
+        expHeadRow.cells[i].style = pdf_gen.PdfGridCellStyle(
+          backgroundBrush: pdf_gen.PdfSolidBrush(tableHeaderBg),
+          font: boldFont,
+        );
+      }
+
+      exportData.expenseBreakdown.keys.toList().forEach((title) {
+        final row = expGrid.rows.add();
+        row.cells[0].value = title;
+        double rowTotal = 0;
+        for (int i = 0; i < periodKeys.length; i++) {
+          double val = getPeriodicData(
+            exportData.periodicExpenseBreakdown,
+            periodKeys[i],
+            title,
+          ).values.first;
+          row.cells[i + 1].value = fmtMoney(val);
+          row.cells[i + 1].style = pdf_gen.PdfGridCellStyle(
+            format: pdf_gen.PdfStringFormat(
+              alignment: pdf_gen.PdfTextAlignment.right,
+            ),
+          );
+          rowTotal += val;
+        }
+        row.cells[colCount - 1].value = fmtMoney(rowTotal);
+        row.cells[colCount - 1].style = pdf_gen.PdfGridCellStyle(
+          font: boldFont,
+          format: pdf_gen.PdfStringFormat(
+            alignment: pdf_gen.PdfTextAlignment.right,
+          ),
+        );
+      });
+
+      final totalExpRow = expGrid.rows.add();
+      totalExpRow.cells[0].value = 'Total Expenses';
+      totalExpRow.cells[0].style = pdf_gen.PdfGridCellStyle(font: boldFont);
+      for (int i = 0; i < periodKeys.length; i++) {
+        double pTotal = 0;
+        if (useYearly) {
+          exportData.periodicExpenseBreakdown.forEach((mKey, cats) {
+            if (mKey.startsWith(periodKeys[i]))
+              cats.values.forEach((v) => pTotal += v);
+          });
+        } else {
+          exportData.periodicExpenseBreakdown[periodKeys[i]]?.values.forEach(
+            (v) => pTotal += v,
+          );
+        }
+        totalExpRow.cells[i + 1].value = fmtMoney(pTotal);
+        totalExpRow.cells[i + 1].style = pdf_gen.PdfGridCellStyle(
+          font: boldFont,
+          format: pdf_gen.PdfStringFormat(
+            alignment: pdf_gen.PdfTextAlignment.right,
+          ),
+        );
+      }
+      totalExpRow.cells[colCount - 1].value = fmtMoney(
+        exportData.totalExpenses,
+      );
+      totalExpRow.cells[colCount - 1].style = pdf_gen.PdfGridCellStyle(
+        font: boldFont,
+        format: pdf_gen.PdfStringFormat(
+          alignment: pdf_gen.PdfTextAlignment.right,
+        ),
+      );
+
+      result = expGrid.draw(
+        page: page,
+        bounds: Rect.fromLTWH(20, currentY, size.width - 40, 0),
+      )!;
+      page = result.page;
+      graphics = page.graphics;
+      currentY = result.bounds.bottom + 20;
+
+      // [4. Summary Row (Net Income)]
+      graphics.drawRectangle(
+        brush: pdf_gen.PdfSolidBrush(navyColor),
+        bounds: Rect.fromLTWH(20, currentY, size.width - 40, 25),
+      );
+      graphics.drawString(
+        'NET PROFIT / LOSS',
+        headerFont,
+        brush: pdf_gen.PdfBrushes.white,
+        bounds: Rect.fromLTWH(30, currentY, 200, 25),
+        format: pdf_gen.PdfStringFormat(
+          lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
+        ),
+      );
+
+      double labelX = 200;
+      double colW = (size.width - 220) / (colCount - 1);
+      for (int i = 0; i < periodKeys.length; i++) {
+        double pNet = 0;
+        if (useYearly) {
+          exportData.periodicNetIncome.forEach((mKey, val) {
+            if (mKey.startsWith(periodKeys[i])) pNet += val;
+          });
+        } else {
+          pNet = exportData.periodicNetIncome[periodKeys[i]] ?? 0;
+        }
+        graphics.drawString(
+          fmtMoney(pNet),
+          boldFont,
+          brush: pdf_gen.PdfBrushes.white,
+          bounds: Rect.fromLTWH(labelX, currentY, colW, 25),
+          format: pdf_gen.PdfStringFormat(
+            alignment: pdf_gen.PdfTextAlignment.right,
+            lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
+          ),
+        );
+        labelX += colW;
+      }
+      graphics.drawString(
+        fmtMoney(exportData.netIncome),
+        headerFont,
+        brush: pdf_gen.PdfBrushes.white,
+        bounds: Rect.fromLTWH(size.width - 120, currentY, 100, 25),
+        format: pdf_gen.PdfStringFormat(
+          alignment: pdf_gen.PdfTextAlignment.right,
+          lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
+        ),
+      );
+
+      currentY += 40;
+      graphics.drawString(
+        'Note',
+        boldFont,
+        bounds: Rect.fromLTWH(20, currentY, 100, 15),
+      );
+      graphics.drawLine(
+        pdf_gen.PdfPen(pdf_gen.PdfColor(200, 200, 200), width: 0.5),
+        Offset(20, currentY + 18),
+        Offset(size.width - 20, currentY + 18),
+      );
+
+      currentY += 40;
+      graphics.drawLine(
+        pdf_gen.PdfPen(textSecondaryColor, width: 0.5),
+        Offset(size.width - 220, currentY),
+        Offset(size.width - 120, currentY),
+      );
+      graphics.drawLine(
+        pdf_gen.PdfPen(textSecondaryColor, width: 0.5),
+        Offset(size.width - 100, currentY),
+        Offset(size.width - 20, currentY),
+      );
+      graphics.drawString(
+        'VERIFIED BY',
+        smallFont,
+        brush: pdf_gen.PdfSolidBrush(textSecondaryColor),
+        bounds: Rect.fromLTWH(size.width - 220, currentY + 2, 100, 15),
+      );
+      graphics.drawString(
+        'DATE',
+        smallFont,
+        brush: pdf_gen.PdfSolidBrush(textSecondaryColor),
+        bounds: Rect.fromLTWH(size.width - 100, currentY + 2, 80, 15),
+      );
+
+      final List<int> bytes = await document.save();
+      document.dispose();
+      await downloadFile(
+        '${orgName.replaceAll(' ', '_')}_Periodic_PL.pdf',
+        bytes,
+        mimeType: 'application/pdf',
+      );
+    } catch (e, st) {
+      dev.log('PDF Export Error: $e\n$st');
+      showSnackBar('Please review PDF generation: $e', isError: true);
+    }
+  }
+
   void _exportExcel(FinancialReportController controller) async {
     try {
-      final start =
-          _startDate ?? DateTime.now().subtract(const Duration(days: 89));
+      final start = _startDate ?? DateTime.now().subtract(const Duration(days: 89));
       final end = _endDate ?? DateTime.now();
       if (end.isBefore(start)) {
         showSnackBar('End date must be on or after start date.', isError: true);
         return;
       }
 
-      final totalMonths =
-          (end.year - start.year) * 12 + end.month - start.month + 1;
+      final totalMonths = (end.year - start.year) * 12 + end.month - start.month + 1;
       final useYearly = totalMonths > 12;
       final periodKeys = <String>[];
       final periodLabels = <String>[];
@@ -469,8 +936,14 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       }
 
       final excel = excel_lib.Excel.createExcel();
-      excel.delete('Sheet1');
       final sheet = excel['P&L Statement'];
+      final existingSheets = List<String>.from(excel.tables.keys);
+      for (final name in existingSheets) {
+        final isDefaultSheet = name.toLowerCase().startsWith('sheet');
+        if (isDefaultSheet && name != 'P&L Statement') {
+          excel.delete(name);
+        }
+      }
       final orgName = getCurrentOrganization?.name ?? 'Booksmart';
 
       final headerStyle = excel_lib.CellStyle(
@@ -524,12 +997,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       sheet.setColumnWidth(totalColIdx, 16);
 
       for (int c = 0; c < totalCols; c++) {
-        setCell(
-          c,
-          0,
-          excel_lib.TextCellValue('Profit & Loss Statement'),
-          headerStyle,
-        );
+        setCell(c, 0, excel_lib.TextCellValue('Profit & Loss Statement'), headerStyle);
         setCell(
           c,
           1,
@@ -541,36 +1009,20 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       }
       sheet.merge(
         excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-        excel_lib.CellIndex.indexByColumnRow(
-          columnIndex: totalColIdx,
-          rowIndex: 0,
-        ),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: totalColIdx, rowIndex: 0),
       );
       sheet.merge(
         excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1),
-        excel_lib.CellIndex.indexByColumnRow(
-          columnIndex: totalColIdx,
-          rowIndex: 1,
-        ),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: totalColIdx, rowIndex: 1),
       );
 
       int row = 3;
       void writeColumnHeader() {
         setCell(0, row, excel_lib.TextCellValue('Description'), headerStyle);
         for (int i = 0; i < periodLabels.length; i++) {
-          setCell(
-            i + 1,
-            row,
-            excel_lib.TextCellValue(periodLabels[i]),
-            headerStyle,
-          );
+          setCell(i + 1, row, excel_lib.TextCellValue(periodLabels[i]), headerStyle);
         }
-        setCell(
-          totalColIdx,
-          row,
-          excel_lib.TextCellValue('TOTAL'),
-          headerStyle,
-        );
+        setCell(totalColIdx, row, excel_lib.TextCellValue('TOTAL'), headerStyle);
         row++;
       }
 
@@ -582,13 +1034,9 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         row++;
       }
 
-      void writeCategoryRows(
-        Map<String, double> breakdown,
-        Map<String, Map<String, double>> periodicMap,
-      ) {
+      void writeCategoryRows(Map<String, double> breakdown, Map<String, Map<String, double>> periodicMap) {
         for (final category in breakdown.keys) {
-          if (category.trim().isEmpty ||
-              category.toLowerCase() == 'uncategorized') {
+          if (category.trim().isEmpty || category.toLowerCase() == 'uncategorized') {
             continue;
           }
           setCell(0, row, excel_lib.TextCellValue(category), labelStyle);
@@ -598,21 +1046,12 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
             rowTotal += v;
             setCell(i + 1, row, excel_lib.DoubleCellValue(v), currencyStyle);
           }
-          setCell(
-            totalColIdx,
-            row,
-            excel_lib.DoubleCellValue(rowTotal),
-            currencyStyle,
-          );
+          setCell(totalColIdx, row, excel_lib.DoubleCellValue(rowTotal), currencyStyle);
           row++;
         }
       }
 
-      void writeTotalRow(
-        String label,
-        Map<String, Map<String, double>> periodicMap,
-        double grandTotal,
-      ) {
+      void writeTotalRow(String label, Map<String, Map<String, double>> periodicMap, double grandTotal) {
         setCell(0, row, excel_lib.TextCellValue(label), totalLabelStyle);
         for (int i = 0; i < periodKeys.length; i++) {
           double pTotal = 0;
@@ -623,59 +1062,27 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
               }
             });
           } else {
-            pTotal = (periodicMap[periodKeys[i]] ?? {}).values.fold(
-              0.0,
-              (a, b) => a + b,
-            );
+            pTotal = (periodicMap[periodKeys[i]] ?? {}).values.fold(0.0, (a, b) => a + b);
           }
-          setCell(
-            i + 1,
-            row,
-            excel_lib.DoubleCellValue(pTotal),
-            currencyBoldStyle,
-          );
+          setCell(i + 1, row, excel_lib.DoubleCellValue(pTotal), currencyBoldStyle);
         }
-        setCell(
-          totalColIdx,
-          row,
-          excel_lib.DoubleCellValue(grandTotal),
-          currencyBoldStyle,
-        );
+        setCell(totalColIdx, row, excel_lib.DoubleCellValue(grandTotal), currencyBoldStyle);
         row++;
       }
 
       writeSectionTitle('INCOME');
       writeColumnHeader();
-      writeCategoryRows(
-        exportData.incomeBreakdown,
-        exportData.periodicIncomeBreakdown,
-      );
-      writeTotalRow(
-        'Total Income',
-        exportData.periodicIncomeBreakdown,
-        exportData.totalIncome,
-      );
+      writeCategoryRows(exportData.incomeBreakdown, exportData.periodicIncomeBreakdown);
+      writeTotalRow('Total Income', exportData.periodicIncomeBreakdown, exportData.totalIncome);
 
       row++;
       writeSectionTitle('EXPENSES');
       writeColumnHeader();
-      writeCategoryRows(
-        exportData.expenseBreakdown,
-        exportData.periodicExpenseBreakdown,
-      );
-      writeTotalRow(
-        'Total Expenses',
-        exportData.periodicExpenseBreakdown,
-        exportData.totalExpenses,
-      );
+      writeCategoryRows(exportData.expenseBreakdown, exportData.periodicExpenseBreakdown);
+      writeTotalRow('Total Expenses', exportData.periodicExpenseBreakdown, exportData.totalExpenses);
 
       row++;
-      setCell(
-        0,
-        row,
-        excel_lib.TextCellValue('NET PROFIT / LOSS'),
-        sectionStyle,
-      );
+      setCell(0, row, excel_lib.TextCellValue('NET PROFIT / LOSS'), sectionStyle);
       for (int i = 0; i < periodKeys.length; i++) {
         double pNet = 0;
         if (useYearly) {
@@ -687,12 +1094,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         }
         setCell(i + 1, row, excel_lib.DoubleCellValue(pNet), currencyBoldStyle);
       }
-      setCell(
-        totalColIdx,
-        row,
-        excel_lib.DoubleCellValue(exportData.netIncome),
-        currencyBoldStyle,
-      );
+      setCell(totalColIdx, row, excel_lib.DoubleCellValue(exportData.netIncome), currencyBoldStyle);
 
       final bytes = excel.save();
       if (bytes == null) {
@@ -701,12 +1103,71 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       await downloadFile(
         '${orgName.replaceAll(' ', '_')}_Periodic_PL.xlsx',
         bytes,
-        mimeType:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
     } catch (e, st) {
       dev.log('Excel Export Error: $e\n$st');
       showSnackBar('Please review Excel generation: $e', isError: true);
+    }
+  }
+
+  List<int> _applyMonthGroupingToSummary(List<int> xlsxBytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(xlsxBytes, verify: false);
+      final sheetFile = archive.findFile('xl/worksheets/sheet1.xml');
+      if (sheetFile == null || !sheetFile.isFile) return xlsxBytes;
+
+      final xml = utf8.decode(sheetFile.content as List<int>);
+      final doc = XmlDocument.parse(xml);
+      final worksheet = doc.rootElement;
+
+      final cols = worksheet.getElement('cols');
+      if (cols != null) {
+        for (final col in cols.findElements('col')) {
+          final min = int.tryParse(col.getAttribute('min') ?? '') ?? 0;
+          final max = int.tryParse(col.getAttribute('max') ?? '') ?? 0;
+          if (!(max < 2 || min > 13)) {
+            col.setAttribute('outlineLevel', '1');
+          }
+          if (min <= 13 && max >= 13) {
+            col.setAttribute('collapsed', '1');
+          }
+        }
+      }
+
+      final sheetFormatPr = worksheet.getElement('sheetFormatPr');
+      sheetFormatPr?.setAttribute('outlineLevelCol', '1');
+
+      var sheetPr = worksheet.getElement('sheetPr');
+      if (sheetPr == null) {
+        sheetPr = XmlElement(XmlName('sheetPr'));
+        worksheet.children.insert(0, sheetPr);
+      }
+      if (sheetPr.getElement('outlinePr') == null) {
+        sheetPr.children.add(
+          XmlElement(XmlName('outlinePr'), [
+            XmlAttribute(XmlName('summaryBelow'), '1'),
+            XmlAttribute(XmlName('summaryRight'), '1'),
+            XmlAttribute(XmlName('showOutlineSymbols'), '1'),
+          ]),
+        );
+      }
+
+      final sheetViews = worksheet.getElement('sheetViews');
+      if (sheetViews != null) {
+        final views = sheetViews.findElements('sheetView');
+        if (views.isNotEmpty) {
+          views.first.setAttribute('showOutlineSymbols', '1');
+        }
+      }
+
+      final patched = utf8.encode(doc.toXmlString(pretty: false));
+      archive.addFile(
+        ArchiveFile('xl/worksheets/sheet1.xml', patched.length, patched),
+      );
+      return ZipEncoder().encode(archive) ?? xlsxBytes;
+    } catch (_) {
+      return xlsxBytes;
     }
   }
 
@@ -753,10 +1214,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     return false;
   }
 
-  Future<_PnlExportData> _buildPnlExportData(
-    DateTime start,
-    DateTime end,
-  ) async {
+  Future<_PnlExportData> _buildPnlExportData(DateTime start, DateTime end) async {
     final orgId = getCurrentOrganization?.id;
     if (orgId == null) {
       return const _PnlExportData(
@@ -771,14 +1229,6 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       );
     }
 
-    final subCategoryRows = await supabase
-        .from(SupabaseTable.subCategory)
-        .select('id,name');
-    final Map<int, String> subCategoryNames = {
-      for (final row in (subCategoryRows as List))
-        (row['id'] as int): (row['name'] as String? ?? '').trim(),
-    };
-
     final txRows = await supabase
         .from(SupabaseTable.transaction)
         .select()
@@ -786,9 +1236,39 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         .gte('date_time', _sqlDateLocal(start))
         .lt('date_time', _sqlDateLocal(_nextDay(end)));
 
-    final txs = (txRows as List)
-        .map((e) => TransactionModel.fromJson(e))
+    final txMaps = (txRows as List).cast<Map<String, dynamic>>();
+    final txs = txMaps.map((e) => TransactionModel.fromJson(e)).toList();
+
+    int? parseInt(dynamic v) {
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v);
+      return null;
+    }
+
+    final subCategoryIds = txMaps
+        .map((row) => parseInt(row['sub_category_id']) ?? parseInt(row['subcategory_id']))
+        .whereType<int>()
+        .toSet()
         .toList();
+    final Map<int, String> subCategoryNames = {};
+    if (subCategoryIds.isNotEmpty) {
+      final subCategoryRows = await supabase
+          .from(SupabaseTable.subCategory)
+          .select('id,name')
+          .inFilter('id', subCategoryIds);
+      for (final row in (subCategoryRows as List)) {
+        final rawId = row['id'];
+        final int? id = rawId is int
+            ? rawId
+            : (rawId is num ? rawId.toInt() : int.tryParse('$rawId'));
+        if (id == null) continue;
+        final name = (row['name'] as String? ?? '').trim();
+        if (name.isNotEmpty) {
+          subCategoryNames[id] = name;
+        }
+      }
+    }
 
     final incomeBreakdown = <String, double>{};
     final expenseBreakdown = <String, double>{};
@@ -796,10 +1276,9 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     final periodicExpenseBreakdown = <String, Map<String, double>>{};
     final periodicNetIncome = <String, double>{};
 
-    String cleanTitle(String raw) =>
-        raw.replaceAll(RegExp(r'\[.*?\]'), '').trim();
-
-    for (final tx in txs) {
+    for (int i = 0; i < txs.length; i++) {
+      final tx = txs[i];
+      final raw = txMaps[i];
       final title = tx.title.toLowerCase();
       final absAmt = tx.amount.abs();
       final monthKey = DateFormat('yyyy-MM').format(tx.dateTime);
@@ -808,8 +1287,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       periodicExpenseBreakdown[monthKey] ??= <String, double>{};
       periodicNetIncome[monthKey] ??= 0;
 
-      final bool isAL =
-          title.contains('[asset') ||
+      final bool isAL = title.contains('[asset') ||
           title.contains('[liab') ||
           title.contains('equity') ||
           title.contains('[cf:');
@@ -819,8 +1297,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
       if (title.startsWith('[revenue]')) {
         isIncome = true;
-      } else if (title.startsWith('[cogs]') ||
-          title.contains('cost of goods')) {
+      } else if (title.startsWith('[cogs]') || title.contains('cost of goods')) {
         isExpense = true;
       } else if (title.startsWith('[opex]')) {
         isExpense = true;
@@ -828,8 +1305,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         // Excluded from P&L
       } else {
         final knownExpense = _isKnownExportExpense(title);
-        final isTransfer =
-            title.contains('credit card payment') ||
+        final isTransfer = title.contains('credit card payment') ||
             title.contains('transfer to') ||
             title.contains('autopay');
         if (knownExpense) {
@@ -843,35 +1319,32 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         }
       }
 
-      final fallback = cleanTitle(tx.title);
-      final subName = tx.subcategory != null
-          ? (subCategoryNames[tx.subcategory!] ?? '')
+      final subCategoryId =
+          parseInt(raw['sub_category_id']) ??
+          parseInt(raw['subcategory_id']) ??
+          tx.subcategory;
+      final subName = subCategoryId != null
+          ? (subCategoryNames[subCategoryId] ?? '')
           : '';
-      final label = subName.isNotEmpty ? subName : fallback;
+      final label = subName.isNotEmpty ? subName : 'Uncategorized';
 
       if (isIncome) {
         incomeBreakdown[label] = (incomeBreakdown[label] ?? 0) + absAmt;
         periodicIncomeBreakdown[monthKey]![label] =
             (periodicIncomeBreakdown[monthKey]![label] ?? 0) + absAmt;
-        periodicNetIncome[monthKey] =
-            (periodicNetIncome[monthKey] ?? 0) + absAmt;
+        periodicNetIncome[monthKey] = (periodicNetIncome[monthKey] ?? 0) + absAmt;
       } else if (isExpense) {
         expenseBreakdown[label] = (expenseBreakdown[label] ?? 0) + absAmt;
         periodicExpenseBreakdown[monthKey]![label] =
             (periodicExpenseBreakdown[monthKey]![label] ?? 0) + absAmt;
-        periodicNetIncome[monthKey] =
-            (periodicNetIncome[monthKey] ?? 0) - absAmt;
+        periodicNetIncome[monthKey] = (periodicNetIncome[monthKey] ?? 0) - absAmt;
       }
     }
 
-    final totalIncome = incomeBreakdown.values.fold<double>(
-      0.0,
-      (a, b) => a + b,
-    );
-    final totalExpenses = expenseBreakdown.values.fold<double>(
-      0.0,
-      (a, b) => a + b,
-    );
+    final totalIncome =
+        incomeBreakdown.values.fold<double>(0.0, (a, b) => a + b);
+    final totalExpenses =
+        expenseBreakdown.values.fold<double>(0.0, (a, b) => a + b);
     final netIncome = totalIncome - totalExpenses;
 
     return _PnlExportData(
@@ -887,10 +1360,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
   }
 
   Future<PnlPdfData> _buildPnlPdfData(PdfExportRequest request) async {
-    final exportData = await _buildPnlExportData(
-      request.startDate,
-      request.endDate,
-    );
+    final exportData = await _buildPnlExportData(request.startDate, request.endDate);
     final labels = PdfExportService().buildBucketLabels(
       request.startDate,
       request.endDate,
@@ -917,10 +1387,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
     final revenueRows = <PnlPdfRowData>[];
     for (final category in exportData.incomeBreakdown.keys) {
-      if (category.trim().isEmpty ||
-          category.toLowerCase() == 'uncategorized') {
-        continue;
-      }
+      if (category.trim().isEmpty) continue;
       final values = valuesFromBuckets(
         aggregateToBuckets(exportData.periodicIncomeBreakdown, category),
       );
@@ -938,10 +1405,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
     final expenseRows = <PnlPdfRowData>[];
     for (final category in exportData.expenseBreakdown.keys) {
-      if (category.trim().isEmpty ||
-          category.toLowerCase() == 'uncategorized') {
-        continue;
-      }
+      if (category.trim().isEmpty) continue;
       final values = valuesFromBuckets(
         aggregateToBuckets(exportData.periodicExpenseBreakdown, category),
       );
@@ -954,11 +1418,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       }
     }
     expenseRows.add(
-      PnlPdfRowData(
-        label: 'Total Expenses',
-        values: expenseTotal,
-        isBold: true,
-      ),
+      PnlPdfRowData(label: 'Total Expenses', values: expenseTotal, isBold: true),
     );
 
     final netProfit = List<double>.filled(labels.length, 0);
@@ -1020,15 +1480,24 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
         final double grossProfit = controller.grossProfit.value;
         final double prevGrossProfit = controller.prevPeriodGrossProfit.value;
-        final double grossProfitChange = _percentChange(
-          grossProfit,
-          prevGrossProfit,
-        );
+        final double grossProfitChange =
+            _percentChange(grossProfit, prevGrossProfit);
 
         final double margin = controller.grossMarginPct.value.clamp(0, 100);
         final double prevMargin = controller.prevPeriodGrossMarginPct.value
             .clamp(0, 100);
         final double marginChange = _percentChange(margin, prevMargin);
+
+        final double ebitda = controller.ebitda.value;
+        final double prevEbitda = controller.prevPeriodEbitda.value;
+        final double ebitdaChange = _percentChange(ebitda, prevEbitda);
+
+        final double netProfit = controller.netIncome.value;
+        final double prevNetProfit = controller.prevPeriodNetIncome.value;
+        final double netProfitChange = _percentChange(netProfit, prevNetProfit);
+
+        final String totalIncomeStr = numFormat.format(income);
+        final String grossProfitStr = numFormat.format(grossProfit);
 
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final screenWidth = MediaQuery.sizeOf(context).width;
@@ -1132,9 +1601,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                   startDate: request.startDate,
                                   endDate: request.endDate,
                                 );
-                                final liveData = await _buildPnlPdfData(
-                                  request,
-                                );
+                                final liveData = await _buildPnlPdfData(request);
                                 await PdfExportService()
                                     .exportProfitLossPresentationPdf(
                                       request,
@@ -1267,7 +1734,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                       ),
                       _outlineButton(
                         "Upload",
-                        onPressed: () => showUploadTaxDocumentDialog(),
+                        onPressed: () =>
+                            showUploadTaxDocumentDialog(type: 'pl'),
                       ),
                     ],
                   ),
@@ -1924,9 +2392,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
               reservedSize: 50,
               interval: (maxY - minY) / 4,
               getTitlesWidget: (value, meta) {
-                if ((value - meta.max).abs() < 0.01) {
+                if ((value - meta.max).abs() < 0.01)
                   return const SizedBox.shrink();
-                }
                 String text;
                 if (value == 0) {
                   text = "\$0";
@@ -2399,9 +2866,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                             reservedSize: 45,
                             interval: yInterval,
                             getTitlesWidget: (value, meta) {
-                              if (value == meta.max || value == meta.min) {
+                              if (value == meta.max || value == meta.min)
                                 return const SizedBox.shrink();
-                              }
                               return AppText(
                                 _formatPercentAxis(value),
                                 fontSize: 10,
@@ -2420,9 +2886,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                             interval: 1,
                             getTitlesWidget: (value, _) {
                               final idx = value.toInt();
-                              if (idx < 0 || idx >= growthSeries.length) {
+                              if (idx < 0 || idx >= growthSeries.length)
                                 return const SizedBox.shrink();
-                              }
                               if (!_shouldShowXAxisLabel(
                                 idx,
                                 growthSeries.length,
@@ -2660,9 +3125,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                 reservedSize: 45,
                                 interval: leftAxisInterval,
                                 getTitlesWidget: (value, _) {
-                                  if (value > revenueAxisMax + 0.001) {
+                                  if (value > revenueAxisMax + 0.001)
                                     return const SizedBox.shrink();
-                                  }
                                   return AppText(
                                     compactFormat.format(value),
                                     fontSize: 10,
@@ -2681,9 +3145,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                 interval: 1,
                                 getTitlesWidget: (value, _) {
                                   int idx = value.toInt();
-                                  if (idx < 0 || idx >= cogsSeries.length) {
+                                  if (idx < 0 || idx >= cogsSeries.length)
                                     return const SizedBox.shrink();
-                                  }
                                   if (!_shouldShowXAxisLabel(
                                     idx,
                                     cogsSeries.length,
@@ -2712,9 +3175,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                 interval: revenueAxisMax / 4,
                                 getTitlesWidget: (value, _) {
                                   final pct = (value / revenueAxisMax) * 100;
-                                  if (pct > 105 || pct < -5) {
+                                  if (pct > 105 || pct < -5)
                                     return const SizedBox.shrink();
-                                  }
                                   return AppText(
                                     "${pct.toInt()}%",
                                     fontSize: 10,
