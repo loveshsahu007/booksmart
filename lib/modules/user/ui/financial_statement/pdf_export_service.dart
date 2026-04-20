@@ -456,11 +456,12 @@ class PdfExportService {
     required _StatementDummy statement,
   }) {
     final grid = pdf_gen.PdfGrid();
-    final colCount = labels.length + 1;
+    final colCount = labels.length + 2; // Description + periods + total
     grid.columns.add(count: colCount);
     grid.columns[0].width = 220;
     for (var i = 1; i < colCount; i++) {
-      grid.columns[i].width = (page.getClientSize().width - 260) / labels.length;
+      grid.columns[i].width =
+          (page.getClientSize().width - 260) / (labels.length + 1);
     }
 
     final header = grid.headers.add(1)[0];
@@ -468,6 +469,7 @@ class PdfExportService {
     for (var i = 0; i < labels.length; i++) {
       header.cells[i + 1].value = labels[i];
     }
+    header.cells[colCount - 1].value = 'TOTAL';
     header.style = pdf_gen.PdfGridRowStyle(
       backgroundBrush: pdf_gen.PdfSolidBrush(sectionColor),
       textBrush: pdf_gen.PdfBrushes.white,
@@ -493,12 +495,19 @@ class PdfExportService {
       for (final row in section.rows.where((r) => !r.values.every((v) => v == 0))) {
         final dataRow = grid.rows.add();
         dataRow.cells[0].value = row.label;
+        double rowTotal = 0;
         for (var i = 0; i < labels.length; i++) {
-          dataRow.cells[i + 1].value = _money(row.values[i]);
+          final value = row.values[i];
+          rowTotal += value;
+          dataRow.cells[i + 1].value = _money(value);
           dataRow.cells[i + 1].style = pdf_gen.PdfGridCellStyle(
             format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
           );
         }
+        dataRow.cells[colCount - 1].value = _money(rowTotal);
+        dataRow.cells[colCount - 1].style = pdf_gen.PdfGridCellStyle(
+          format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
+        );
         if (row.isBold) {
           dataRow.style = pdf_gen.PdfGridRowStyle(font: bodyBold);
         } else {
@@ -509,12 +518,19 @@ class PdfExportService {
 
     final netRow = grid.rows.add();
     netRow.cells[0].value = 'Net Profit';
+    double netTotal = 0;
     for (var i = 0; i < labels.length; i++) {
-      netRow.cells[i + 1].value = _money(statement.netProfit[i]);
+      final value = statement.netProfit[i];
+      netTotal += value;
+      netRow.cells[i + 1].value = _money(value);
       netRow.cells[i + 1].style = pdf_gen.PdfGridCellStyle(
         format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
       );
     }
+    netRow.cells[colCount - 1].value = _money(netTotal);
+    netRow.cells[colCount - 1].style = pdf_gen.PdfGridCellStyle(
+      format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
+    );
     netRow.style = pdf_gen.PdfGridRowStyle(
       backgroundBrush: pdf_gen.PdfSolidBrush(sectionColor),
       textBrush: pdf_gen.PdfBrushes.white,

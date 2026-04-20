@@ -8,7 +8,7 @@ import 'package:path/path.dart' as path;
 
 import '../../../../widgets/custom_drop_down.dart';
 
-void showUploadTaxDocumentDialog() {
+void showUploadTaxDocumentDialog({String? type}) {
   Get.generalDialog(
     pageBuilder: (context, animation, secondaryAnimation) {
       return Align(
@@ -30,7 +30,7 @@ void showUploadTaxDocumentDialog() {
       );
     },
     barrierDismissible: false,
-    barrierLabel: 'showUploadTaxDocumentDialog',
+    barrierLabel: 'showUploadTaxDocumentDialog_${type ?? 'general'}',
   );
 }
 
