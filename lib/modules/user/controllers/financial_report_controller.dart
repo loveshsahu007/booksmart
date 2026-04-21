@@ -3,6 +3,7 @@ import 'package:booksmart/modules/user/controllers/organization_controller.dart'
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/utils/supabase.dart';
+import 'package:booksmart/widgets/snackbar.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart' as intl;
 
@@ -200,9 +201,8 @@ class FinancialReportController extends GetxController {
   }
 
   double get prevPeriodCurrentRatio {
-    if (prevPeriodCurrentLiabilities.value == 0) {
+    if (prevPeriodCurrentLiabilities.value == 0)
       return prevPeriodCurrentAssets.value > 0 ? 5.0 : 0.0;
-    }
     return prevPeriodCurrentAssets.value / prevPeriodCurrentLiabilities.value;
   }
 
@@ -277,18 +277,21 @@ class FinancialReportController extends GetxController {
       isLoading.value = true;
       update();
 
-      if (startDate != null && endDate != null) {
-        lastStartDate = startDate;
-        lastEndDate = endDate;
+      DateTime effectiveStart = _dateOnly(startDate ?? firstDayOfYear);
+      DateTime effectiveEnd = _dateOnly(endDate ?? today);
+      if (effectiveStart.isAfter(effectiveEnd)) {
+        final tmp = effectiveStart;
+        effectiveStart = effectiveEnd;
+        effectiveEnd = tmp;
       }
+      lastStartDate = effectiveStart;
+      lastEndDate = effectiveEnd;
 
       DateTime pStart;
       DateTime pEnd;
-      if (startDate != null && endDate != null) {
-        final s = _dateOnly(startDate);
-        final e = _dateOnly(endDate);
-        final inclusiveDays = e.difference(s).inDays + 1;
-        pEnd = s.subtract(const Duration(days: 1));
+      if (!effectiveStart.isAfter(effectiveEnd)) {
+        final inclusiveDays = effectiveEnd.difference(effectiveStart).inDays + 1;
+        pEnd = effectiveStart.subtract(const Duration(days: 1));
         pStart = pEnd.subtract(Duration(days: inclusiveDays - 1));
       } else {
         pStart = DateTime(now.year - 1, 1, 1);
@@ -305,13 +308,8 @@ class FinancialReportController extends GetxController {
           .from(SupabaseTable.transaction)
           .select()
           .eq('org_id', orgId);
-      if (startDate != null && endDate != null) {
-        query = query.gte('date_time', _sqlDateLocal(startDate));
-        query = query.lt('date_time', _sqlDateLocal(_nextDay(endDate)));
-      } else {
-        query = query.gte('date_time', _sqlDateLocal(firstDayOfYear));
-        query = query.lt('date_time', _sqlDateLocal(_nextDay(today)));
-      }
+      query = query.gte('date_time', _sqlDateLocal(effectiveStart));
+      query = query.lt('date_time', _sqlDateLocal(_nextDay(effectiveEnd)));
 
       final res = await query;
       final List<TransactionModel> currentTransactions = (res as List)
@@ -330,7 +328,7 @@ class FinancialReportController extends GetxController {
           .map((e) => TransactionModel.fromJson(e))
           .toList();
 
-      final DateTime reportStart = _dateOnly(startDate ?? firstDayOfYear);
+      final DateTime reportStart = effectiveStart;
       final openingRes = await supabase
           .from(SupabaseTable.transaction)
           .select()
@@ -352,8 +350,8 @@ class FinancialReportController extends GetxController {
       _calculateMetrics(
         currentTransactions,
         previousTransactions,
-        startDate: startDate ?? firstDayOfYear,
-        endDate: endDate ?? today,
+        startDate: effectiveStart,
+        endDate: effectiveEnd,
         prevStart: pStart,
         prevEnd: pEnd,
         openingCash: openingCash,
@@ -418,9 +416,8 @@ class FinancialReportController extends GetxController {
           }
         }
 
-        if (title.contains("depreciation") || title.contains("amortization")) {
+        if (title.contains("depreciation") || title.contains("amortization"))
           dep += amt;
-        }
       }
       return {
         'income': inc,
@@ -438,10 +435,12 @@ class FinancialReportController extends GetxController {
     totalExpenses.value = cT['expense']!;
     netIncome.value = totalIncome.value - totalExpenses.value;
     cogs.value = cT['cogs']!;
+    operatingExpenses.value = cT['opex']!;
     grossProfit.value = totalIncome.value - totalExpenses.value;
     grossMarginPct.value = totalIncome.value != 0
         ? (grossProfit.value / totalIncome.value) * 100
         : 0;
+    netOperatingIncome.value = grossProfit.value - operatingExpenses.value;
     ebitda.value = netIncome.value + cT['dep']!;
 
     prevPeriodIncome.value = pT['income']!;
@@ -456,6 +455,7 @@ class FinancialReportController extends GetxController {
         prevPeriodIncome.value - prevPeriodExpenses.value;
     prevPeriodEbitda.value = prevPeriodNetIncome.value + pT['dep']!;
 
+    double taxDeductions = 0;
     double opAdj = 0,
         wcChg = 0,
         opOther = 0,
@@ -465,7 +465,6 @@ class FinancialReportController extends GetxController {
         ownCont = 0,
         dist = 0,
         finOther = 0;
-
     Map<String, double> incBreakdown = {};
     Map<String, double> expBreakdown = {};
 
@@ -497,7 +496,7 @@ class FinancialReportController extends GetxController {
       double absAmt = tx.amount.abs();
       // Use yyyy-MM as key to differentiate months across years
       String mKey = intl.DateFormat('yyyy-MM').format(tx.dateTime);
-      if (!monthlyMap.containsKey(mKey)) {
+      if (!monthlyMap.containsKey(mKey))
         monthlyMap[mKey] = {
           'income': 0,
           'expense': 0,
@@ -505,7 +504,6 @@ class FinancialReportController extends GetxController {
           'net': 0,
           'dep': 0,
         };
-      }
 
       // Initialize periodic maps for this mKey
       pInc[mKey] ??= {};
@@ -557,8 +555,7 @@ class FinancialReportController extends GetxController {
           title.contains('equity') ||
           title.contains('capital') ||
           title.contains('[equity]');
-      final bool isAssetLike =
-          title.contains('[asset') || title.contains('asset');
+      final bool isAssetLike = title.contains('[asset') || title.contains('asset');
       final bool isCurrentForOther =
           title.contains('cash') ||
           title.contains('bank') ||
@@ -627,9 +624,8 @@ class FinancialReportController extends GetxController {
         pNetInc[mKey] = (pNetInc[mKey] ?? 0) + absAmt;
       } else if (isExpense) {
         monthlyMap[mKey]!['expense'] = monthlyMap[mKey]!['expense']! + absAmt;
-        if (isCogs) {
+        if (isCogs)
           monthlyMap[mKey]!['cogs'] = monthlyMap[mKey]!['cogs']! + absAmt;
-        }
         expBreakdown[cleanTitle] = (expBreakdown[cleanTitle] ?? 0) + absAmt;
         pExp[mKey]![cleanTitle] = (pExp[mKey]![cleanTitle] ?? 0) + absAmt;
         pNetInc[mKey] = (pNetInc[mKey] ?? 0) - absAmt;
@@ -763,11 +759,86 @@ class FinancialReportController extends GetxController {
         monthlyMap[mKey]!['dep'] = monthlyMap[mKey]!['dep']! + absAmt;
         opAdj += absAmt;
       }
+
+      if (tx.deductible) taxDeductions += absAmt;
+    }
+
+    Map<String, double> balanceTotals(List<TransactionModel> txs) {
+      double bCash = 0;
+      double bTaggedCurrent = 0;
+      double bAr = 0;
+      double bInventory = 0;
+      double bFixed = 0;
+      double bOther = 0;
+      double bCurLiab = 0;
+      double bLongLiab = 0;
+
+      for (final tx in txs) {
+        final title = tx.title.toLowerCase();
+        final absAmt = tx.amount.abs();
+        final isCashLike =
+            title.contains('cash') ||
+            title.contains('bank') ||
+            title.contains('checking') ||
+            title.contains('savings');
+        final isTaggedCurrentAsset = title.contains('[asset:current]');
+        final isReceivableLike =
+            title.contains('receivable') || title.contains('customer owes');
+        final isInventoryLike =
+            title.contains('inventory') || title.contains('stock');
+        final isFixedAssetLike =
+            title.contains('equipment') ||
+            title.contains('property') ||
+            title.contains('vehicle') ||
+            title.contains('furniture') ||
+            title.contains('[asset:non-current]');
+        final isCurrentLiabilityLike =
+            title.contains('payable') ||
+            title.contains('credit card') ||
+            title.contains('[liab:current]');
+        final isLongTermLiabilityLike =
+            title.contains('loan') ||
+            title.contains('mortgage') ||
+            title.contains('debt:long') ||
+            title.contains('[liab:long-term]');
+        final isAssetLike = title.contains('[asset') || title.contains('asset');
+        final isCurrentForOther =
+            title.contains('cash') ||
+            title.contains('bank') ||
+            title.contains('receivable') ||
+            title.contains('inventory') ||
+            title.contains('[asset:current]');
+        final isFixedForOther =
+            title.contains('equipment') ||
+            title.contains('property') ||
+            title.contains('vehicle') ||
+            title.contains('[asset:non-current]');
+
+        if (isCashLike) bCash += absAmt;
+        if (isTaggedCurrentAsset) bTaggedCurrent += absAmt;
+        if (isReceivableLike) bAr += absAmt;
+        if (isInventoryLike) bInventory += absAmt;
+        if (isFixedAssetLike) {
+          bFixed += title.contains('depreciation') ? -absAmt : absAmt;
+        }
+        if (isAssetLike && !isCurrentForOther && !isFixedForOther) {
+          bOther += absAmt;
+        }
+        if (isCurrentLiabilityLike) bCurLiab += absAmt;
+        if (isLongTermLiabilityLike) bLongLiab += absAmt;
+      }
+
+      final computedAssets = bCash + bAr + bInventory + bFixed + bOther;
+      return {
+        'assets': computedAssets,
+        'liabilities': bCurLiab + bLongLiab,
+        'currentAssets': bTaggedCurrent + bCash + bAr + bInventory,
+        'currentLiabilities': bCurLiab,
+      };
     }
 
     currentAssetsBreakdown.value = {
-      if (taggedCurrentAssetsTotal > 0)
-        "Current Assets": taggedCurrentAssetsTotal,
+      if (taggedCurrentAssetsTotal > 0) "Current Assets": taggedCurrentAssetsTotal,
       "Cash": cashTotal,
       "Accounts Receivable": arTotal,
       if (inventoryTotal > 0) "Inventory": inventoryTotal,
@@ -787,6 +858,30 @@ class FinancialReportController extends GetxController {
         fixedAssetsTotal +
         otherAssetsTotal;
     totalLiabilities.value = curLiabTotal + longTermLiabTotal;
+    totalTaxDeductions.value = taxDeductions;
+
+    final prevBalance = balanceTotals(prevTransactions);
+    prevPeriodAssets.value = prevBalance['assets'] ?? 0.0;
+    prevPeriodLiabilities.value = prevBalance['liabilities'] ?? 0.0;
+    prevPeriodCurrentAssets.value = prevBalance['currentAssets'] ?? 0.0;
+    prevPeriodCurrentLiabilities.value =
+        prevBalance['currentLiabilities'] ?? 0.0;
+
+    final prevEquity = prevPeriodAssets.value - prevPeriodLiabilities.value;
+    final currEquity = totalAssets.value - totalLiabilities.value;
+    assetsChange.value = prevPeriodAssets.value != 0
+        ? ((totalAssets.value - prevPeriodAssets.value) /
+                prevPeriodAssets.value) *
+            100
+        : (totalAssets.value > 0 ? 100 : 0);
+    liabilitiesChange.value = prevPeriodLiabilities.value != 0
+        ? ((totalLiabilities.value - prevPeriodLiabilities.value) /
+                prevPeriodLiabilities.value) *
+            100
+        : (totalLiabilities.value > 0 ? 100 : 0);
+    equityChange.value = prevEquity != 0
+        ? ((currEquity - prevEquity) / prevEquity) * 100
+        : (currEquity > 0 ? 100 : 0);
 
     operatingAdjustments.value = opAdj;
     workingCapitalChanges.value = wcChg;
@@ -803,11 +898,8 @@ class FinancialReportController extends GetxController {
     financingCashFlow.value = loanAct + ownCont + dist + finOther;
     beginningCashBalance.value = openingCash;
     netChangeInCash.value =
-        operatingCashFlow.value +
-        investingCashFlow.value +
-        financingCashFlow.value;
-    endingCashBalance.value =
-        beginningCashBalance.value + netChangeInCash.value;
+        operatingCashFlow.value + investingCashFlow.value + financingCashFlow.value;
+    endingCashBalance.value = beginningCashBalance.value + netChangeInCash.value;
 
     incomeBreakdown.assignAll(incBreakdown);
     expenseBreakdown.assignAll(expBreakdown);

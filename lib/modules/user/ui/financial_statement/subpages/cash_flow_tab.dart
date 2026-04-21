@@ -16,8 +16,12 @@ import 'package:booksmart/widgets/recent_documents_widget.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/pdf_export_service.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/export_modal_widget.dart';
 import 'package:booksmart/modules/user/utils/cash_flow_manual_entry_service.dart';
+import 'package:syncfusion_flutter_pdf/pdf.dart' as pdf_gen;
+import 'dart:convert';
 import 'dart:developer' as dev;
 import 'package:booksmart/widgets/snackbar.dart';
+import 'package:flutter/cupertino.dart';
+import 'dart:ui' as ui;
 import 'package:booksmart/utils/downloader.dart';
 import 'package:xml/xml.dart';
 import 'package:booksmart/models/cash_flow_manual_entry_model.dart';
@@ -59,21 +63,24 @@ class _CashFlowTabState extends State<CashFlowTab> {
     _endDate = today;
   }
 
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  bool _isSameRange(DateTime start, DateTime end) {
+    if (_startDate == null || _endDate == null) return false;
+    return _dateOnly(_startDate!) == _dateOnly(start) &&
+        _dateOnly(_endDate!) == _dateOnly(end);
+  }
+
   void _exportCSV(FinancialReportController controller) async {
     final buffer = StringBuffer();
     final String orgName = getCurrentOrganization?.name ?? 'Organization';
-    final String periodLabel =
-        "${DateFormat('MM-dd-yyyy').format(_startDate ?? DateTime.now())}_to_${DateFormat('MM-dd-yyyy').format(_endDate ?? DateTime.now())}";
-
+    final String periodLabel = "${DateFormat('MM-dd-yyyy').format(_startDate ?? DateTime.now())}_to_${DateFormat('MM-dd-yyyy').format(_endDate ?? DateTime.now())}";
+    
     buffer.writeln('Cash Flow Statement - $orgName');
     buffer.writeln('Period: $periodLabel');
     buffer.writeln('');
 
-    void addActivitySection(
-      String title,
-      List<Map<String, dynamic>> items,
-      double total,
-    ) {
+    void addActivitySection(String title, List<Map<String, dynamic>> items, double total) {
       buffer.writeln(title.toUpperCase());
       buffer.writeln('Activity Item,Amount');
       for (var item in items) {
@@ -83,40 +90,54 @@ class _CashFlowTabState extends State<CashFlowTab> {
       buffer.writeln('');
     }
 
-    addActivitySection(
-      'Operating Activities',
-      _getOperatingItems(controller),
-      controller.operatingCashFlow.value,
-    );
-    addActivitySection(
-      'Investing Activities',
-      _getInvestingItems(controller),
-      controller.investingCashFlow.value,
-    );
-    addActivitySection(
-      'Financing Activities',
-      _getFinancingItems(controller),
-      controller.financingCashFlow.value,
-    );
+    addActivitySection('Operating Activities', _getOperatingItems(controller), controller.operatingCashFlow.value);
+    addActivitySection('Investing Activities', _getInvestingItems(controller), controller.investingCashFlow.value);
+    addActivitySection('Financing Activities', _getFinancingItems(controller), controller.financingCashFlow.value);
 
-    final netCash =
-        controller.operatingCashFlow.value +
-        controller.investingCashFlow.value +
-        controller.financingCashFlow.value;
+    final netCash = controller.operatingCashFlow.value + controller.investingCashFlow.value + controller.financingCashFlow.value;
     buffer.writeln('NET CHANGE IN CASH,$netCash');
 
     final csvBytes = utf8.encode(buffer.toString());
-    await downloadFile(
-      '${orgName}_Cash_Flow_$periodLabel.csv',
-      csvBytes,
-      mimeType: 'text/csv',
-    );
+    await downloadFile('${orgName}_Cash_Flow_$periodLabel.csv', csvBytes, mimeType: 'text/csv');
   }
 
-  CashFlowPdfData _buildCashFlowPdfData(
+  void _exportPDF(FinancialReportController controller) async {
+    try {
+      if (_startDate == null || _endDate == null) {
+        showSnackBar('Please select a valid date range.', isError: true);
+        return;
+      }
+
+      final start = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+      final end = DateTime(_endDate!.year, _endDate!.month, _endDate!.day);
+      final totalMonths = (end.year - start.year) * 12 + end.month - start.month + 1;
+
+      // Keep existing filter behavior, but enforce 5-column export constraints.
+      final PdfViewType viewType = _selectedFilterIdx == 4
+          ? PdfViewType.yearly
+          : (totalMonths <= 5 ? PdfViewType.monthly : PdfViewType.quarterly);
+
+      final request = PdfExportRequest(
+        startDate: start,
+        endDate: end,
+        viewType: viewType,
+        templateVariant: PdfTemplateVariant.templateA,
+        companyName: getCurrentOrganization?.name ?? 'Organization',
+        companyAddress: '',
+      );
+
+      await PdfExportService().exportCashFlowPresentationPdf(request);
+
+    } catch (e, st) {
+      dev.log('PDF Export Error: $e\n$st');
+      showSnackBar('Please review PDF generation: $e', isError: true);
+    }
+  }
+
+  Future<CashFlowPdfData> _buildCashFlowPdfData(
     FinancialReportController controller,
     PdfExportRequest request,
-  ) {
+  ) async {
     final bucketLabels = PdfExportService().buildBucketLabels(
       request.startDate,
       request.endDate,
@@ -138,79 +159,100 @@ class _CashFlowTabState extends State<CashFlowTab> {
     final monthlyDistributions = <String, double>{};
     final monthlyFinancingOther = <String, double>{};
     final monthlyFinancingTotal = <String, double>{};
+    final monthlyDepFromTransactions = <String, double>{};
 
-    DateTime cursor = DateTime(
-      request.startDate.year,
-      request.startDate.month,
-      1,
-    );
-    final DateTime last = DateTime(
-      request.endDate.year,
-      request.endDate.month,
-      1,
-    );
+    String sqlDateLocal(DateTime d) {
+      final x = DateTime(d.year, d.month, d.day);
+      final mm = x.month.toString().padLeft(2, '0');
+      final dd = x.day.toString().padLeft(2, '0');
+      return '${x.year}-$mm-$dd';
+    }
+
+    DateTime nextDay(DateTime d) => DateTime(d.year, d.month, d.day + 1);
+
+    final orgId = getCurrentOrganization?.id;
+    if (orgId != null) {
+      final txRows = await supabase
+          .from(SupabaseTable.transaction)
+          .select('date_time,title,amount')
+          .eq('org_id', orgId)
+          .gte('date_time', sqlDateLocal(request.startDate))
+          .lt('date_time', sqlDateLocal(nextDay(request.endDate)));
+
+      for (final row in (txRows as List)) {
+        final rawTitle = (row['title'] ?? '').toString().toLowerCase();
+        final rawAmount = row['amount'];
+        final double amount = rawAmount is num
+            ? rawAmount.toDouble()
+            : (double.tryParse(rawAmount?.toString() ?? '0') ?? 0.0);
+        final rawDate = (row['date_time'] ?? '').toString();
+        final DateTime? dateTime = DateTime.tryParse(rawDate);
+        if (dateTime == null) continue;
+        if (rawTitle.contains('depreciation') ||
+            rawTitle.contains('amortization') ||
+            rawTitle.contains('[cf:adjustments]')) {
+          final monthKey = DateFormat('yyyy-MM').format(dateTime);
+          monthlyDepFromTransactions[monthKey] =
+              (monthlyDepFromTransactions[monthKey] ?? 0) + amount.abs();
+        }
+      }
+    }
+
+    DateTime cursor = DateTime(request.startDate.year, request.startDate.month, 1);
+    final DateTime last = DateTime(request.endDate.year, request.endDate.month, 1);
     while (!cursor.isAfter(last)) {
       final monthKey = DateFormat('yyyy-MM').format(cursor);
 
       final netIncome = controller.periodicNetIncome[monthKey] ?? 0.0;
-      final expenseMap =
-          controller.periodicExpenseBreakdown[monthKey] ?? <String, double>{};
+      final expenseMap = controller.periodicExpenseBreakdown[monthKey] ?? <String, double>{};
       final operatingMap =
-          controller.periodicOperatingActivities[monthKey] ??
-          <String, double>{};
+          controller.periodicOperatingActivities[monthKey] ?? <String, double>{};
       final investingMap =
-          controller.periodicInvestingActivities[monthKey] ??
-          <String, double>{};
+          controller.periodicInvestingActivities[monthKey] ?? <String, double>{};
       final financingMap =
-          controller.periodicFinancingActivities[monthKey] ??
-          <String, double>{};
+          controller.periodicFinancingActivities[monthKey] ?? <String, double>{};
 
-      final depAmort = _sumByKeywords(expenseMap, const [
-        'depreciation',
-        'amortization',
-      ]);
-      final wcChanges = _sumByKeywords(operatingMap, const [
-        'receivable',
-        'inventory',
-        'payable',
-        'accrued',
-        'deferred',
-        'prepaid',
-        '[cf:workingcapital]',
-      ]);
+      final depAmort = monthlyDepFromTransactions[monthKey] ??
+          _sumByKeywords(
+            expenseMap,
+            const ['depreciation', 'amortization'],
+          );
+      final wcChanges = _sumByKeywords(
+        operatingMap,
+        const [
+          'receivable',
+          'inventory',
+          'payable',
+          'accrued',
+          'deferred',
+          'prepaid',
+          '[cf:workingcapital]',
+        ],
+      );
       final operatingOther = _sumValues(operatingMap) - wcChanges;
       final operatingTotal = netIncome + depAmort + wcChanges + operatingOther;
 
-      final capex = _sumByKeywords(investingMap, const [
-        'equipment',
-        'property',
-        'asset purchase',
-        '[cf:investing]',
-      ]);
+      final capex = _sumByKeywords(
+        investingMap,
+        const ['equipment', 'property', 'asset purchase', '[cf:investing]'],
+      );
       final investingOther = _sumValues(investingMap) - capex;
       final investingTotal = capex + investingOther;
 
-      final loanActivities = _sumByKeywords(financingMap, const [
-        'loan',
-        'debt',
-        '[cf:financing]',
-      ]);
-      final ownerContributions = _sumByKeywords(financingMap, const [
-        'contribution',
-        'share capital',
-        '[cf:contribution]',
-      ]);
-      final distributions = _sumByKeywords(financingMap, const [
-        'distribution',
-        'dividend',
-        'owner draw',
-        '[cf:distributions]',
-      ]);
+      final loanActivities = _sumByKeywords(
+        financingMap,
+        const ['loan', 'debt', '[cf:financing]'],
+      );
+      final ownerContributions = _sumByKeywords(
+        financingMap,
+        const ['contribution', 'share capital', '[cf:contribution]'],
+      );
+      final distributions = _sumByKeywords(
+        financingMap,
+        const ['distribution', 'dividend', 'owner draw', '[cf:distributions]'],
+      );
       final financingOther =
-          _sumValues(financingMap) -
-          loanActivities -
-          ownerContributions -
-          distributions;
+          _sumValues(financingMap) - loanActivities - ownerContributions - distributions;
       final financingTotal =
           loanActivities + ownerContributions + distributions + financingOther;
 
@@ -301,20 +343,75 @@ class _CashFlowTabState extends State<CashFlowTab> {
       request.viewType,
     );
 
-    final opTotalSeries = _valuesFromBuckets(opTotalByBucket, bucketLabels);
-    final investingTotalSeries = _valuesFromBuckets(
-      investingTotalByBucket,
-      bucketLabels,
+    final netIncomeSeries = _valuesFromBuckets(netIncomeByBucket, bucketLabels);
+    final depSeries = _valuesFromBuckets(depByBucket, bucketLabels);
+    final wcSeries = _valuesFromBuckets(wcByBucket, bucketLabels);
+    final opOtherSeries = _valuesFromBuckets(opOtherByBucket, bucketLabels);
+    final capexSeries = _valuesFromBuckets(capexByBucket, bucketLabels);
+    final investingOtherSeries =
+        _valuesFromBuckets(investingOtherByBucket, bucketLabels);
+    final loanSeries = _valuesFromBuckets(loanByBucket, bucketLabels);
+    final contributionSeries = _valuesFromBuckets(contribByBucket, bucketLabels);
+    final distributionsSeries =
+        _valuesFromBuckets(distributionsByBucket, bucketLabels);
+    final financingOtherSeries = _valuesFromBuckets(finOtherByBucket, bucketLabels);
+
+    List<double> recomputeTotalSeries(List<List<double>> parts) {
+      return List<double>.generate(
+        bucketLabels.length,
+        (i) => parts.fold<double>(0.0, (sum, p) => sum + p[i]),
+      );
+    }
+
+    void alignSectionToDashboardTotal(
+      List<double> sectionTotal,
+      List<double> adjustableComponent,
+      double targetTotal,
+    ) {
+      if (sectionTotal.isEmpty || adjustableComponent.isEmpty) return;
+      final current = sectionTotal.fold<double>(0.0, (a, b) => a + b);
+      final delta = targetTotal - current;
+      if (delta.abs() < 0.000001) return;
+      final lastIdx = sectionTotal.length - 1;
+      sectionTotal[lastIdx] += delta;
+      adjustableComponent[lastIdx] += delta;
+    }
+
+    var opTotalSeries = recomputeTotalSeries(
+      [netIncomeSeries, depSeries, wcSeries, opOtherSeries],
     );
-    final financingTotalSeries = _valuesFromBuckets(
-      financingTotalByBucket,
-      bucketLabels,
+    var investingTotalSeries = recomputeTotalSeries(
+      [capexSeries, investingOtherSeries],
+    );
+    var financingTotalSeries = recomputeTotalSeries(
+      [loanSeries, contributionSeries, distributionsSeries, financingOtherSeries],
     );
 
-    final netChangeSeries = List<double>.generate(
+    // Keep exported totals exactly in sync with dashboard cards.
+    alignSectionToDashboardTotal(
+      opTotalSeries,
+      opOtherSeries,
+      controller.operatingCashFlow.value,
+    );
+    alignSectionToDashboardTotal(
+      investingTotalSeries,
+      investingOtherSeries,
+      controller.investingCashFlow.value,
+    );
+    alignSectionToDashboardTotal(
+      financingTotalSeries,
+      financingOtherSeries,
+      controller.financingCashFlow.value,
+    );
+
+    var netChangeSeries = List<double>.generate(
       bucketLabels.length,
-      (i) =>
-          opTotalSeries[i] + investingTotalSeries[i] + financingTotalSeries[i],
+      (i) => opTotalSeries[i] + investingTotalSeries[i] + financingTotalSeries[i],
+    );
+    alignSectionToDashboardTotal(
+      netChangeSeries,
+      financingOtherSeries,
+      controller.netChangeInCash.value,
     );
 
     final beginningCashSeries = <double>[];
@@ -333,24 +430,25 @@ class _CashFlowTabState extends State<CashFlowTab> {
           rows: [
             CashFlowPdfRowData(
               label: 'Net income',
-              values: _valuesFromBuckets(netIncomeByBucket, bucketLabels),
+              values: netIncomeSeries,
             ),
             CashFlowPdfRowData(
               label: 'Depreciation & amortization',
-              values: _valuesFromBuckets(depByBucket, bucketLabels),
+              values: depSeries,
             ),
             CashFlowPdfRowData(
               label: 'Working capital changes',
-              values: _valuesFromBuckets(wcByBucket, bucketLabels),
+              values: wcSeries,
             ),
             CashFlowPdfRowData(
               label: 'Other operating adjustments',
-              values: _valuesFromBuckets(opOtherByBucket, bucketLabels),
+              values: opOtherSeries,
             ),
             CashFlowPdfRowData(
               label: 'Net Cash from Operating Activities (A)',
               values: opTotalSeries,
               isTotal: true,
+              periodTotalOverride: controller.operatingCashFlow.value,
             ),
           ],
         ),
@@ -359,16 +457,17 @@ class _CashFlowTabState extends State<CashFlowTab> {
           rows: [
             CashFlowPdfRowData(
               label: 'Asset purchases / CapEx',
-              values: _valuesFromBuckets(capexByBucket, bucketLabels),
+              values: capexSeries,
             ),
             CashFlowPdfRowData(
               label: 'Other investing activities',
-              values: _valuesFromBuckets(investingOtherByBucket, bucketLabels),
+              values: investingOtherSeries,
             ),
             CashFlowPdfRowData(
               label: 'Net Cash from Investing Activities (B)',
               values: investingTotalSeries,
               isTotal: true,
+              periodTotalOverride: controller.investingCashFlow.value,
             ),
           ],
         ),
@@ -377,24 +476,25 @@ class _CashFlowTabState extends State<CashFlowTab> {
           rows: [
             CashFlowPdfRowData(
               label: 'Loan activities',
-              values: _valuesFromBuckets(loanByBucket, bucketLabels),
+              values: loanSeries,
             ),
             CashFlowPdfRowData(
               label: 'Owner contributions',
-              values: _valuesFromBuckets(contribByBucket, bucketLabels),
+              values: contributionSeries,
             ),
             CashFlowPdfRowData(
               label: 'Distributions',
-              values: _valuesFromBuckets(distributionsByBucket, bucketLabels),
+              values: distributionsSeries,
             ),
             CashFlowPdfRowData(
               label: 'Other financing activities',
-              values: _valuesFromBuckets(finOtherByBucket, bucketLabels),
+              values: financingOtherSeries,
             ),
             CashFlowPdfRowData(
               label: 'Net Cash from Financing Activities (C)',
               values: financingTotalSeries,
               isTotal: true,
+              periodTotalOverride: controller.financingCashFlow.value,
             ),
           ],
         ),
@@ -402,6 +502,12 @@ class _CashFlowTabState extends State<CashFlowTab> {
       netChange: netChangeSeries,
       beginningCash: beginningCashSeries,
       endingCash: endingCashSeries,
+      operatingTotal: controller.operatingCashFlow.value,
+      investingTotal: controller.investingCashFlow.value,
+      financingTotal: controller.financingCashFlow.value,
+      netChangeTotal: controller.netChangeInCash.value,
+      beginningCashTotal: controller.beginningCashBalance.value,
+      endingCashTotal: controller.endingCashBalance.value,
     );
   }
 
@@ -480,7 +586,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
       final DateTime reportEnd = selectedEnd.isBefore(selectedStart)
           ? selectedStart
           : selectedEnd;
-      final String orgName = org.name;
+      final String orgName = org.name ?? 'Organization';
       DateTime nextDay(DateTime d) => DateTime(d.year, d.month, d.day + 1);
       String sqlDateLocal(DateTime d) {
         final x = DateTime(d.year, d.month, d.day);
@@ -488,11 +594,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
         final dd = x.day.toString().padLeft(2, '0');
         return '${x.year}-$mm-$dd';
       }
-
       String cleanTitle(String raw) {
         return raw.replaceAll(RegExp(r'\[[^\]]+\]'), '').trim();
       }
-
       List<String> extractTags(String title) {
         return RegExp(r'\[([^\]]+)\]')
             .allMatches(title)
@@ -500,7 +604,6 @@ class _CashFlowTabState extends State<CashFlowTab> {
             .where((x) => x.isNotEmpty)
             .toList();
       }
-
       String classifyFlowSection(String titleLower) {
         if (titleLower.contains('[cf:manual:operating]') ||
             titleLower.contains('[cf:manual:other]')) {
@@ -534,10 +637,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
       }
 
       final totalMonths =
-          (reportEnd.year - reportStart.year) * 12 +
-          reportEnd.month -
-          reportStart.month +
-          1;
+          (reportEnd.year - reportStart.year) * 12 + reportEnd.month - reportStart.month + 1;
       final PdfViewType viewType = _selectedFilterIdx == 4
           ? PdfViewType.yearly
           : (totalMonths <= 5 ? PdfViewType.monthly : PdfViewType.quarterly);
@@ -549,12 +649,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
         companyName: orgName,
         companyAddress: '',
       );
-      final liveData = _buildCashFlowPdfData(controller, request);
-      final bucketLabels = PdfExportService().buildBucketLabels(
-        reportStart,
-        reportEnd,
-        viewType,
-      );
+      final liveData = await _buildCashFlowPdfData(controller, request);
+      final bucketLabels =
+          PdfExportService().buildBucketLabels(reportStart, reportEnd, viewType);
       final keys = List<String>.generate(bucketLabels.length, (i) => 'b$i');
       final Map<String, String> keyToLabel = {
         for (int i = 0; i < keys.length; i++) keys[i]: bucketLabels[i],
@@ -571,7 +668,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
       }
 
       Map<String, double> mapFromSeries(List<double> values) {
-        return {for (int i = 0; i < keys.length; i++) keys[i]: values[i]};
+        return {
+          for (int i = 0; i < keys.length; i++) keys[i]: values[i],
+        };
       }
 
       final netIncomeMap = mapFromSeries(
@@ -587,22 +686,13 @@ class _CashFlowTabState extends State<CashFlowTab> {
         seriesFor('Operating Activities', 'Other operating adjustments'),
       );
       final operatingMap = mapFromSeries(
-        seriesFor(
-          'Operating Activities',
-          'Net Cash from Operating Activities (A)',
-        ),
+        seriesFor('Operating Activities', 'Net Cash from Operating Activities (A)'),
       );
       final investingMap = mapFromSeries(
-        seriesFor(
-          'Investing Activities',
-          'Net Cash from Investing Activities (B)',
-        ),
+        seriesFor('Investing Activities', 'Net Cash from Investing Activities (B)'),
       );
       final financingMap = mapFromSeries(
-        seriesFor(
-          'Financing Activities',
-          'Net Cash from Financing Activities (C)',
-        ),
+        seriesFor('Financing Activities', 'Net Cash from Financing Activities (C)'),
       );
       final netChangeMap = mapFromSeries(liveData.netChange);
       final beginningCashMap = mapFromSeries(liveData.beginningCash);
@@ -611,20 +701,34 @@ class _CashFlowTabState extends State<CashFlowTab> {
       final adjustmentsMap = {
         for (final k in keys) k: (depAmortMap[k] ?? 0) + (opOtherMap[k] ?? 0),
       };
+      double periodTotal(Map<String, double> values) =>
+          keys.fold<double>(0.0, (sum, key) => sum + (values[key] ?? 0.0));
+
+      void alignPeriodTotal(Map<String, double> values, double targetTotal) {
+        if (keys.isEmpty) return;
+        final currentTotal = periodTotal(values);
+        final delta = targetTotal - currentTotal;
+        final lastKey = keys.last;
+        values[lastKey] = (values[lastKey] ?? 0.0) + delta;
+      }
+
+      // Keep export period totals aligned with dashboard/controller totals.
+      alignPeriodTotal(netIncomeMap, controller.netIncome.value);
+      alignPeriodTotal(adjustmentsMap, controller.operatingAdjustments.value);
+      alignPeriodTotal(wcMap, controller.workingCapitalChanges.value);
+      alignPeriodTotal(operatingMap, controller.operatingCashFlow.value);
+      alignPeriodTotal(investingMap, controller.investingCashFlow.value);
+      alignPeriodTotal(financingMap, controller.financingCashFlow.value);
+      alignPeriodTotal(netChangeMap, controller.netChangeInCash.value);
+
       final reconciliationTotalMap = {
         for (final k in keys)
-          k:
-              (netIncomeMap[k] ?? 0) +
-              (adjustmentsMap[k] ?? 0) +
-              (wcMap[k] ?? 0),
+          k: (netIncomeMap[k] ?? 0) + (adjustmentsMap[k] ?? 0) + (wcMap[k] ?? 0),
       };
       final varianceMap = {
         for (final k in keys)
           k: (reconciliationTotalMap[k] ?? 0) - (netChangeMap[k] ?? 0),
       };
-
-      double periodTotal(Map<String, double> values) =>
-          keys.fold<double>(0.0, (sum, key) => sum + (values[key] ?? 0.0));
 
       final rangeRes = await supabase
           .from(SupabaseTable.transaction)
@@ -633,18 +737,27 @@ class _CashFlowTabState extends State<CashFlowTab> {
           .gte('date_time', sqlDateLocal(reportStart))
           .lt('date_time', sqlDateLocal(nextDay(reportEnd)));
 
-      final transactions =
-          (rangeRes as List).map((e) => TransactionModel.fromJson(e)).toList()
-            ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      final transactions = (rangeRes as List)
+          .map((e) => TransactionModel.fromJson(e))
+          .toList()
+        ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
 
       final excel = excel_lib.Excel.createExcel();
       final summary = excel['Cash Flow Summary'];
       final detail = excel['Transaction Detail'];
       final recon = excel['Reconciliation'];
-      excel.delete('Sheet1');
+      final existingSheets = List<String>.from(excel.tables.keys);
+      for (final name in existingSheets) {
+        final isDefaultSheet = name.toLowerCase().startsWith('sheet');
+        if (isDefaultSheet &&
+            name != 'Cash Flow Summary' &&
+            name != 'Transaction Detail' &&
+            name != 'Reconciliation') {
+          excel.delete(name);
+        }
+      }
 
-      final int totalCols =
-          keys.length + 2; // Description + buckets + period total
+      final int totalCols = keys.length + 2; // Description + buckets + period total
       const descCol = 0;
       const firstMonthCol = 1;
       final int ytdCol = keys.length + 1;
@@ -721,7 +834,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
       // Tab 1: Cash Flow Summary
       summary.setColumnWidth(descCol, 40);
       for (var c = firstMonthCol; c <= ytdCol; c++) {
-        summary.setColumnWidth(c, c == ytdCol ? 15 : 11);
+        summary.setColumnWidth(c, c == ytdCol ? 18 : 16);
       }
 
       for (int c = 0; c < totalCols; c++) {
@@ -768,20 +881,11 @@ class _CashFlowTabState extends State<CashFlowTab> {
         subTitleStyle,
       );
 
-      setCell(
-        summary,
-        0,
-        4,
-        excel_lib.TextCellValue('Grouped Columns'),
-        quarterBandStyle,
-      );
+      setCell(summary, 0, 4, excel_lib.TextCellValue('Grouped Columns'), quarterBandStyle);
       if (keys.isNotEmpty) {
         summary.merge(
           excel_lib.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 4),
-          excel_lib.CellIndex.indexByColumnRow(
-            columnIndex: ytdCol - 1,
-            rowIndex: 4,
-          ),
+          excel_lib.CellIndex.indexByColumnRow(columnIndex: ytdCol - 1, rowIndex: 4),
         );
         setCell(
           summary,
@@ -791,13 +895,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
           quarterBandStyle,
         );
       }
-      setCell(
-        summary,
-        ytdCol,
-        4,
-        excel_lib.TextCellValue('Period Total'),
-        quarterBandStyle,
-      );
+      setCell(summary, ytdCol, 4, excel_lib.TextCellValue('Period Total'), quarterBandStyle);
 
       setCell(summary, 0, 5, excel_lib.TextCellValue('Line Item'), headerStyle);
       for (int i = 0; i < keys.length; i++) {
@@ -809,13 +907,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
           headerStyle,
         );
       }
-      setCell(
-        summary,
-        ytdCol,
-        5,
-        excel_lib.TextCellValue('Period Total'),
-        headerStyle,
-      );
+      setCell(summary, ytdCol, 5, excel_lib.TextCellValue('Period Total'), headerStyle);
 
       int row = 7;
       void writeSection(String title) {
@@ -830,6 +922,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
         String label,
         Map<String, double> values, {
         bool total = false,
+        double? periodTotalOverride,
       }) {
         setCell(
           summary,
@@ -852,20 +945,33 @@ class _CashFlowTabState extends State<CashFlowTab> {
           summary,
           ytdCol,
           row,
-          excel_lib.DoubleCellValue(periodTotal(values)),
+          excel_lib.DoubleCellValue(periodTotalOverride ?? periodTotal(values)),
           total ? currencyTotalStyle : currencyStyle,
         );
         row++;
       }
 
       writeSection('Operating Activities');
-      writeMetricRow('Net Income', netIncomeMap);
-      writeMetricRow('Adjustments', adjustmentsMap);
-      writeMetricRow('Balance Sheet Changes', wcMap);
+      writeMetricRow(
+        'Net Income',
+        netIncomeMap,
+        periodTotalOverride: controller.netIncome.value,
+      );
+      writeMetricRow(
+        'Adjustments',
+        adjustmentsMap,
+        periodTotalOverride: controller.operatingAdjustments.value,
+      );
+      writeMetricRow(
+        'Balance Sheet Changes',
+        wcMap,
+        periodTotalOverride: controller.workingCapitalChanges.value,
+      );
       writeMetricRow(
         'Net Cash from Operating Activities',
         operatingMap,
         total: true,
+        periodTotalOverride: controller.operatingCashFlow.value,
       );
       row++;
 
@@ -874,6 +980,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
         'Net Cash from Investing Activities',
         investingMap,
         total: true,
+        periodTotalOverride: controller.investingCashFlow.value,
       );
       row++;
 
@@ -882,11 +989,17 @@ class _CashFlowTabState extends State<CashFlowTab> {
         'Net Cash from Financing Activities',
         financingMap,
         total: true,
+        periodTotalOverride: controller.financingCashFlow.value,
       );
       row++;
 
       writeSection('Cash Position');
-      writeMetricRow('Net Change in Cash', netChangeMap, total: true);
+      writeMetricRow(
+        'Net Change in Cash',
+        netChangeMap,
+        total: true,
+        periodTotalOverride: controller.netChangeInCash.value,
+      );
       writeMetricRow('Beginning Cash', beginningCashMap);
       writeMetricRow('Ending Cash', endingCashMap, total: true);
 
@@ -946,26 +1059,16 @@ class _CashFlowTabState extends State<CashFlowTab> {
         'Deductible',
       ];
       for (int c = 0; c < detailHeaders.length; c++) {
-        setCell(
-          detail,
-          c,
-          3,
-          excel_lib.TextCellValue(detailHeaders[c]),
-          headerStyle,
-        );
+        setCell(detail, c, 3, excel_lib.TextCellValue(detailHeaders[c]), headerStyle);
       }
 
       int detailRow = 4;
       for (final tx in transactions) {
         final tags = extractTags(tx.title);
         final titleLower = tx.title.toLowerCase();
-        final category =
-            (tx.plaidCategory?['primary']?.toString().trim().isNotEmpty ??
-                false)
+        final category = (tx.plaidCategory?['primary']?.toString().trim().isNotEmpty ?? false)
             ? tx.plaidCategory!['primary'].toString()
-            : (tx.category != null
-                  ? 'Category #${tx.category}'
-                  : 'Uncategorized');
+            : (tx.category != null ? 'Category #${tx.category}' : 'Uncategorized');
         final tagText = tags.isEmpty ? '-' : tags.join(', ');
 
         setCell(
@@ -974,12 +1077,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
           detailRow,
           excel_lib.TextCellValue(DateFormat('yyyy-MM-dd').format(tx.dateTime)),
         );
-        setCell(
-          detail,
-          1,
-          detailRow,
-          excel_lib.TextCellValue(cleanTitle(tx.title)),
-        );
+        setCell(detail, 1, detailRow, excel_lib.TextCellValue(cleanTitle(tx.title)));
         setCell(
           detail,
           2,
@@ -1039,20 +1137,10 @@ class _CashFlowTabState extends State<CashFlowTab> {
           headerStyle,
         );
       }
-      setCell(
-        recon,
-        ytdCol,
-        2,
-        excel_lib.TextCellValue('Period Total'),
-        headerStyle,
-      );
+      setCell(recon, ytdCol, 2, excel_lib.TextCellValue('Period Total'), headerStyle);
 
       int reconRow = 4;
-      void writeReconRow(
-        String label,
-        Map<String, double> values, {
-        bool total = false,
-      }) {
+      void writeReconRow(String label, Map<String, double> values, {bool total = false}) {
         setCell(
           recon,
           0,
@@ -1082,11 +1170,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
       writeReconRow('Net Income', netIncomeMap);
       writeReconRow('Adjustments', adjustmentsMap);
       writeReconRow('Balance Sheet Changes', wcMap);
-      writeReconRow(
-        'Reconciliation Total',
-        reconciliationTotalMap,
-        total: true,
-      );
+      writeReconRow('Reconciliation Total', reconciliationTotalMap, total: true);
       writeReconRow('Net Change in Cash', netChangeMap, total: true);
       writeReconRow('Variance', varianceMap, total: true);
 
@@ -1114,11 +1198,17 @@ class _CashFlowTabState extends State<CashFlowTab> {
           }
 
           cols.children.add(
-            XmlElement(XmlName('col'), [
-              XmlAttribute(XmlName('min'), '2'),
-              XmlAttribute(XmlName('max'), (keys.length + 1).toString()),
-              XmlAttribute(XmlName('outlineLevel'), '1'),
-            ]),
+            XmlElement(
+              XmlName('col'),
+              [
+                XmlAttribute(XmlName('min'), '2'),
+                XmlAttribute(
+                  XmlName('max'),
+                  (keys.length + 1).toString(),
+                ),
+                XmlAttribute(XmlName('outlineLevel'), '1'),
+              ],
+            ),
           );
 
           final sheetFormatPr = worksheet.getElement('sheetFormatPr');
@@ -1131,10 +1221,13 @@ class _CashFlowTabState extends State<CashFlowTab> {
           }
           if (sheetPr.getElement('outlinePr') == null) {
             sheetPr.children.add(
-              XmlElement(XmlName('outlinePr'), [
-                XmlAttribute(XmlName('summaryBelow'), '1'),
-                XmlAttribute(XmlName('summaryRight'), '1'),
-              ]),
+              XmlElement(
+                XmlName('outlinePr'),
+                [
+                  XmlAttribute(XmlName('summaryBelow'), '1'),
+                  XmlAttribute(XmlName('summaryRight'), '1'),
+                ],
+              ),
             );
           }
 
@@ -1167,11 +1260,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
   }
 
   // Helper method to update filter and trigger data fetch
-  Future<void> _updateFilter(
-    int index,
-    FinancialReportController controller, {
-    int? year,
-  }) async {
+  Future<void> _updateFilter(int index, FinancialReportController controller, {int? year}) async {
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
     DateTime? start;
@@ -1213,147 +1302,94 @@ class _CashFlowTabState extends State<CashFlowTab> {
         final isDark = Theme.of(context).brightness == Brightness.dark;
         return Dialog(
           backgroundColor: isDark ? const Color(0xFF0F1E37) : Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Container(
             padding: const EdgeInsets.all(24),
-            width: 400,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppText(
-                  "Select Date Range",
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white
-                      : Colors.black87,
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppText("Select Date Range", fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
+              const SizedBox(height: 24),
+              SfDateRangePicker(
+                view: DateRangePickerView.month,
+                selectionMode: DateRangePickerSelectionMode.range,
+                headerStyle: DateRangePickerHeaderStyle(
+                  textStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 24),
-                SfDateRangePicker(
-                  view: DateRangePickerView.month,
-                  selectionMode: DateRangePickerSelectionMode.range,
-                  headerStyle: DateRangePickerHeaderStyle(
-                    textStyle: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white
-                          : Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ),
+                monthCellStyle: DateRangePickerMonthCellStyle(
+                  textStyle: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54),
+                  todayTextStyle: const TextStyle(color: orangeColor),
+                ),
+                rangeSelectionColor: orangeColor.withValues(alpha: 0.1),
+                startRangeSelectionColor: orangeColor,
+                endRangeSelectionColor: orangeColor,
+                todayHighlightColor: orangeColor,
+                onSelectionChanged: (DateRangePickerSelectionChangedArgs args) {
+                  if (args.value is PickerDateRange) {
+                    tempStart = args.value.startDate;
+                    tempEnd = args.value.endDate;
+                  }
+                },
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: AppText("Close", color: isDark ? Colors.white38 : Colors.black38),
                   ),
-                  monthCellStyle: DateRangePickerMonthCellStyle(
-                    textStyle: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white70
-                          : Colors.black54,
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: orangeColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    todayTextStyle: const TextStyle(color: orangeColor),
+                    onPressed: () {
+                      if (tempStart != null && tempEnd != null) {
+                        final ts = tempStart!;
+                        final te = tempEnd!;
+                        final s = DateTime(ts.year, ts.month, ts.day);
+                        final e = DateTime(te.year, te.month, te.day);
+                        setState(() {
+                          _selectedFilterIdx = 5;
+                          _startDate = s;
+                          _endDate = e;
+                        });
+                        controller.fetchAndAggregateData(startDate: s, endDate: e);
+                        Navigator.pop(context);
+                      }
+                    },
+                    child: const AppText("Select", color: Colors.black, fontWeight: FontWeight.bold),
                   ),
-                  rangeSelectionColor: orangeColor.withValues(alpha: 0.1),
-                  startRangeSelectionColor: orangeColor,
-                  endRangeSelectionColor: orangeColor,
-                  todayHighlightColor: orangeColor,
-                  onSelectionChanged:
-                      (DateRangePickerSelectionChangedArgs args) {
-                        if (args.value is PickerDateRange) {
-                          tempStart = args.value.startDate;
-                          tempEnd = args.value.endDate;
-                        }
-                      },
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: AppText(
-                        "Close",
-                        color: isDark ? Colors.white38 : Colors.black38,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: orangeColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: () {
-                        if (tempStart != null && tempEnd != null) {
-                          final ts = tempStart!;
-                          final te = tempEnd!;
-                          final s = DateTime(ts.year, ts.month, ts.day);
-                          final e = DateTime(te.year, te.month, te.day);
-                          setState(() {
-                            _selectedFilterIdx = 5;
-                            _startDate = s;
-                            _endDate = e;
-                          });
-                          controller.fetchAndAggregateData(
-                            startDate: s,
-                            endDate: e,
-                          );
-                          Navigator.pop(context);
-                        }
-                      },
-                      child: const AppText(
-                        "Select",
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildTimeFilter(FinancialReportController controller) {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? Colors.black26
-            : Colors.grey.withValues(alpha: 0.1),
+        color: Theme.of(context).brightness == Brightness.dark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(10),
       ),
       child: Wrap(
         spacing: 4,
         runSpacing: 4,
         children: [
-          _filterItem(
-            "7 Days",
-            _selectedFilterIdx == 0,
-            () => _updateFilter(0, controller),
-          ),
-          _filterItem(
-            "30 Days",
-            _selectedFilterIdx == 1,
-            () => _updateFilter(1, controller),
-          ),
-          _filterItem(
-            "3 Months",
-            _selectedFilterIdx == 2,
-            () => _updateFilter(2, controller),
-          ),
-          _filterItem(
-            "12 Months",
-            _selectedFilterIdx == 3,
-            () => _updateFilter(3, controller),
-          ),
+          _filterItem("7 Days", _selectedFilterIdx == 0, () => _updateFilter(0, controller)),
+          _filterItem("30 Days", _selectedFilterIdx == 1, () => _updateFilter(1, controller)),
+          _filterItem("3 Months", _selectedFilterIdx == 2, () => _updateFilter(2, controller)),
+          _filterItem("12 Months", _selectedFilterIdx == 3, () => _updateFilter(3, controller)),
           _buildYearDropdown(controller),
-          _filterItem(
-            "Custom",
-            _selectedFilterIdx == 5,
-            () => _selectCustomRange(controller),
-          ),
+          _filterItem("Custom", _selectedFilterIdx == 5, () => _selectCustomRange(controller)),
         ],
       ),
     );
@@ -1367,72 +1403,31 @@ class _CashFlowTabState extends State<CashFlowTab> {
     return PopupMenuButton<int>(
       offset: const Offset(0, 40),
       onSelected: (year) => _updateFilter(4, controller, year: year),
-      itemBuilder: (context) => years
-          .map(
-            (y) => PopupMenuItem(
-              value: y,
-              child: Text(
-                '$y',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white
-                      : Colors.black87,
-                  fontFamily: 'Outfit',
-                ),
-              ), // Standard Text to avoid AppText's auto-formatting
-            ),
-          )
-          .toList(),
+      itemBuilder: (context) => years.map((y) => PopupMenuItem(
+        value: y,
+        child: Text('$y', style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87, fontFamily: 'Outfit')), // Standard Text to avoid AppText's auto-formatting
+      )).toList(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected
-              ? (Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFF1E293B)
-                    : Colors.black.withValues(alpha: 0.05))
-              : Colors.transparent,
+          color: isSelected ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.black.withValues(alpha: 0.05)) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: isSelected
-              ? Border.all(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white12
-                      : Colors.black12,
-                )
-              : null,
+          border: isSelected ? Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : Colors.black12) : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              isSelected
-                  ? (_selectedYear != null ? '$_selectedYear' : "Yearly")
-                  : "Yearly",
+              isSelected ? (_selectedYear != null ? '$_selectedYear' : "Yearly") : "Yearly",
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected
-                    ? (Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white
-                          : Colors.black87)
-                    : (Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white38
-                          : Colors.black45),
+                color: isSelected ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87) : (Theme.of(context).brightness == Brightness.dark ? Colors.white38 : Colors.black45),
                 fontFamily: 'Outfit',
               ),
             ),
             const SizedBox(width: 4),
-            Icon(
-              Icons.keyboard_arrow_down,
-              size: 12,
-              color: isSelected
-                  ? (Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.black87)
-                  : (Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white38
-                        : Colors.black45),
-            ),
+            Icon(Icons.keyboard_arrow_down, size: 12, color: isSelected ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87) : (Theme.of(context).brightness == Brightness.dark ? Colors.white38 : Colors.black45)),
           ],
         ),
       ),
@@ -1445,31 +1440,15 @@ class _CashFlowTabState extends State<CashFlowTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected
-              ? (Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFF1E293B)
-                    : Colors.black.withValues(alpha: 0.05))
-              : Colors.transparent,
+          color: isSelected ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.black.withValues(alpha: 0.05)) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: isSelected
-              ? Border.all(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white12
-                      : Colors.black12,
-                )
-              : null,
+          border: isSelected ? Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : Colors.black12) : null,
         ),
         child: AppText(
           text,
           fontSize: 11,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected
-              ? (Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white
-                    : Colors.black87)
-              : (Theme.of(context).brightness == Brightness.dark
-                    ? Colors.white38
-                    : Colors.black45),
+          color: isSelected ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87) : (Theme.of(context).brightness == Brightness.dark ? Colors.white38 : Colors.black45),
         ),
       ),
     );
@@ -1483,60 +1462,74 @@ class _CashFlowTabState extends State<CashFlowTab> {
     const netCashColor = Color(0xFFF2C94C);
     final textPrimary = isDark ? Colors.white : Colors.black87;
     final textSecondary = isDark ? Colors.white70 : Colors.black54;
-    final backgroundColor = isDark
-        ? const Color(0xFF071223)
-        : const Color(0xFFF8FAFC);
+    final backgroundColor = isDark ? const Color(0xFF071223) : const Color(0xFFF8FAFC);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isNarrow = screenWidth <= 1024;
 
     return GetBuilder<FinancialReportController>(
-      tag: getCurrentOrganization!.id.toString(),
-      builder: (controller) {
-        if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
+        tag: getCurrentOrganization!.id.toString(),
+        builder: (controller) {
+          if (controller.isLoading.value) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        final trendSeries = controller.trendChartSeries;
-        final operatingCash = controller.operatingCashFlow.value;
-        final investingCash = controller.investingCashFlow.value;
-        final financingCash = controller.financingCashFlow.value;
+          final trendSeries = controller.trendChartSeries;
+          final operatingCash = controller.operatingCashFlow.value;
+          final investingCash = controller.investingCashFlow.value;
+          final financingCash = controller.financingCashFlow.value;
 
-        final totalIn =
-            (operatingCash > 0 ? operatingCash : 0.0) +
-            (investingCash > 0 ? investingCash : 0.0) +
-            (financingCash > 0 ? financingCash : 0.0);
-        final totalOut =
-            (operatingCash < 0 ? -operatingCash : 0.0) +
-            (investingCash < 0 ? -investingCash : 0.0) +
-            (financingCash < 0 ? -financingCash : 0.0);
-        final netCash = operatingCash + investingCash + financingCash;
+          final totalIn = (operatingCash > 0 ? operatingCash : 0.0) +
+              (investingCash > 0 ? investingCash : 0.0) +
+              (financingCash > 0 ? financingCash : 0.0);
+          final totalOut = (operatingCash < 0 ? -operatingCash : 0.0) +
+              (investingCash < 0 ? -investingCash : 0.0) +
+              (financingCash < 0 ? -financingCash : 0.0);
+          final netCash = operatingCash + investingCash + financingCash;
 
-        final netInvestingFinancing = netCash;
+          final netInvestingFinancing = netCash;
 
-        final prevIn = controller.prevPeriodIncome.value;
-        final prevOut = controller.prevPeriodExpenses.value;
-        final prevNet = controller.prevPeriodNetIncome.value;
+          final prevIn = controller.prevPeriodIncome.value;
+          final prevOut = controller.prevPeriodExpenses.value;
+          final prevNet = controller.prevPeriodNetIncome.value;
 
-        final double incomeChange = prevIn != 0
-            ? ((totalIn - prevIn) / prevIn) * 100
-            : (totalIn > 0 ? 100 : 0);
-        final double expensesChange = prevOut != 0
-            ? ((totalOut - prevOut) / prevOut) * 100
-            : (totalOut > 0 ? 100 : 0);
-        final double netCashChange = prevNet != 0
-            ? ((netCash - prevNet) / prevNet) * 100
-            : (netCash > 0 ? 100 : 0);
+          final double incomeChange = prevIn != 0 ? ((totalIn - prevIn) / prevIn) * 100 : (totalIn > 0 ? 100 : 0);
+          final double expensesChange = prevOut != 0 ? ((totalOut - prevOut) / prevOut) * 100 : (totalOut > 0 ? 100 : 0);
+          final double netCashChange = prevNet != 0 ? ((netCash - prevNet) / prevNet) * 100 : (netCash > 0 ? 100 : 0);
 
-        return Container(
-          color: backgroundColor,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 🔹 Title & Filter Header
-                isNarrow
-                    ? Column(
+          return Container(
+            color: backgroundColor,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 🔹 Title & Filter Header
+                  isNarrow 
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AppText(
+                          "Cash Flow Dashboard",
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: isDark ? Colors.white : Colors.black87,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildTimeFilter(controller),
+                        if (_startDate != null && _endDate != null) ...[
+                          const SizedBox(height: 8),
+                          AppText(
+                            "${DateFormat('MMM dd, yyyy').format(_startDate!)} – ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
+                            fontSize: 12,
+                            color: isDark ? Colors.white38 : Colors.black45,
+                          ),
+                        ],
+                      ],
+                    )
+                  : Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           AppText(
@@ -1545,10 +1538,8 @@ class _CashFlowTabState extends State<CashFlowTab> {
                             fontWeight: FontWeight.w900,
                             color: isDark ? Colors.white : Colors.black87,
                           ),
-                          const SizedBox(height: 12),
-                          _buildTimeFilter(controller),
                           if (_startDate != null && _endDate != null) ...[
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 4),
                             AppText(
                               "${DateFormat('MMM dd, yyyy').format(_startDate!)} – ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
                               fontSize: 12,
@@ -1556,255 +1547,178 @@ class _CashFlowTabState extends State<CashFlowTab> {
                             ),
                           ],
                         ],
-                      )
-                    : Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              AppText(
-                                "Cash Flow Dashboard",
-                                fontSize: 28,
-                                fontWeight: FontWeight.w900,
-                                color: isDark ? Colors.white : Colors.black87,
-                              ),
-                              if (_startDate != null && _endDate != null) ...[
-                                const SizedBox(height: 4),
-                                AppText(
-                                  "${DateFormat('MMM dd, yyyy').format(_startDate!)} – ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
-                                  fontSize: 12,
-                                  color: isDark
-                                      ? Colors.white38
-                                      : Colors.black45,
-                                ),
-                              ],
-                            ],
-                          ),
-                          _buildTimeFilter(controller),
-                        ],
                       ),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    alignment: WrapAlignment.end,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      PopupMenuButton<String>(
-                        offset: const Offset(0, 40),
-                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        elevation: 8,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        onSelected: (value) {
-                          if (value == 'csv') _exportCSV(controller);
-                          if (value == 'pdf') {
-                            ExportModalWidget.showPdfModal(
-                              context: context,
-                              companyName:
-                                  (getCurrentOrganization?.name ?? '')
-                                      .trim()
-                                      .isNotEmpty
-                                  ? (getCurrentOrganization?.name ?? '').trim()
-                                  : 'Booksmart',
-                              companyAddress: 'Address not available',
-                              reportType: ExportPdfReportType.cashFlow,
-                              initialStartDate: _startDate,
-                              initialEndDate: _endDate,
-                              onExport: (request) async {
-                                setState(() {
-                                  _startDate = request.startDate;
-                                  _endDate = request.endDate;
-                                });
-                                await controller.fetchAndAggregateData(
-                                  startDate: request.startDate,
-                                  endDate: request.endDate,
-                                );
-                                final liveData = _buildCashFlowPdfData(
-                                  controller,
-                                  request,
-                                );
-                                await PdfExportService()
-                                    .exportCashFlowPresentationPdf(
-                                      request,
-                                      cashFlowData: liveData,
-                                    );
-                              },
-                            );
-                          }
-                          if (value == 'excel') {
-                            ExportModalWidget.showExcelModal(
-                              context: context,
-                              companyName:
-                                  (getCurrentOrganization?.name ?? '')
-                                      .trim()
-                                      .isNotEmpty
-                                  ? (getCurrentOrganization?.name ?? '').trim()
-                                  : 'Booksmart',
-                              companyAddress: 'Address not available',
-                              reportType: ExportPdfReportType.cashFlow,
-                              initialStartDate: _startDate,
-                              initialEndDate: _endDate,
-                              onExport: (request) async {
-                                setState(() {
-                                  _startDate = request.startDate;
-                                  _endDate = request.endDate;
-                                });
-                                await controller.fetchAndAggregateData(
-                                  startDate: request.startDate,
-                                  endDate: request.endDate,
-                                );
-                                _exportExcel(controller);
-                              },
-                            );
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'csv',
-                            child: AppText(
-                              "Export CSV",
-                              fontSize: 13,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            height: 1,
-                            padding: EdgeInsets.zero,
-                            enabled: false,
-                            child: Divider(
-                              height: 1,
-                              thickness: 0.2,
-                              color: isDark ? Colors.white24 : Colors.black12,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'pdf',
-                            child: AppText(
-                              "Export PDF",
-                              fontSize: 13,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          PopupMenuItem<String>(
-                            height: 1,
-                            padding: EdgeInsets.zero,
-                            enabled: false,
-                            child: Divider(
-                              height: 1,
-                              thickness: 0.2,
-                              color: isDark ? Colors.white24 : Colors.black12,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'excel',
-                            child: AppText(
-                              "Export Excel",
-                              fontSize: 13,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                        ],
-                        child: Builder(
-                          builder: (context) {
-                            bool isHovered = false;
-                            return StatefulBuilder(
-                              builder: (context, setState) {
-                                return MouseRegion(
-                                  onEnter: (_) =>
-                                      setState(() => isHovered = true),
-                                  onExit: (_) =>
-                                      setState(() => isHovered = false),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 10,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isHovered
-                                          ? orangeColor.withValues(alpha: 0.1)
-                                          : Colors.transparent,
-                                      border: Border.all(
-                                        color: orangeColor,
-                                        width: 1.2,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: const [
-                                        AppText(
-                                          "EXPORT",
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: orangeColor,
-                                        ),
-                                        SizedBox(width: 6),
-                                        Icon(
-                                          Icons.keyboard_arrow_down,
-                                          size: 16,
-                                          color: orangeColor,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => showUploadTaxDocumentDialog(),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: orangeColor, width: 1.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const AppText(
-                            "UPLOAD",
-                            color: orangeColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      InkWell(
-                        onTap: () => _showManualCashFlowDialog(controller),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: orangeColor, width: 1.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const AppText(
-                            "ADJUST CASH FLOW",
-                            color: orangeColor,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                      _buildTimeFilter(controller),
                     ],
                   ),
-                ),
-                const SizedBox(height: 24),
-                LayoutBuilder(
-                  builder: (context, constraints) {
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        PopupMenuButton<String>(
+                          offset: const Offset(0, 40),
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                          elevation: 8,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          onSelected: (value) {
+                            if (value == 'csv') _exportCSV(controller);
+                            if (value == 'pdf') {
+                              ExportModalWidget.showPdfModal(
+                                context: context,
+                                companyName:
+                                    (getCurrentOrganization?.name ?? '')
+                                            .trim()
+                                            .isNotEmpty
+                                        ? (getCurrentOrganization?.name ?? '')
+                                              .trim()
+                                        : 'Booksmart',
+                                companyAddress: 'Address not available',
+                                reportType: ExportPdfReportType.cashFlow,
+                                initialStartDate: _startDate,
+                                initialEndDate: _endDate,
+                                onExport: (request) async {
+                                  final bool sameRange = _isSameRange(
+                                    request.startDate,
+                                    request.endDate,
+                                  );
+                                  setState(() {
+                                    _startDate = request.startDate;
+                                    _endDate = request.endDate;
+                                  });
+                                  if (!sameRange) {
+                                    await controller.fetchAndAggregateData(
+                                      startDate: request.startDate,
+                                      endDate: request.endDate,
+                                    );
+                                  }
+                                  final liveData = await _buildCashFlowPdfData(
+                                    controller,
+                                    request,
+                                  );
+                                  await PdfExportService()
+                                      .exportCashFlowPresentationPdf(
+                                        request,
+                                        cashFlowData: liveData,
+                                      );
+                                },
+                              );
+                            }
+                            if (value == 'excel') {
+                              ExportModalWidget.showExcelModal(
+                                context: context,
+                                companyName:
+                                    (getCurrentOrganization?.name ?? '')
+                                            .trim()
+                                            .isNotEmpty
+                                        ? (getCurrentOrganization?.name ?? '')
+                                              .trim()
+                                        : 'Booksmart',
+                                companyAddress: 'Address not available',
+                                reportType: ExportPdfReportType.cashFlow,
+                                initialStartDate: _startDate,
+                                initialEndDate: _endDate,
+                                onExport: (request) async {
+                                  final bool sameRange = _isSameRange(
+                                    request.startDate,
+                                    request.endDate,
+                                  );
+                                  setState(() {
+                                    _startDate = request.startDate;
+                                    _endDate = request.endDate;
+                                  });
+                                  if (!sameRange) {
+                                    await controller.fetchAndAggregateData(
+                                      startDate: request.startDate,
+                                      endDate: request.endDate,
+                                    );
+                                  }
+                                  _exportExcel(controller);
+                                },
+                              );
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(value: 'csv', child: AppText("Export CSV", fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
+                            PopupMenuItem<String>(height: 1, padding: EdgeInsets.zero, enabled: false, child: Divider(height: 1, thickness: 0.2, color: isDark ? Colors.white24 : Colors.black12)),
+                            PopupMenuItem(value: 'pdf', child: AppText("Export PDF", fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
+                            PopupMenuItem<String>(height: 1, padding: EdgeInsets.zero, enabled: false, child: Divider(height: 1, thickness: 0.2, color: isDark ? Colors.white24 : Colors.black12)),
+                            PopupMenuItem(value: 'excel', child: AppText("Export Excel", fontSize: 13, color: isDark ? Colors.white : Colors.black87)),
+                          ],
+                          child: Builder(
+                            builder: (context) {
+                              bool isHovered = false;
+                              return StatefulBuilder(
+                                builder: (context, setState) {
+                                  return MouseRegion(
+                                    onEnter: (_) => setState(() => isHovered = true),
+                                    onExit: (_) => setState(() => isHovered = false),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                      decoration: BoxDecoration(
+                                        color: isHovered ? orangeColor.withValues(alpha: 0.1) : Colors.transparent,
+                                        border: Border.all(color: orangeColor, width: 1.2),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: const [
+                                          AppText("EXPORT", fontSize: 12, fontWeight: FontWeight.w600, color: orangeColor),
+                                          SizedBox(width: 6),
+                                          Icon(Icons.keyboard_arrow_down, size: 16, color: orangeColor),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => showUploadTaxDocumentDialog(type: 'cf'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: orangeColor, width: 1.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const AppText(
+                              "UPLOAD",
+                              color: orangeColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        InkWell(
+                          onTap: () => _showManualCashFlowDialog(controller),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: orangeColor, width: 1.2),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const AppText(
+                              "ADJUST CASH FLOW",
+                              color: orangeColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  LayoutBuilder(builder: (context, constraints) {
                     return isNarrow
                         ? Wrap(
                             spacing: 12,
@@ -1812,38 +1726,15 @@ class _CashFlowTabState extends State<CashFlowTab> {
                             children: [
                               SizedBox(
                                 width: screenWidth - 32,
-                                child: _premiumKPICard(
-                                  title: "Money In",
-                                  value: _formatCurrency(totalIn),
-                                  change: incomeChange,
-                                  isCurrency: true,
-                                  timeframe: _getTimeframeLabel(),
-                                  valueColor: moneyInColor,
-                                ),
+                                child: _premiumKPICard(title: "Money In", value: _formatCurrency(totalIn), change: incomeChange, isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: moneyInColor),
                               ),
                               SizedBox(
                                 width: screenWidth - 32,
-                                child: _premiumKPICard(
-                                  title: "Money Out",
-                                  value: _formatCurrency(totalOut),
-                                  change: expensesChange,
-                                  isCurrency: true,
-                                  timeframe: _getTimeframeLabel(),
-                                  valueColor: isDark
-                                      ? Colors.white
-                                      : Colors.black87,
-                                ),
+                                child: _premiumKPICard(title: "Money Out", value: _formatCurrency(totalOut), change: expensesChange, isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: isDark ? Colors.white : Colors.black87),
                               ),
                               SizedBox(
                                 width: screenWidth - 32,
-                                child: _premiumKPICard(
-                                  title: "Net Cash",
-                                  value: _formatCurrency(netCash),
-                                  change: netCashChange,
-                                  isCurrency: true,
-                                  timeframe: _getTimeframeLabel(),
-                                  isNetCash: true,
-                                ),
+                                child: _premiumKPICard(title: "Net Cash", value: _formatCurrency(netCash), change: netCashChange, isCurrency: true, timeframe: _getTimeframeLabel(), isNetCash: true),
                               ),
                             ],
                           )
@@ -1851,463 +1742,282 @@ class _CashFlowTabState extends State<CashFlowTab> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Expanded(
-                                  child: _premiumKPICard(
-                                    title: "Money In",
-                                    value: _formatCurrency(totalIn),
-                                    change: incomeChange,
-                                    isCurrency: true,
-                                    timeframe: _getTimeframeLabel(),
-                                    valueColor: moneyInColor,
-                                  ),
-                                ),
+                                Expanded(child: _premiumKPICard(title: "Money In", value: _formatCurrency(totalIn), change: incomeChange, isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: moneyInColor)),
                                 const SizedBox(width: 12),
-                                Expanded(
-                                  child: _premiumKPICard(
-                                    title: "Money Out",
-                                    value: _formatCurrency(totalOut),
-                                    change: expensesChange,
-                                    isCurrency: true,
-                                    timeframe: _getTimeframeLabel(),
-                                    valueColor: isDark
-                                        ? Colors.white
-                                        : Colors.black87,
-                                  ),
-                                ),
+                                Expanded(child: _premiumKPICard(title: "Money Out", value: _formatCurrency(totalOut), change: expensesChange, isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: isDark ? Colors.white : Colors.black87)),
                                 const SizedBox(width: 12),
-                                Expanded(
-                                  child: _premiumKPICard(
-                                    title: "Net Cash",
-                                    value: _formatCurrency(netCash),
-                                    change: netCashChange,
-                                    isCurrency: true,
-                                    timeframe: _getTimeframeLabel(),
-                                    isNetCash: true,
-                                  ),
-                                ),
+                                Expanded(child: _premiumKPICard(title: "Net Cash", value: _formatCurrency(netCash), change: netCashChange, isCurrency: true, timeframe: _getTimeframeLabel(), isNetCash: true)),
                               ],
                             ),
                           );
-                  },
-                ),
-                const SizedBox(height: 24),
+                  }),
+                  const SizedBox(height: 24),
 
-                // 🔹 Middle Section: Chart Area
-                Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.05)
-                          : Colors.black12,
+                  // 🔹 Middle Section: Chart Area
+                  Container(
+                    margin: const EdgeInsets.only(top: 8),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black12),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(isDark ? 0.15 : 0.03), blurRadius: 40, offset: const Offset(0, 10))
+                      ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: isDark ? 0.15 : 0.03,
-                        ),
-                        blurRadius: 40,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                AppText(
-                                  "Cash Flow Trend",
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? Colors.white : Colors.black87,
-                                ),
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 6,
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    if (_startDate != null &&
-                                        _endDate != null &&
-                                        controller
-                                            .trendGranularityLabel
-                                            .isNotEmpty)
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  AppText("Cash Flow Trend", fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    crossAxisAlignment: WrapCrossAlignment.center,
+                                    children: [
+                                      if (_startDate != null && _endDate != null && controller.trendGranularityLabel.isNotEmpty)
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            AppText(
+                                              "${DateFormat('MMM dd, yyyy').format(_startDate!)} – ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: textSecondary,
+                                            ),
+                                            Container(
+                                              width: 1,
+                                              height: 12,
+                                              margin: const EdgeInsets.symmetric(horizontal: 8),
+                                              color: Colors.white,
+                                            ),
+                                            AppText(
+                                              controller.trendGranularityLabel,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: textSecondary,
+                                            ),
+                                          ],
+                                        )
+                                      else ...[
+                                        if (_startDate != null && _endDate != null)
                                           AppText(
                                             "${DateFormat('MMM dd, yyyy').format(_startDate!)} – ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
                                             color: textSecondary,
                                           ),
-                                          Container(
-                                            width: 1,
-                                            height: 12,
-                                            margin: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                            ),
-                                            color: Colors.white,
-                                          ),
+                                        if (controller.trendGranularityLabel.isNotEmpty)
                                           AppText(
                                             controller.trendGranularityLabel,
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
                                             color: textSecondary,
                                           ),
-                                        ],
-                                      )
-                                    else ...[
-                                      if (_startDate != null &&
-                                          _endDate != null)
-                                        AppText(
-                                          "${DateFormat('MMM dd, yyyy').format(_startDate!)} – ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
-                                          fontSize: 12,
-                                          color: textSecondary,
-                                        ),
-                                      if (controller
-                                          .trendGranularityLabel
-                                          .isNotEmpty)
-                                        AppText(
-                                          controller.trendGranularityLabel,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: textSecondary,
-                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildCashFlowMetricToggles(isDark),
+                                Container(
+                                  width: 1,
+                                  height: 18,
+                                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                                  color: isDark ? Colors.white24 : Colors.black12,
+                                ),
+                                InkWell(
+                                  onTap: () => setState(() => _comparePriorPeriod = !_comparePriorPeriod),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        SizedBox(
+                                          width: 12,
+                                          height: 12,
+                                          child: Transform.scale(
+                                            scale: 0.78,
+                                            child: Checkbox(
+                                              value: _comparePriorPeriod,
+                                              onChanged: (v) => setState(() => _comparePriorPeriod = v ?? false),
+                                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                                              activeColor: orangeColor,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        AppText(
+                                          "vs prior period",
+                                          fontSize: 11,
+                                          color: isDark ? Colors.white54 : Colors.black45,
+                                          disableFormat: true,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              _buildCashFlowMetricToggles(isDark),
-                              Container(
-                                width: 1,
-                                height: 18,
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                color: isDark ? Colors.white24 : Colors.black12,
-                              ),
-                              InkWell(
-                                onTap: () => setState(
-                                  () => _comparePriorPeriod =
-                                      !_comparePriorPeriod,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      SizedBox(
-                                        width: 12,
-                                        height: 12,
-                                        child: Transform.scale(
-                                          scale: 0.78,
-                                          child: Checkbox(
-                                            value: _comparePriorPeriod,
-                                            onChanged: (v) => setState(
-                                              () => _comparePriorPeriod =
-                                                  v ?? false,
-                                            ),
-                                            materialTapTargetSize:
-                                                MaterialTapTargetSize
-                                                    .shrinkWrap,
-                                            visualDensity: const VisualDensity(
-                                              horizontal: -4,
-                                              vertical: -4,
-                                            ),
-                                            activeColor: orangeColor,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      AppText(
-                                        "vs prior period",
-                                        fontSize: 11,
-                                        color: isDark
-                                            ? Colors.white54
-                                            : Colors.black45,
-                                        disableFormat: true,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        height: 320,
-                        child: trendSeries.isEmpty
-                            ? Center(
-                                child: AppText(
-                                  "Data will appear for this range",
-                                  color: isDark
-                                      ? Colors.white38
-                                      : Colors.black45,
-                                ),
-                              )
-                            : _buildCashFlowTrendChart(
-                                controller,
-                                trendSeries,
-                                moneyInColor,
-                                moneyOutColor,
-                                netCashColor,
-                                isDark,
-                              ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Wrap(
-                          alignment: WrapAlignment.center,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 24,
-                          runSpacing: 8,
-                          children: [
-                            if (_showMoneyIn)
-                              _LegendItem(
-                                color: moneyInColor,
-                                label: "Money In",
-                              ),
-                            if (_showMoneyOut)
-                              _LegendItem(
-                                color: moneyOutColor,
-                                label: "Money Out",
-                              ),
-                            if (_showNetCash)
-                              _LegendItem(
-                                color: netCashColor,
-                                label: "Net Cash",
-                                isLine: true,
-                              ),
-                            if (_comparePriorPeriod)
-                              _LegendItem(
-                                color: isDark ? Colors.white54 : Colors.black45,
-                                label: "Prior net",
-                                isLine: true,
-                                isDashed: true,
-                              ),
                           ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 48),
-
-                // 🔹 Bottom Section: Cash Flow Statement Container (match trend chart surface)
-                Container(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: .05)
-                          : Colors.black12,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: isDark ? 0.15 : 0.03,
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          height: 320,
+                          child: trendSeries.isEmpty
+                              ? Center(
+                                  child: AppText(
+                                    "Data will appear for this range",
+                                    color: isDark ? Colors.white38 : Colors.black45,
+                                  ),
+                                )
+                              : _buildCashFlowTrendChart(
+                                  controller,
+                                  trendSeries,
+                                  moneyInColor,
+                                  moneyOutColor,
+                                  netCashColor,
+                                  isDark,
+                                ),
                         ),
-                        blurRadius: 40,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 24,
+                            runSpacing: 8,
+                            children: [
+                              if (_showMoneyIn) _LegendItem(color: moneyInColor, label: "Money In"),
+                              if (_showMoneyOut) _LegendItem(color: moneyOutColor, label: "Money Out"),
+                              if (_showNetCash) _LegendItem(color: netCashColor, label: "Net Cash", isLine: true),
+                              if (_comparePriorPeriod)
+                                _LegendItem(
+                                  color: isDark ? Colors.white54 : Colors.black45,
+                                  label: "Prior net",
+                                  isLine: true,
+                                  isDashed: true,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            AppText(
-                              "Cash Flow Statement",
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                            const SizedBox(height: 24),
+                  const SizedBox(height: 48),
 
-                            LayoutBuilder(
-                              builder: (context, constraints) {
+                  // 🔹 Bottom Section: Cash Flow Statement Container (match trend chart surface)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(isDark ? 0.15 : 0.03),
+                          blurRadius: 40,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppText("Cash Flow Statement", fontSize: 22, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87),
+                              const SizedBox(height: 24),
+                              
+                              LayoutBuilder(builder: (context, constraints) {
                                 final isWide = constraints.maxWidth > 950;
                                 final opItems = _getOperatingItems(controller);
-                                final investItems = _getInvestingItems(
-                                  controller,
-                                );
-                                final financeItems = _getFinancingItems(
-                                  controller,
-                                );
+                                final investItems = _getInvestingItems(controller);
+                                final financeItems = _getFinancingItems(controller);
 
-                                final statementCardFill = Theme.of(
-                                  context,
-                                ).colorScheme.surface;
+                                final statementCardFill = Theme.of(context).colorScheme.surface;
                                 if (isWide) {
-                                  return Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: _buildStatementCard(
-                                          "Operating Activities",
-                                          opItems,
-                                          controller.operatingCashFlow.value,
-                                          const Color(0xFF19C37D),
-                                          statementCardFill,
-                                          textPrimary,
-                                          textSecondary,
-                                          equalHeightWithNeighbors: false,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: _buildStatementCard(
-                                          "Investing Activities",
-                                          investItems,
-                                          controller.investingCashFlow.value,
-                                          const Color(0xFF2B7FFF),
-                                          statementCardFill,
-                                          textPrimary,
-                                          textSecondary,
-                                          equalHeightWithNeighbors: false,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: _buildStatementCard(
-                                          "Financing Activities",
-                                          financeItems,
-                                          controller.financingCashFlow.value,
-                                          const Color(0xFFF2C94C),
-                                          statementCardFill,
-                                          textPrimary,
-                                          textSecondary,
-                                          equalHeightWithNeighbors: false,
-                                        ),
-                                      ),
-                                    ],
+                                  return IntrinsicHeight(
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                                      children: [
+                                        Expanded(child: _buildStatementCard("Operating Activities", opItems, controller.operatingCashFlow.value, const Color(0xFF19C37D), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: true)),
+                                        const SizedBox(width: 16),
+                                        Expanded(child: _buildStatementCard("Investing Activities", investItems, controller.investingCashFlow.value, const Color(0xFF2B7FFF), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: true)),
+                                        const SizedBox(width: 16),
+                                        Expanded(child: _buildStatementCard("Financing Activities", financeItems, controller.financingCashFlow.value, const Color(0xFFF2C94C), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: true)),
+                                      ],
+                                    ),
                                   );
                                 } else {
                                   return Column(
                                     children: [
-                                      _buildStatementCard(
-                                        "Operating Activities",
-                                        opItems,
-                                        controller.operatingCashFlow.value,
-                                        const Color(0xFF19C37D),
-                                        statementCardFill,
-                                        textPrimary,
-                                        textSecondary,
-                                        equalHeightWithNeighbors: false,
-                                      ),
+                                      _buildStatementCard("Operating Activities", opItems, controller.operatingCashFlow.value, const Color(0xFF19C37D), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: false),
                                       const SizedBox(height: 16),
-                                      _buildStatementCard(
-                                        "Investing Activities",
-                                        investItems,
-                                        controller.investingCashFlow.value,
-                                        const Color(0xFF2B7FFF),
-                                        statementCardFill,
-                                        textPrimary,
-                                        textSecondary,
-                                        equalHeightWithNeighbors: false,
-                                      ),
+                                      _buildStatementCard("Investing Activities", investItems, controller.investingCashFlow.value, const Color(0xFF2B7FFF), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: false),
                                       const SizedBox(height: 16),
-                                      _buildStatementCard(
-                                        "Financing Activities",
-                                        financeItems,
-                                        controller.financingCashFlow.value,
-                                        const Color(0xFFF2C94C),
-                                        statementCardFill,
-                                        textPrimary,
-                                        textSecondary,
-                                        equalHeightWithNeighbors: false,
-                                      ),
+                                      _buildStatementCard("Financing Activities", financeItems, controller.financingCashFlow.value, const Color(0xFFF2C94C), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: false),
                                     ],
                                   );
                                 }
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // 3️⃣ Shared Footer: Net Change in Cash
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 24,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.02)
-                              : Colors.black.withValues(alpha: 0.02),
-                          borderRadius: const BorderRadius.vertical(
-                            bottom: Radius.circular(24),
-                          ),
-                          border: Border(
-                            top: BorderSide(
-                              color: isDark
-                                  ? Colors.white.withValues(alpha: 0.05)
-                                  : Colors.black.withValues(alpha: 0.05),
-                            ),
-                          ),
-                        ),
-                        child: Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              AppText(
-                                "Net Cash: ",
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: isDark ? Colors.white : Colors.black87,
-                              ),
-                              AppText(
-                                _formatCurrencyExact(netInvestingFinancing),
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                color: netCash < 0
-                                    ? const Color(0xFFE57373)
-                                    : const Color(0xFF19C37D),
-                              ),
+                              }),
                             ],
                           ),
                         ),
-                      ),
-                    ],
+                        
+                        // 3️⃣ Shared Footer: Net Change in Cash
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                          decoration: BoxDecoration(
+                            color: isDark ? Colors.white.withOpacity(0.02) : Colors.black.withOpacity(0.02),
+                            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+                            border: Border(top: BorderSide(color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05))),
+                          ),
+                          child: Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AppText(
+                                  "Net Cash: ",
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: isDark ? Colors.white : Colors.black87,
+                                ),
+                                AppText(
+                                  _formatCurrencyExact(netInvestingFinancing),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                  color: netCash < 0 ? const Color(0xFFE57373) : const Color(0xFF19C37D),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const RecentDocumentsWidget(type: 'cf'),
-                const SizedBox(height: 80),
-              ],
+                  const RecentDocumentsWidget(type: 'cf'),
+                  const SizedBox(height: 80),
+                ],
+              ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        });
   }
 
   Widget _premiumKPICard({
@@ -2324,10 +2034,10 @@ class _CashFlowTabState extends State<CashFlowTab> {
     const Color softRed = Color(0xFFE57373);
     const Color cashGreen = Color(0xFF19C37D);
     final Color changeColor = isPositive ? cashGreen : softRed;
-    final IconData changeIcon = isPositive
-        ? Icons.arrow_upward
-        : Icons.arrow_downward;
-
+    final IconData changeIcon = isPositive ? Icons.arrow_upward : Icons.arrow_downward;
+    
+    final bool isNegativeValue = value.contains('-') || (isCurrency && value.startsWith('-\$'));
+    
     // Explicit value color rules as per reqs
     Color displayValueColor = valueColor ?? Colors.white;
     if (isNetCash) {
@@ -2339,17 +2049,10 @@ class _CashFlowTabState extends State<CashFlowTab> {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color:
-              (Theme.of(context).brightness == Brightness.dark
-                      ? Colors.white
-                      : Colors.black)
-                  .withValues(alpha: 0.05),
-          width: 0.5,
-        ),
+        border: Border.all(color: (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black).withOpacity(0.05), width: 0.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.1 : 0.03),
+            color: Colors.black.withOpacity(isDark ? 0.1 : 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -2384,9 +2087,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isPositive
-                      ? changeColor.withValues(alpha: 0.15)
-                      : softRed.withValues(alpha: 0.15),
+                  color: isPositive ? changeColor.withOpacity(0.15) : softRed.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Row(
@@ -2463,8 +2164,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
     final notesCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
     DateTime selectedDate =
-        _endDate ??
-        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+        _endDate ?? DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
     CashFlowManualSection selectedSection = CashFlowManualSection.operating;
     bool isNonCash = false;
     String suggestionMessage = '';
@@ -2531,15 +2231,15 @@ class _CashFlowTabState extends State<CashFlowTab> {
                 isNonCash: isNonCash,
               );
               await _manualEntryService.saveManualEntry(
-                userId: user.id,
-                orgId: org.id,
+                userId: user.id!,
+                orgId: org.id!,
                 entry: entry,
               );
               await controller.fetchAndAggregateData(
                 startDate: _startDate,
                 endDate: _endDate,
               );
-              if (mounted) Get.back();
+              if (mounted) Navigator.of(context).pop();
               showSnackBar('Manual cash flow entry added.');
             }
 
@@ -2553,7 +2253,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       DropdownButtonFormField<CashFlowManualSection>(
-                        initialValue: selectedSection,
+                        value: selectedSection,
                         decoration: const InputDecoration(labelText: 'Section'),
                         items: CashFlowManualSection.values
                             .map(
@@ -2583,23 +2283,25 @@ class _CashFlowTabState extends State<CashFlowTab> {
                           decimal: true,
                           signed: true,
                         ),
-                        decoration: const InputDecoration(labelText: 'Amount'),
+                        decoration: const InputDecoration(
+                          labelText: 'Amount',
+                        ),
                       ),
                       const SizedBox(height: 12),
                       InkWell(
                         onTap: pickDate,
                         child: InputDecorator(
                           decoration: const InputDecoration(labelText: 'Date'),
-                          child: Text(
-                            DateFormat('MMM dd, yyyy').format(selectedDate),
-                          ),
+                          child: Text(DateFormat('MMM dd, yyyy').format(selectedDate)),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: notesCtrl,
                         maxLines: 3,
-                        decoration: const InputDecoration(labelText: 'Notes'),
+                        decoration: const InputDecoration(
+                          labelText: 'Notes',
+                        ),
                       ),
                       const SizedBox(height: 8),
                       CheckboxListTile(
@@ -2626,17 +2328,16 @@ class _CashFlowTabState extends State<CashFlowTab> {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             suggestionMessage,
-                            style:
-                                const TextStyle(
-                                  fontSize: 12,
-                                  color: Color(0xFFE57373),
-                                  fontWeight: FontWeight.w600,
-                                ).copyWith(
-                                  color: suggestionIsError
-                                      ? const Color(0xFFE57373)
-                                      : const Color(0xFF19C37D),
-                                  fontWeight: FontWeight.w600,
-                                ),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFFE57373),
+                              fontWeight: FontWeight.w600,
+                            ).copyWith(
+                              color: suggestionIsError
+                                  ? const Color(0xFFE57373)
+                                  : const Color(0xFF19C37D),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                     ],
@@ -2669,6 +2370,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
       },
     );
   }
+
 
   Widget _buildCashFlowMetricToggles(bool isDark) {
     return PopupMenuButton<String>(
@@ -2705,9 +2407,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.04)
-              : Colors.black.withValues(alpha: 0.02),
+          color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.02),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -2761,11 +2461,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
   }
 
   /// Same as fl_chart [BarChartAlignment.spaceAround] group centers (uniform group width).
-  List<double> _cfBarGroupCenterXsSpaceAround(
-    double viewWidth,
-    int n,
-    double groupWidth,
-  ) {
+  List<double> _cfBarGroupCenterXsSpaceAround(double viewWidth, int n, double groupWidth) {
     if (n <= 0) return [];
     final sumWidth = groupWidth * n;
     final spaceAvailable = viewWidth - sumWidth;
@@ -2803,10 +2499,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
     return LayoutBuilder(
       builder: (context, constraints) {
         const leftAxis = 50.0;
-        final usableW = (constraints.maxWidth - leftAxis).clamp(
-          1.0,
-          double.infinity,
-        );
+        final usableW = (constraints.maxWidth - leftAxis).clamp(1.0, double.infinity);
         final minY = _cfTrendMinY(series);
         final maxY = _cfTrendMaxY(series);
         final n = series.length;
@@ -2889,9 +2582,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                         final idx = v.toInt();
                         if (idx < 0 || idx >= n) return const SizedBox.shrink();
                         return Padding(
-                          padding: EdgeInsets.only(
-                            top: compactXAxis ? 6.0 : 12.0,
-                          ),
+                          padding: EdgeInsets.only(top: compactXAxis ? 6.0 : 12.0),
                           child: AppText(
                             series[idx]['label']?.toString() ?? '',
                             fontSize: compactXAxis ? 8 : 10,
@@ -2910,9 +2601,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                       reservedSize: 50,
                       interval: (maxY - minY) / 4,
                       getTitlesWidget: (v, meta) {
-                        if ((v - meta.max).abs() < 0.01) {
-                          return const SizedBox.shrink();
-                        }
+                        if ((v - meta.max).abs() < 0.01) return const SizedBox.shrink();
                         return Padding(
                           padding: const EdgeInsets.only(right: 8),
                           child: AppText(
@@ -2925,20 +2614,14 @@ class _CashFlowTabState extends State<CashFlowTab> {
                       },
                     ),
                   ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
                   getDrawingHorizontalLine: (v) => FlLine(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.05)
-                        : Colors.black.withValues(alpha: 0.05),
+                    color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
                     strokeWidth: 1,
                   ),
                 ),
@@ -2954,13 +2637,14 @@ class _CashFlowTabState extends State<CashFlowTab> {
                         toY: inc,
                         color: inColor,
                         width: (320 / n).clamp(4.0, 16.0),
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(4),
-                        ),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                         gradient: LinearGradient(
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
-                          colors: [inColor.withValues(alpha: 0.4), inColor],
+                          colors: [
+                            inColor.withOpacity(0.4),
+                            inColor,
+                          ],
                         ),
                       ),
                     );
@@ -2971,25 +2655,20 @@ class _CashFlowTabState extends State<CashFlowTab> {
                         toY: exp,
                         color: outColor,
                         width: (320 / n).clamp(4.0, 16.0),
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(4),
-                        ),
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
                         gradient: LinearGradient(
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
-                          colors: [outColor.withValues(alpha: 0.4), outColor],
+                          colors: [
+                            outColor.withOpacity(0.4),
+                            outColor,
+                          ],
                         ),
                       ),
                     );
                   }
                   if (rods.isEmpty) {
-                    rods.add(
-                      BarChartRodData(
-                        toY: 0.001,
-                        color: Colors.transparent,
-                        width: 1,
-                      ),
-                    );
+                    rods.add(BarChartRodData(toY: 0.001, color: Colors.transparent, width: 1));
                   }
                   return BarChartGroupData(x: i, barsSpace: 6, barRods: rods);
                 }),
@@ -3006,8 +2685,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                   enabled: tooltipEnabled,
                   handleBuiltInTouches: tooltipEnabled,
                   touchSpotThreshold: 18,
-                  distanceCalculator: (touch, spotPixel) =>
-                      (touch - spotPixel).distance,
+                  distanceCalculator: (touch, spotPixel) => (touch - spotPixel).distance,
                   getTouchedSpotIndicator: (barData, spotIndexes) {
                     return spotIndexes
                         .map(
@@ -3022,9 +2700,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                     maxContentWidth: 240,
                     fitInsideHorizontally: true,
                     fitInsideVertically: true,
-                    getTooltipColor: (_) => isDark
-                        ? const Color(0xFF1E293B)
-                        : const Color(0xFF0F1E37),
+                    getTooltipColor: (_) => isDark ? const Color(0xFF1E293B) : const Color(0xFF0F1E37),
                     getTooltipItems: (touchedSpots) {
                       return touchedSpots.map((s) {
                         if (s.barIndex != 0) return null;
@@ -3033,23 +2709,13 @@ class _CashFlowTabState extends State<CashFlowTab> {
                         final row = series[idx];
                         final dateStr = row['tooltipDate']?.toString() ?? '';
                         final bucketStart = row['bucketStart'];
-                        final bucketDate = bucketStart is DateTime
-                            ? bucketStart
-                            : DateTime.tryParse(bucketStart?.toString() ?? '');
-                        final hasSpecificDay = RegExp(
-                          r'\b[A-Za-z]{3,9}\s+\d{1,2}\b',
-                        ).hasMatch(dateStr);
+                        final bucketDate = bucketStart is DateTime ? bucketStart : DateTime.tryParse(bucketStart?.toString() ?? '');
+                        final hasSpecificDay = RegExp(r'\b[A-Za-z]{3,9}\s+\d{1,2}\b').hasMatch(dateStr);
                         final tooltipDateText = dateStr.isNotEmpty
                             ? (hasSpecificDay || bucketDate == null
-                                  ? dateStr
-                                  : DateFormat(
-                                      'MMMM dd, yyyy',
-                                    ).format(bucketDate))
-                            : (bucketDate != null
-                                  ? DateFormat(
-                                      'MMM dd, yyyy',
-                                    ).format(bucketDate)
-                                  : '');
+                                ? dateStr
+                                : DateFormat('MMMM dd, yyyy').format(bucketDate))
+                            : (bucketDate != null ? DateFormat('MMM dd, yyyy').format(bucketDate) : '');
                         final inc = (row['income'] as num?)?.toDouble() ?? 0;
                         final exp = (row['expense'] as num?)?.toDouble() ?? 0;
                         final net = (row['net'] as num?)?.toDouble() ?? 0;
@@ -3059,38 +2725,19 @@ class _CashFlowTabState extends State<CashFlowTab> {
                           children: [
                             TextSpan(
                               text: '$tooltipDateText\n',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
-                                height: 1.35,
-                              ),
+                              style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 12, height: 1.35),
                             ),
                             TextSpan(
                               text: 'Money In: ${_formatCurrencyExact(inc)}\n',
-                              style: TextStyle(
-                                color: inColor,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
-                                height: 1.35,
-                              ),
+                              style: TextStyle(color: inColor, fontWeight: FontWeight.w800, fontSize: 12, height: 1.35),
                             ),
                             TextSpan(
                               text: 'Money Out: ${_formatCurrencyExact(exp)}\n',
-                              style: TextStyle(
-                                color: outColor,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
-                                height: 1.35,
-                              ),
+                              style: TextStyle(color: outColor, fontWeight: FontWeight.w800, fontSize: 12, height: 1.35),
                             ),
                             TextSpan(
                               text: 'Net Cash: ${_formatCurrencyExact(net)}',
-                              style: TextStyle(
-                                color: netColor,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 12,
-                              ),
+                              style: TextStyle(color: netColor, fontWeight: FontWeight.w900, fontSize: 12),
                             ),
                           ],
                         );
@@ -3100,34 +2747,19 @@ class _CashFlowTabState extends State<CashFlowTab> {
                 ),
                 titlesData: FlTitlesData(
                   leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 50,
-                      getTitlesWidget: (_, __) => const SizedBox.shrink(),
-                    ),
+                    sideTitles: SideTitles(showTitles: true, reservedSize: 50, getTitlesWidget: (_, __) => const SizedBox.shrink()),
                   ),
                   bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: bottomReserved,
-                      getTitlesWidget: (_, __) => const SizedBox.shrink(),
-                    ),
+                    sideTitles: SideTitles(showTitles: true, reservedSize: bottomReserved, getTitlesWidget: (_, __) => const SizedBox.shrink()),
                   ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
+                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
                 gridData: const FlGridData(show: false),
                 borderData: FlBorderData(show: false),
                 lineBarsData: lineBars.isEmpty
                     ? [
-                        LineChartBarData(
-                          spots: const [FlSpot(0, 0)],
-                          dotData: const FlDotData(show: false),
-                        ),
+                        LineChartBarData(spots: const [FlSpot(0, 0)], dotData: const FlDotData(show: false)),
                       ]
                     : lineBars,
               ),
@@ -3165,31 +2797,18 @@ class _CashFlowTabState extends State<CashFlowTab> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          AppText(
-                            item["label"],
-                            fontSize: 13,
-                            color: textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          AppText(item["label"], fontSize: 13, color: textSecondary, fontWeight: FontWeight.w500),
                           AppText(
                             _formatCurrencyExact(item["value"]),
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: (item["value"] as double) < 0
-                                ? const Color(0xFFE57373)
-                                : textPrimary,
+                            color: (item["value"] as double) < 0 ? const Color(0xFFE57373) : textPrimary,
                           ),
                         ],
                       ),
                     ),
                     if (idx < items.length - 1)
-                      Divider(
-                        height: 1,
-                        thickness: 0.5,
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.05)
-                            : Colors.black.withValues(alpha: 0.05),
-                      ),
+                      Divider(height: 1, thickness: 0.5, color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05)),
                   ],
                 );
               }).toList(),
@@ -3202,15 +2821,13 @@ class _CashFlowTabState extends State<CashFlowTab> {
         color: cardColor,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.05)
-              : Colors.black.withValues(alpha: 0.06),
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.06),
         ),
         boxShadow: isDark
             ? null
             : [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.02),
+                  color: Colors.black.withOpacity(0.02),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -3241,8 +2858,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   InkWell(
-                    onTap: () =>
-                        setState(() => _expandedCards[title] = !isExpanded),
+                    onTap: () => setState(() => _expandedCards[title] = !isExpanded),
                     child: Container(
                       padding: const EdgeInsets.all(24),
                       child: Row(
@@ -3257,11 +2873,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
                             ),
                           ),
                           Icon(
-                            isExpanded
-                                ? Icons.keyboard_arrow_down
-                                : Icons.keyboard_arrow_right,
+                            isExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_right,
                             size: 20,
-                            color: textSecondary.withValues(alpha: 0.3),
+                            color: textSecondary.withOpacity(0.3),
                           ),
                         ],
                       ),
@@ -3269,22 +2883,15 @@ class _CashFlowTabState extends State<CashFlowTab> {
                   ),
                   if (isExpanded) ...[
                     detailSection,
-                    if (items.length < 3)
-                      SizedBox(height: (3 - items.length) * 44.0),
+                    if (items.length < 3) SizedBox(height: (3 - items.length) * 44.0),
                   ],
+                  if (equalHeightWithNeighbors) const Spacer(),
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
                       color: accentColor.withValues(alpha: 0.1),
-                      borderRadius: const BorderRadius.only(
-                        bottomRight: Radius.circular(24),
-                      ),
-                      border: Border(
-                        top: BorderSide(
-                          color: accentColor.withValues(alpha: 0.2),
-                          width: 1,
-                        ),
-                      ),
+                      borderRadius: const BorderRadius.only(bottomRight: Radius.circular(24)),
+                      border: Border(top: BorderSide(color: accentColor.withValues(alpha: 0.2), width: 1)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -3292,9 +2899,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                         AppText(
                           title == "Operating Activities"
                               ? "Operating Cash Flow"
-                              : (title == "Investing Activities"
-                                    ? "Investing Cash Flow"
-                                    : "Financing Cash Flow"),
+                              : (title == "Investing Activities" ? "Investing Cash Flow" : "Financing Cash Flow"),
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
                           color: textPrimary,
@@ -3303,9 +2908,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                           _formatCurrencyExact(total),
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
-                          color: total >= 0
-                              ? const Color(0xFF19C37D)
-                              : const Color(0xFFE57373),
+                          color: total >= 0 ? const Color(0xFF19C37D) : const Color(0xFFE57373),
                         ),
                       ],
                     ),
@@ -3319,32 +2922,23 @@ class _CashFlowTabState extends State<CashFlowTab> {
     );
   }
 
-  List<Map<String, dynamic>> _getOperatingItems(
-    FinancialReportController controller,
-  ) {
+  List<Map<String, dynamic>> _getOperatingItems(FinancialReportController controller) {
     return [
       {"label": "Net Income", "value": controller.netIncome.value},
       {"label": "Adjustments", "value": controller.operatingAdjustments.value},
-      {
-        "label": "Working Capital",
-        "value": controller.workingCapitalChanges.value,
-      },
+      {"label": "Working Capital", "value": controller.workingCapitalChanges.value},
       {"label": "Other Operating", "value": controller.operatingOther.value},
     ];
   }
 
-  List<Map<String, dynamic>> _getInvestingItems(
-    FinancialReportController controller,
-  ) {
+  List<Map<String, dynamic>> _getInvestingItems(FinancialReportController controller) {
     return [
       {"label": "Asset Purchases", "value": controller.assetPurchases.value},
       {"label": "Investments", "value": controller.investmentActivities.value},
     ];
   }
 
-  List<Map<String, dynamic>> _getFinancingItems(
-    FinancialReportController controller,
-  ) {
+  List<Map<String, dynamic>> _getFinancingItems(FinancialReportController controller) {
     return [
       {"label": "Loans", "value": controller.loanActivities.value},
       {"label": "Contributions", "value": controller.ownerContributions.value},
@@ -3352,6 +2946,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
       {"label": "Other Financing", "value": controller.financingOther.value},
     ];
   }
+
 
   String _formatCurrency(double value) {
     final formatted = NumberFormat("#,##0.00").format(value.abs());
@@ -3422,22 +3017,9 @@ class _LegendItem extends StatelessWidget {
                 )
               : Container(width: 16, height: 2, color: color)
         else
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
+          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 8),
-        AppText(
-          label,
-          fontSize: 11,
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white70
-              : Colors.black54,
-        ),
+        AppText(label, fontSize: 11, color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54),
       ],
     );
   }
