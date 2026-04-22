@@ -311,18 +311,21 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(16),
-
                     child: PieChart(
                       dataMap: pieMap,
                       chartType: ChartType.ring,
                       colorList: colorList,
                       chartRadius: 160,
                       ringStrokeWidth: 32,
-                      centerText: 'Total\n${_formatCurrency(overall)}',
-                      centerTextStyle: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                      // centerText: 'Total\n${_formatCurrency(overall)}',
+                      centerWidget: Text(
+                        'Total\n${_formatCurrency(overall)}',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                       chartValuesOptions: const ChartValuesOptions(
                         showChartValues: false,
