@@ -19,6 +19,7 @@ import 'dart:developer' as dev;
 import 'package:booksmart/utils/downloader.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/balance_sheet_excel_service.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/export_modal_widget.dart';
+import 'package:booksmart/modules/user/ui/financial_statement/pdf_export_service.dart';
 
 class BalanceSheetTab extends StatefulWidget {
   const BalanceSheetTab({super.key});
@@ -190,10 +191,38 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
   );
 }
 
-  void _exportExcel(FinancialReportController controller) async {
+  void _exportExcel(
+    FinancialReportController controller, {
+    PdfExportRequest? request,
+  }) async {
     try {
       final asOfDate = _endDate ?? DateTime.now();
-      final orgName = getCurrentOrganization?.name ?? 'Organization';
+      final org = getCurrentOrganization;
+      final orgName = org?.name.trim().isNotEmpty == true
+          ? org!.name.trim()
+          : 'Organization';
+      final streetLine = org?.street.trim() ?? '';
+      final cityStateZipLine = [
+        org?.city.trim() ?? '',
+        org?.state.trim() ?? '',
+        org?.zip.trim() ?? '',
+      ].where((e) => e.isNotEmpty).join(', ');
+      final asOfLine = 'As of ${DateFormat('MMMM dd, yyyy').format(asOfDate)}';
+      final exportService = PdfExportService();
+      final exportStart =
+          request?.startDate ??
+          _startDate ??
+          asOfDate.subtract(const Duration(days: 89));
+      final exportEnd = request?.endDate ?? asOfDate;
+      final exportViewType = request?.viewType ?? PdfViewType.monthly;
+      final bucketLabels = exportService.buildBucketLabels(
+        exportStart,
+        exportEnd,
+        exportViewType,
+      );
+      if (bucketLabels.isEmpty) {
+        throw Exception('No Excel columns available for selected range.');
+      }
       final excel = excel_lib.Excel.createExcel();
       final sheet = excel['Balance Sheet'];
       final existingSheets = List<String>.from(excel.tables.keys);
@@ -203,34 +232,78 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
           excel.delete(name);
         }
       }
+      final int labelCol = 0;
+      final int firstSymbolCol = 1;
+      final int yearCount = bucketLabels.length;
+      int symbolCol(int index) => firstSymbolCol + (index * 2);
+      int amountCol(int index) => symbolCol(index) + 1;
 
-      final headerStyle = excel_lib.CellStyle(
+      final titleStyle = excel_lib.CellStyle(
         bold: true,
-        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF0F1E37'),
+        fontSize: 20,
         horizontalAlign: excel_lib.HorizontalAlign.Center,
       );
-      final sectionStyle = excel_lib.CellStyle(
-        bold: true,
-        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF1F4E78'),
+      final metaCenterStyle = excel_lib.CellStyle(
+        fontSize: 10,
+        horizontalAlign: excel_lib.HorizontalAlign.Center,
       );
-      final labelStyle = excel_lib.CellStyle(
+      final companyStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 16,
         horizontalAlign: excel_lib.HorizontalAlign.Left,
       );
-      final totalStyle = excel_lib.CellStyle(
+      final headerStyle = excel_lib.CellStyle(
         bold: true,
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE9F0FA'),
+        fontSize: 10,
+        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF1F4E78'),
+        horizontalAlign: excel_lib.HorizontalAlign.Center,
+      );
+      final sectionLabelStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 10,
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+      );
+      final lineLabelStyle = excel_lib.CellStyle(
+        fontSize: 10,
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+      );
+      final totalLabelStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 10,
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE8EEF6'),
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+      );
+      final ratioHeaderStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 10,
+        fontColorHex: excel_lib.ExcelColor.fromHexString('FF1F1F1F'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFBFD3E8'),
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+      );
+      final ratioLabelStyle = excel_lib.CellStyle(
+        fontSize: 10,
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFD8E6F4'),
+      );
+      final dollarStyle = excel_lib.CellStyle(
+        fontSize: 10,
+        horizontalAlign: excel_lib.HorizontalAlign.Center,
       );
       final currencyStyle = excel_lib.CellStyle(
+        fontSize: 10,
         numberFormat: const excel_lib.CustomNumericNumFormat(
-          formatCode: r'$#,##0.00;[Red]-$#,##0.00',
+          formatCode: r'_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)',
         ),
         horizontalAlign: excel_lib.HorizontalAlign.Right,
       );
-      final currencyTotalStyle = currencyStyle.copyWith(
+      final totalCurrencyStyle = currencyStyle.copyWith(
         boldVal: true,
-        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFE9F0FA'),
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFE8EEF6'),
+      );
+      final totalDollarStyle = dollarStyle.copyWith(
+        boldVal: true,
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFE8EEF6'),
       );
 
       void setCell(
@@ -248,105 +321,603 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         }
       }
 
-      sheet.setColumnWidth(0, 42);
-      sheet.setColumnWidth(1, 18);
-
-      setCell(0, 0, excel_lib.TextCellValue('Balance Sheet'), headerStyle);
-      setCell(1, 0, excel_lib.TextCellValue('Balance Sheet'), headerStyle);
-      setCell(
-        0,
-        1,
-        excel_lib.TextCellValue(
-          '$orgName | As of ${DateFormat('MMM dd, yyyy').format(asOfDate)}',
-        ),
-        headerStyle,
-      );
-      setCell(
-        1,
-        1,
-        excel_lib.TextCellValue(
-          '$orgName | As of ${DateFormat('MMM dd, yyyy').format(asOfDate)}',
-        ),
-        headerStyle,
-      );
-      sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0),
-      );
-      sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 1),
-      );
-
-      int row = 3;
-      void writeHeader() {
-        setCell(0, row, excel_lib.TextCellValue('Line Item'), headerStyle);
-        setCell(1, row, excel_lib.TextCellValue('Amount'), headerStyle);
-        row++;
+      String colLetter(int columnIndexZeroBased) {
+        int index = columnIndexZeroBased + 1;
+        String result = '';
+        while (index > 0) {
+          final int rem = (index - 1) % 26;
+          result = String.fromCharCode(65 + rem) + result;
+          index = (index - 1) ~/ 26;
+        }
+        return result;
       }
 
-      void writeSection(String title) {
-        setCell(0, row, excel_lib.TextCellValue(title), sectionStyle);
-        setCell(1, row, excel_lib.TextCellValue(' '), sectionStyle);
-        row++;
+      String monthKey(DateTime d) => DateFormat('yyyy-MM').format(DateTime(d.year, d.month, 1));
+
+      List<DateTime> buildBucketStarts() {
+        switch (exportViewType) {
+          case PdfViewType.monthly:
+            final out = <DateTime>[];
+            var cursor = DateTime(exportStart.year, exportStart.month, 1);
+            final last = DateTime(exportEnd.year, exportEnd.month, 1);
+            while (!cursor.isAfter(last)) {
+              out.add(cursor);
+              cursor = DateTime(cursor.year, cursor.month + 1, 1);
+            }
+            return out;
+          case PdfViewType.quarterly:
+            final out = <DateTime>[];
+            var cursor = DateTime(
+              exportStart.year,
+              (((exportStart.month - 1) ~/ 3) * 3) + 1,
+              1,
+            );
+            while (!cursor.isAfter(exportEnd)) {
+              out.add(cursor);
+              cursor = DateTime(cursor.year, cursor.month + 3, 1);
+            }
+            return out;
+          case PdfViewType.yearly:
+            return [
+              for (int y = exportStart.year; y <= exportEnd.year; y++)
+                DateTime(y, 1, 1),
+            ];
+        }
+        return <DateTime>[];
       }
 
-      void writeRows(Map<String, double> map) {
-        map.forEach((key, value) {
-          final clean = key.contains(']') ? key.split(']').last.trim() : key;
-          setCell(0, row, excel_lib.TextCellValue(clean), labelStyle);
-          setCell(1, row, excel_lib.DoubleCellValue(value), currencyStyle);
-          row++;
-        });
+      final bucketStarts = buildBucketStarts();
+      final bucketMonthKeys = <List<String>>[
+        for (final start in bucketStarts)
+          switch (exportViewType) {
+            PdfViewType.monthly => [monthKey(start)],
+            PdfViewType.quarterly => [
+                monthKey(start),
+                monthKey(DateTime(start.year, start.month + 1, 1)),
+                monthKey(DateTime(start.year, start.month + 2, 1)),
+              ],
+            PdfViewType.yearly => [
+                for (int m = 1; m <= 12; m++) monthKey(DateTime(start.year, m, 1)),
+              ],
+          },
+      ];
+
+      double sumAllForBucket(
+        Map<String, Map<String, double>> periodic,
+        int bucketIdx,
+      ) {
+        double total = 0;
+        for (final mk in bucketMonthKeys[bucketIdx]) {
+          final rows = periodic[mk];
+          if (rows == null) continue;
+          total += rows.values.fold(0.0, (a, b) => a + b);
+        }
+        return total;
       }
 
-      void writeTotal(String label, double value) {
-        setCell(0, row, excel_lib.TextCellValue(label), totalStyle);
-        setCell(1, row, excel_lib.DoubleCellValue(value), currencyTotalStyle);
-        row++;
+      double sumMatchingForBucket(
+        Map<String, Map<String, double>> periodic,
+        int bucketIdx,
+        List<String> keywords,
+      ) {
+        double total = 0;
+        for (final mk in bucketMonthKeys[bucketIdx]) {
+          final rows = periodic[mk];
+          if (rows == null) continue;
+          for (final entry in rows.entries) {
+            final key = entry.key.toLowerCase();
+            if (keywords.any((k) => key.contains(k))) {
+              total += entry.value;
+            }
+          }
+        }
+        return total;
       }
 
-      final currentAssets =
-          controller.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
-      final fixedAssets =
-          controller.fixedAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
-      final otherAssets =
-          controller.otherAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
-      final totalAssets = controller.totalAssets.value;
-      final currentLiabilities = controller.currentLiabilitiesBreakdown.values
-          .fold(0.0, (a, b) => a + b);
-      final longTermLiabilities = controller.longTermLiabilitiesBreakdown.values
-          .fold(0.0, (a, b) => a + b);
-      final totalLiabilities = controller.totalLiabilities.value;
-      final equityMap = <String, double>{
-        'Net Income (Retained Earnings)': controller.netIncome.value,
-        ...controller.ownerEquityBreakdown,
+      Map<int, double> valuesMap(List<double> values) => {
+        for (int i = 0; i < values.length; i++) i: values[i],
       };
-      final totalEquity = totalAssets - totalLiabilities;
 
-      writeHeader();
-      writeSection('ASSETS');
-      writeSection('Current Assets');
-      writeRows(controller.currentAssetsBreakdown);
-      writeSection('Fixed Assets');
-      writeRows(controller.fixedAssetsBreakdown);
-      writeSection('Other Assets');
-      writeRows(controller.otherAssetsBreakdown);
-      writeTotal('TOTAL ASSETS', totalAssets);
+      for (int c = 0; c <= amountCol(yearCount - 1); c++) {
+        if (c == labelCol) {
+          sheet.setColumnWidth(c, 34);
+        } else if (c.isOdd) {
+          sheet.setColumnWidth(c, 4);
+        } else {
+          sheet.setColumnWidth(c, 11);
+        }
+      }
+      sheet.setColumnWidth(amountCol(yearCount - 1) + 1, 6);
+      sheet.setColumnWidth(amountCol(yearCount - 1) + 2, 34);
+      sheet.setRowHeight(1, 24);
+      sheet.setRowHeight(2, 16);
+      sheet.setRowHeight(3, 16);
+      sheet.setRowHeight(4, 16);
+      sheet.setRowHeight(5, 6);
+
+      setCell(labelCol, 1, excel_lib.TextCellValue(orgName), companyStyle);
+      setCell(labelCol, 2, excel_lib.TextCellValue(streetLine));
+      setCell(labelCol, 3, excel_lib.TextCellValue(cityStateZipLine));
+      setCell(firstSymbolCol, 1, excel_lib.TextCellValue('BALANCE SHEET'), titleStyle);
+      sheet.merge(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 1),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: amountCol(yearCount - 1), rowIndex: 1),
+      );
+      sheet.setMergedCellStyle(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 1),
+        titleStyle,
+      );
+      setCell(firstSymbolCol, 2, excel_lib.TextCellValue('Date Prepared:'));
+      sheet.merge(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 2),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: amountCol(yearCount - 1), rowIndex: 2),
+      );
+      sheet.setMergedCellStyle(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 2),
+        metaCenterStyle,
+      );
+      setCell(
+        firstSymbolCol,
+        3,
+        excel_lib.TextCellValue(asOfLine),
+      );
+      sheet.merge(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 3),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: amountCol(yearCount - 1), rowIndex: 3),
+      );
+      sheet.setMergedCellStyle(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 3),
+        metaCenterStyle,
+      );
+
+      int row = 6;
+      void writeYearHeader(String label) {
+        setCell(labelCol, row, excel_lib.TextCellValue(label), headerStyle);
+        for (int i = 0; i < yearCount; i++) {
+          setCell(
+            amountCol(i),
+            row,
+            excel_lib.TextCellValue(bucketLabels[i]),
+            headerStyle,
+          );
+          sheet.merge(
+            excel_lib.CellIndex.indexByColumnRow(columnIndex: symbolCol(i), rowIndex: row),
+            excel_lib.CellIndex.indexByColumnRow(columnIndex: amountCol(i), rowIndex: row),
+          );
+          sheet.setMergedCellStyle(
+            excel_lib.CellIndex.indexByColumnRow(columnIndex: symbolCol(i), rowIndex: row),
+            headerStyle,
+          );
+        }
+        row++;
+      }
+
+      int writeLine(
+        String label, {
+        bool isTotal = false,
+        bool isSection = false,
+        Map<int, double>? valuesByYearIndex,
+        Map<int, String>? formulasByYearIndex,
+        bool indent = false,
+        bool ratioLine = false,
+      }) {
+        final lineStyle = isSection
+            ? sectionLabelStyle
+            : isTotal
+                ? totalLabelStyle
+                : ratioLine
+                    ? ratioLabelStyle
+                    : lineLabelStyle;
+        setCell(
+          labelCol,
+          row,
+          excel_lib.TextCellValue(indent ? '      $label' : label),
+          lineStyle,
+        );
+
+        for (int i = 0; i < yearCount; i++) {
+          final excel_lib.CellStyle moneyStyle = isTotal
+              ? totalCurrencyStyle
+              : ratioLine
+                  ? currencyStyle.copyWith(
+                      backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFD8E6F4'),
+                    )
+                  : currencyStyle;
+          final excel_lib.CellStyle moneyDollarStyle = isTotal
+              ? totalDollarStyle
+              : ratioLine
+                  ? dollarStyle.copyWith(
+                      backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFD8E6F4'),
+                    )
+                  : dollarStyle;
+
+          setCell(symbolCol(i), row, excel_lib.TextCellValue('\$'), moneyDollarStyle);
+          if (formulasByYearIndex != null && formulasByYearIndex.containsKey(i)) {
+            setCell(
+              amountCol(i),
+              row,
+              excel_lib.FormulaCellValue(formulasByYearIndex[i]!),
+              moneyStyle,
+            );
+          } else {
+            final value = valuesByYearIndex?[i] ?? 0.0;
+            setCell(amountCol(i), row, excel_lib.DoubleCellValue(value), moneyStyle);
+          }
+        }
+        final writtenRow = row;
+        row++;
+        return writtenRow;
+      }
+
+      final currentAssetsVals = <double>[];
+      final fixedAssetsVals = <double>[];
+      final otherAssetsVals = <double>[];
+      final cashVals = <double>[];
+      final arVals = <double>[];
+      final inventoryVals = <double>[];
+      final shortTermInvestmentsVals = <double>[];
+      final currentLiabilitiesVals = <double>[];
+      final longTermLiabilitiesVals = <double>[];
+      final ownerInvestmentVals = <double>[];
+      final retainedEarningsVals = <double>[];
+      final totalAssetsVals = <double>[];
+      final totalLiabilitiesVals = <double>[];
+      final totalEquityVals = <double>[];
+
+      void adjustSeriesTotal(List<double> series, double expectedTotal) {
+        if (series.isEmpty) return;
+        final actual = series.fold(0.0, (a, b) => a + b);
+        final diff = expectedTotal - actual;
+        series[series.length - 1] += diff;
+      }
+
+      for (int i = 0; i < yearCount; i++) {
+        final curAssets = sumAllForBucket(
+          controller.periodicCurrentAssetsBreakdown,
+          i,
+        );
+        final fixedAssets = sumAllForBucket(
+          controller.periodicFixedAssetsBreakdown,
+          i,
+        );
+        final otherAssets = sumAllForBucket(
+          controller.periodicOtherAssetsBreakdown,
+          i,
+        );
+        final curLiab = sumAllForBucket(
+          controller.periodicCurrentLiabilitiesBreakdown,
+          i,
+        );
+        final longLiab = sumAllForBucket(
+          controller.periodicLongTermLiabilitiesBreakdown,
+          i,
+        );
+        final cash = sumMatchingForBucket(
+          controller.periodicCurrentAssetsBreakdown,
+          i,
+          ['cash'],
+        );
+        final ar = sumMatchingForBucket(
+          controller.periodicCurrentAssetsBreakdown,
+          i,
+          ['receivable'],
+        );
+        final inventory = sumMatchingForBucket(
+          controller.periodicCurrentAssetsBreakdown,
+          i,
+          ['inventory'],
+        );
+        final ownerInvestment = sumMatchingForBucket(
+          controller.periodicEquityBreakdown,
+          i,
+          ['owner', 'capital', 'contribution'],
+        );
+        final totalAssets = curAssets + fixedAssets + otherAssets;
+        final totalLiabilities = curLiab + longLiab;
+        final totalEquity = totalAssets - totalLiabilities;
+
+        currentAssetsVals.add(curAssets);
+        fixedAssetsVals.add(fixedAssets);
+        otherAssetsVals.add(otherAssets);
+        cashVals.add(cash);
+        arVals.add(ar);
+        inventoryVals.add(inventory);
+        shortTermInvestmentsVals.add(curAssets - cash - ar - inventory);
+        currentLiabilitiesVals.add(curLiab);
+        longTermLiabilitiesVals.add(longLiab);
+        ownerInvestmentVals.add(ownerInvestment);
+        retainedEarningsVals.add(totalEquity - ownerInvestment);
+        totalAssetsVals.add(totalAssets);
+        totalLiabilitiesVals.add(totalLiabilities);
+        totalEquityVals.add(totalEquity);
+      }
+
+      // Reconcile exported bucket totals with currently displayed dashboard totals.
+      // This guarantees Excel aggregates match BS dashboard numbers for selected range.
+      final expectedCurrentAssets = controller.currentAssetsBreakdown.values.fold(
+        0.0,
+        (a, b) => a + b,
+      );
+      final expectedFixedAssets = controller.fixedAssetsBreakdown.values.fold(
+        0.0,
+        (a, b) => a + b,
+      );
+      final expectedOtherAssets = controller.otherAssetsBreakdown.values.fold(
+        0.0,
+        (a, b) => a + b,
+      );
+      final expectedCurrentLiabilities = controller
+          .currentLiabilitiesBreakdown
+          .values
+          .fold(0.0, (a, b) => a + b);
+      final expectedLongTermLiabilities = controller
+          .longTermLiabilitiesBreakdown
+          .values
+          .fold(0.0, (a, b) => a + b);
+      final expectedOwnerInvestment = controller.ownerEquityBreakdown.values.fold(
+        0.0,
+        (a, b) => a + b,
+      );
+
+      adjustSeriesTotal(currentAssetsVals, expectedCurrentAssets);
+      adjustSeriesTotal(fixedAssetsVals, expectedFixedAssets);
+      adjustSeriesTotal(otherAssetsVals, expectedOtherAssets);
+      adjustSeriesTotal(currentLiabilitiesVals, expectedCurrentLiabilities);
+      adjustSeriesTotal(longTermLiabilitiesVals, expectedLongTermLiabilities);
+      adjustSeriesTotal(ownerInvestmentVals, expectedOwnerInvestment);
+
+      for (int i = 0; i < yearCount; i++) {
+        totalAssetsVals[i] =
+            currentAssetsVals[i] + fixedAssetsVals[i] + otherAssetsVals[i];
+        totalLiabilitiesVals[i] =
+            currentLiabilitiesVals[i] + longTermLiabilitiesVals[i];
+        totalEquityVals[i] = totalAssetsVals[i] - totalLiabilitiesVals[i];
+        retainedEarningsVals[i] = totalEquityVals[i] - ownerInvestmentVals[i];
+      }
+
+      writeYearHeader('ASSETS');
+
+      writeLine('CURRENT ASSETS', isSection: true);
+      writeLine(
+        'Cash',
+        indent: true,
+        valuesByYearIndex: valuesMap(cashVals),
+      );
+      writeLine(
+        'Accounts Receivable',
+        indent: true,
+        valuesByYearIndex: valuesMap(arVals),
+      );
+      writeLine(
+        'Inventory',
+        indent: true,
+        valuesByYearIndex: valuesMap(inventoryVals),
+      );
+      writeLine(
+        'Prepaid Expenses',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      writeLine(
+        'Short-Term Investments',
+        indent: true,
+        valuesByYearIndex: valuesMap(shortTermInvestmentsVals),
+      );
+      final rTotalCurrentAssets = writeLine(
+        'TOTAL CURRENT ASSETS',
+        isTotal: true,
+        valuesByYearIndex: valuesMap(currentAssetsVals),
+      );
+
+      writeLine('FIXED (LONG-TERM) ASSETS', isSection: true);
+      writeLine(
+        'Long-Term Investments',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      writeLine(
+        'Property, Plant, and Equipment',
+        indent: true,
+        valuesByYearIndex: valuesMap(fixedAssetsVals),
+      );
+      writeLine(
+        'Intangible Assets',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      writeLine(
+        'Accumulated Depreciation',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      final rTotalFixed = writeLine(
+        'TOTAL FIXED (LONG-TERM) ASSETS',
+        isTotal: true,
+        valuesByYearIndex: valuesMap(fixedAssetsVals),
+      );
+
+      writeLine('OTHER ASSETS', isSection: true);
+      writeLine(
+        'Deferred Income Tax',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      writeLine(
+        'Other',
+        indent: true,
+        valuesByYearIndex: valuesMap(otherAssetsVals),
+      );
+      final rTotalOtherAssets = writeLine(
+        'TOTAL OTHER ASSETS',
+        isTotal: true,
+        valuesByYearIndex: valuesMap(otherAssetsVals),
+      );
+
+      final rTotalAssets = writeLine(
+        'TOTAL ASSETS',
+        isTotal: true,
+        valuesByYearIndex: valuesMap(totalAssetsVals),
+      );
+
+      writeYearHeader('LIABILITIES AND OWNERS EQUITY');
+
+      writeLine('CURRENT LIABILITIES', isSection: true);
+      writeLine(
+        'Accounts Payable',
+        indent: true,
+        valuesByYearIndex: valuesMap(currentLiabilitiesVals),
+      );
+      writeLine(
+        'Short-Term Loans',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      writeLine(
+        'Income Taxes Payable',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      writeLine(
+        'Accrued Salaries and Wages',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      writeLine(
+        'Unearned Revenue',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      writeLine(
+        'Current Portion of Long-Term Debt',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      final rTotalCurrentLiab = writeLine(
+        'TOTAL CURRENT LIABILITIES',
+        isTotal: true,
+        valuesByYearIndex: valuesMap(currentLiabilitiesVals),
+      );
+
+      writeLine('LONG-TERM LIABILITIES', isSection: true);
+      writeLine(
+        'Long-term debt',
+        indent: true,
+        valuesByYearIndex: valuesMap(longTermLiabilitiesVals),
+      );
+      writeLine(
+        'Deferred income tax',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      writeLine(
+        'Other',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      final rTotalLongTermLiab = writeLine(
+        'TOTAL LONG-TERM LIABILITIES',
+        isTotal: true,
+        valuesByYearIndex: valuesMap(longTermLiabilitiesVals),
+      );
+
+      writeLine('OWNER\'S EQUITY', isSection: true);
+      writeLine(
+        'Owner\'s Investment',
+        indent: true,
+        valuesByYearIndex: valuesMap(ownerInvestmentVals),
+      );
+      writeLine(
+        'Retained Earnings',
+        indent: true,
+        valuesByYearIndex: valuesMap(retainedEarningsVals),
+      );
+      writeLine(
+        'Other',
+        indent: true,
+        valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
+      );
+      final rTotalEquity = writeLine(
+        'TOTAL OWNER\'S EQUITY',
+        isTotal: true,
+        valuesByYearIndex: valuesMap(totalEquityVals),
+      );
+
+      final rTotalLiabEq = writeLine(
+        'TOTAL LIABILITIES AND OWNERS EQUITY',
+        isTotal: true,
+        valuesByYearIndex: valuesMap(
+          List<double>.generate(
+            yearCount,
+            (i) => totalLiabilitiesVals[i] + totalEquityVals[i],
+          ),
+        ),
+      );
 
       row++;
-      writeSection('LIABILITIES');
-      writeSection('Current Liabilities');
-      writeRows(controller.currentLiabilitiesBreakdown);
-      writeSection('Long-Term Liabilities');
-      writeRows(controller.longTermLiabilitiesBreakdown);
-      writeTotal('TOTAL LIABILITIES', totalLiabilities);
-
+      setCell(labelCol, row, excel_lib.TextCellValue('FINANCIAL RATIOS'), ratioHeaderStyle);
+      for (int i = 0; i < yearCount; i++) {
+        setCell(
+          amountCol(i),
+          row,
+          excel_lib.TextCellValue(bucketLabels[i]),
+          ratioHeaderStyle,
+        );
+        sheet.merge(
+          excel_lib.CellIndex.indexByColumnRow(columnIndex: symbolCol(i), rowIndex: row),
+          excel_lib.CellIndex.indexByColumnRow(columnIndex: amountCol(i), rowIndex: row),
+        );
+        sheet.setMergedCellStyle(
+          excel_lib.CellIndex.indexByColumnRow(columnIndex: symbolCol(i), rowIndex: row),
+          ratioHeaderStyle,
+        );
+      }
       row++;
-      writeSection('OWNER\'S EQUITY');
-      writeRows(equityMap);
-      writeTotal('TOTAL EQUITY', totalEquity);
-      writeTotal('TOTAL LIABILITIES + EQUITY', totalLiabilities + totalEquity);
+
+      writeLine(
+        'Debt Ratio (Total Liabilities / Total Assets)',
+        ratioLine: true,
+        formulasByYearIndex: {
+          for (int i = 0; i < yearCount; i++)
+            i:
+                '=IFERROR((${colLetter(amountCol(i))}${rTotalCurrentLiab + 1}+${colLetter(amountCol(i))}${rTotalLongTermLiab + 1})/${colLetter(amountCol(i))}${rTotalAssets + 1},0)',
+        },
+      );
+      writeLine(
+        'Current Ratio (Current Assets / Current Liabilities)',
+        ratioLine: true,
+        formulasByYearIndex: {
+          for (int i = 0; i < yearCount; i++)
+            i:
+                '=IFERROR(${colLetter(amountCol(i))}${rTotalCurrentAssets + 1}/${colLetter(amountCol(i))}${rTotalCurrentLiab + 1},0)',
+        },
+      );
+      writeLine(
+        'Working Capital (Current Assets - Current Liabilities)',
+        ratioLine: true,
+        formulasByYearIndex: {
+          for (int i = 0; i < yearCount; i++)
+            i:
+                '=${colLetter(amountCol(i))}${rTotalCurrentAssets + 1}-${colLetter(amountCol(i))}${rTotalCurrentLiab + 1}',
+        },
+      );
+      writeLine(
+        'Assets-to-Equity Ratio (Total Assets / Owner\'s Equity)',
+        ratioLine: true,
+        formulasByYearIndex: {
+          for (int i = 0; i < yearCount; i++)
+            i:
+                '=IFERROR(${colLetter(amountCol(i))}${rTotalAssets + 1}/${colLetter(amountCol(i))}${rTotalEquity + 1},0)',
+        },
+      );
+      writeLine(
+        'Debt-to-Equity Ratio (Total Liabilities / Owner\'s Equity)',
+        ratioLine: true,
+        formulasByYearIndex: {
+          for (int i = 0; i < yearCount; i++)
+            i:
+                '=IFERROR((${colLetter(amountCol(i))}${rTotalCurrentLiab + 1}+${colLetter(amountCol(i))}${rTotalLongTermLiab + 1})/${colLetter(amountCol(i))}${rTotalEquity + 1},0)',
+        },
+      );
 
       final bytes = excel.save();
       if (bytes == null) {
@@ -679,15 +1250,27 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                               onExport: (request) async {
                                 final DateTime asOfDate = request.endDate;
                                 final start = _deriveStartDateForEndDate(asOfDate);
+                                final normalizedRequest = PdfExportRequest(
+                                  startDate: start ?? request.startDate,
+                                  endDate: asOfDate,
+                                  viewType: request.viewType,
+                                  templateVariant: request.templateVariant,
+                                  companyName: request.companyName,
+                                  companyAddress: request.companyAddress,
+                                  logoBytes: request.logoBytes,
+                                );
                                 setState(() {
-                                  _startDate = start;
-                                  _endDate = asOfDate;
+                                  _startDate = normalizedRequest.startDate;
+                                  _endDate = normalizedRequest.endDate;
                                 });
                                 await controller.fetchAndAggregateData(
-                                  startDate: start,
-                                  endDate: asOfDate,
+                                  startDate: normalizedRequest.startDate,
+                                  endDate: normalizedRequest.endDate,
                                 );
-                                await _exportPDF(controller);
+                                await _exportPDF(
+                                  controller,
+                                  request: normalizedRequest,
+                                );
                               },
                             );
                           }
@@ -706,18 +1289,33 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                               useSingleDate: true,
                               singleDateLabel: 'As Of Date',
                               initialEndDate: _endDate,
+                              initialStartDate: _startDate,
                               onExport: (request) async {
-                                final DateTime asOfDate = request.endDate;
-                                final start = _deriveStartDateForEndDate(asOfDate);
+                                final asOfDate = request.endDate;
+                                final derivedStart =
+                                    _deriveStartDateForEndDate(asOfDate) ??
+                                    request.startDate;
+                                final normalizedRequest = PdfExportRequest(
+                                  startDate: derivedStart,
+                                  endDate: asOfDate,
+                                  viewType: request.viewType,
+                                  templateVariant: request.templateVariant,
+                                  companyName: request.companyName,
+                                  companyAddress: request.companyAddress,
+                                  logoBytes: request.logoBytes,
+                                );
                                 setState(() {
-                                  _startDate = start;
-                                  _endDate = asOfDate;
+                                  _startDate = normalizedRequest.startDate;
+                                  _endDate = normalizedRequest.endDate;
                                 });
                                 await controller.fetchAndAggregateData(
-                                  startDate: start,
-                                  endDate: asOfDate,
+                                  startDate: normalizedRequest.startDate,
+                                  endDate: normalizedRequest.endDate,
                                 );
-                                _exportExcel(controller);
+                                _exportExcel(
+                                  controller,
+                                  request: normalizedRequest,
+                                );
                               },
                             );
                           }
@@ -1383,151 +1981,636 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     );
   }
 
-  Future<void> _exportPDF(FinancialReportController controller) async {
+  Future<void> _exportPDF(
+    FinancialReportController controller, {
+    PdfExportRequest? request,
+  }) async {
     try {
       final asOfDate = _endDate ?? DateTime.now();
-      final orgName = getCurrentOrganization?.name ?? 'Organization';
-      final formatter = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
-      String fmt(double v) => formatter.format(v);
+      final org = getCurrentOrganization;
+      final orgName = org?.name.trim().isNotEmpty == true
+          ? org!.name.trim()
+          : 'Organization';
+      final streetLine = org?.street.trim() ?? '';
+      final cityStateZipLine = [
+        org?.city.trim() ?? '',
+        org?.state.trim() ?? '',
+        org?.zip.trim() ?? '',
+      ].where((e) => e.isNotEmpty).join(', ');
+      final exportService = PdfExportService();
+      final exportStart =
+          request?.startDate ??
+          _startDate ??
+          asOfDate.subtract(const Duration(days: 89));
+      final exportEnd = request?.endDate ?? asOfDate;
+      final exportViewType = request?.viewType ?? PdfViewType.monthly;
+      final labels = exportService.buildBucketLabels(
+        exportStart,
+        exportEnd,
+        exportViewType,
+      );
+      if (labels.isEmpty) {
+        throw Exception('No PDF columns available for selected range.');
+      }
+      final int yearCount = labels.length;
 
-      final currentAssets =
-          controller.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
-      final fixedAssets =
-          controller.fixedAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
-      final otherAssets =
-          controller.otherAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
-      final totalAssets = controller.totalAssets.value;
+      double pickByKeywords(Map<String, double> map, List<String> keywords) {
+        double total = 0;
+        for (final entry in map.entries) {
+          final key = entry.key.toLowerCase();
+          if (keywords.any((k) => key.contains(k))) {
+            total += entry.value;
+          }
+        }
+        return total;
+      }
 
-      final currentLiabilities = controller.currentLiabilitiesBreakdown.values
+      String monthKey(DateTime d) => DateFormat(
+        'yyyy-MM',
+      ).format(DateTime(d.year, d.month, 1));
+
+      List<DateTime> buildBucketStarts() {
+        switch (exportViewType) {
+          case PdfViewType.monthly:
+            final out = <DateTime>[];
+            var cursor = DateTime(exportStart.year, exportStart.month, 1);
+            final last = DateTime(exportEnd.year, exportEnd.month, 1);
+            while (!cursor.isAfter(last)) {
+              out.add(cursor);
+              cursor = DateTime(cursor.year, cursor.month + 1, 1);
+            }
+            return out;
+          case PdfViewType.quarterly:
+            final out = <DateTime>[];
+            var cursor = DateTime(
+              exportStart.year,
+              (((exportStart.month - 1) ~/ 3) * 3) + 1,
+              1,
+            );
+            while (!cursor.isAfter(exportEnd)) {
+              out.add(cursor);
+              cursor = DateTime(cursor.year, cursor.month + 3, 1);
+            }
+            return out;
+          case PdfViewType.yearly:
+            return [
+              for (int y = exportStart.year; y <= exportEnd.year; y++)
+                DateTime(y, 1, 1),
+            ];
+        }
+      }
+
+      final bucketStarts = buildBucketStarts();
+      final bucketMonthKeys = <List<String>>[
+        for (final start in bucketStarts)
+          switch (exportViewType) {
+            PdfViewType.monthly => [monthKey(start)],
+            PdfViewType.quarterly => [
+                monthKey(start),
+                monthKey(DateTime(start.year, start.month + 1, 1)),
+                monthKey(DateTime(start.year, start.month + 2, 1)),
+              ],
+            PdfViewType.yearly => [
+                for (int m = 1; m <= 12; m++) monthKey(DateTime(start.year, m, 1)),
+              ],
+          },
+      ];
+
+      double sumAllForBucket(
+        Map<String, Map<String, double>> periodic,
+        int bucketIdx,
+      ) {
+        double total = 0;
+        for (final mk in bucketMonthKeys[bucketIdx]) {
+          final rows = periodic[mk];
+          if (rows == null) continue;
+          total += rows.values.fold(0.0, (a, b) => a + b);
+        }
+        return total;
+      }
+
+      double sumMatchingForBucket(
+        Map<String, Map<String, double>> periodic,
+        int bucketIdx,
+        List<String> keywords,
+      ) {
+        double total = 0;
+        for (final mk in bucketMonthKeys[bucketIdx]) {
+          final rows = periodic[mk];
+          if (rows == null) continue;
+          for (final entry in rows.entries) {
+            final key = entry.key.toLowerCase();
+            if (keywords.any((k) => key.contains(k))) {
+              total += entry.value;
+            }
+          }
+        }
+        return total;
+      }
+
+      final dashboardCurrentAssets = controller.currentAssetsBreakdown.values
           .fold(0.0, (a, b) => a + b);
-      final longTermLiabilities = controller.longTermLiabilitiesBreakdown.values
+      final dashboardFixedAssets = controller.fixedAssetsBreakdown.values.fold(
+        0.0,
+        (a, b) => a + b,
+      );
+      final dashboardOtherAssets = controller.otherAssetsBreakdown.values.fold(
+        0.0,
+        (a, b) => a + b,
+      );
+      final dashboardCurrentLiabilities = controller
+          .currentLiabilitiesBreakdown
+          .values
           .fold(0.0, (a, b) => a + b);
-      final totalLiabilities = controller.totalLiabilities.value;
+      final dashboardLongTermLiabilities = controller
+          .longTermLiabilitiesBreakdown
+          .values
+          .fold(0.0, (a, b) => a + b);
+      final dashboardOwnerInvestment = controller.ownerEquityBreakdown.values
+          .fold(0.0, (a, b) => a + b);
+      final dashboardTotalAssets = controller.totalAssets.value;
+      final dashboardTotalLiabilities = controller.totalLiabilities.value;
+      final dashboardTotalEquity =
+          dashboardTotalAssets - dashboardTotalLiabilities;
 
-      final equityMap = <String, double>{
-        'Net Income (Retained Earnings)': controller.netIncome.value,
-        ...controller.ownerEquityBreakdown,
-      };
-      final totalEquity = totalAssets - totalLiabilities;
+      final currentAssetsVals = <double>[];
+      final fixedAssetsVals = <double>[];
+      final otherAssetsVals = <double>[];
+      final cashVals = <double>[];
+      final arVals = <double>[];
+      final inventoryVals = <double>[];
+      final shortTermInvestmentsVals = <double>[];
+      final ppeVals = <double>[];
+      final depreciationVals = <double>[];
+      final currentLiabilitiesVals = <double>[];
+      final longTermLiabilitiesVals = <double>[];
+      final ownerInvestmentVals = <double>[];
+      final totalAssetsVals = <double>[];
+      final totalLiabilitiesVals = <double>[];
+      final totalEquityVals = <double>[];
+      final retainedEarningsVals = <double>[];
+
+      for (int i = 0; i < yearCount; i++) {
+        final curAssets = sumAllForBucket(
+          controller.periodicCurrentAssetsBreakdown,
+          i,
+        );
+        final fixedAssets = sumAllForBucket(
+          controller.periodicFixedAssetsBreakdown,
+          i,
+        );
+        final otherAssets = sumAllForBucket(
+          controller.periodicOtherAssetsBreakdown,
+          i,
+        );
+        final curLiab = sumAllForBucket(
+          controller.periodicCurrentLiabilitiesBreakdown,
+          i,
+        );
+        final longLiab = sumAllForBucket(
+          controller.periodicLongTermLiabilitiesBreakdown,
+          i,
+        );
+        final cash = sumMatchingForBucket(
+          controller.periodicCurrentAssetsBreakdown,
+          i,
+          ['cash'],
+        );
+        final ar = sumMatchingForBucket(
+          controller.periodicCurrentAssetsBreakdown,
+          i,
+          ['receivable'],
+        );
+        final inventory = sumMatchingForBucket(
+          controller.periodicCurrentAssetsBreakdown,
+          i,
+          ['inventory'],
+        );
+        final rawDep = sumMatchingForBucket(
+          controller.periodicFixedAssetsBreakdown,
+          i,
+          ['depreciation', 'amortization', 'accumulated'],
+        );
+        final dep = rawDep > 0 ? -rawDep : rawDep;
+        final ppe = fixedAssets - dep;
+        final ownerInvestment = sumMatchingForBucket(
+          controller.periodicEquityBreakdown,
+          i,
+          ['owner', 'capital', 'contribution'],
+        );
+        final totalAssets = curAssets + fixedAssets + otherAssets;
+        final totalLiabilities = curLiab + longLiab;
+        final totalEquity = totalAssets - totalLiabilities;
+
+        currentAssetsVals.add(curAssets);
+        fixedAssetsVals.add(fixedAssets);
+        otherAssetsVals.add(otherAssets);
+        cashVals.add(cash);
+        arVals.add(ar);
+        inventoryVals.add(inventory);
+        shortTermInvestmentsVals.add(curAssets - cash - ar - inventory);
+        ppeVals.add(ppe);
+        depreciationVals.add(dep);
+        currentLiabilitiesVals.add(curLiab);
+        longTermLiabilitiesVals.add(longLiab);
+        ownerInvestmentVals.add(ownerInvestment);
+        totalAssetsVals.add(totalAssets);
+        totalLiabilitiesVals.add(totalLiabilities);
+        totalEquityVals.add(totalEquity);
+        retainedEarningsVals.add(totalEquity - ownerInvestment);
+      }
+
+      // Keep latest visible bucket synced with dashboard values.
+      final int lastIdx = yearCount - 1;
+      currentAssetsVals[lastIdx] = dashboardCurrentAssets;
+      fixedAssetsVals[lastIdx] = dashboardFixedAssets;
+      otherAssetsVals[lastIdx] = dashboardOtherAssets;
+      currentLiabilitiesVals[lastIdx] = dashboardCurrentLiabilities;
+      longTermLiabilitiesVals[lastIdx] = dashboardLongTermLiabilities;
+      ownerInvestmentVals[lastIdx] = dashboardOwnerInvestment;
+      totalAssetsVals[lastIdx] = dashboardTotalAssets;
+      totalLiabilitiesVals[lastIdx] = dashboardTotalLiabilities;
+      totalEquityVals[lastIdx] = dashboardTotalEquity;
+      retainedEarningsVals[lastIdx] =
+          dashboardTotalEquity - dashboardOwnerInvestment;
+
+      final cashNow = pickByKeywords(controller.currentAssetsBreakdown, ['cash']);
+      final arNow = pickByKeywords(controller.currentAssetsBreakdown, ['receivable']);
+      final inventoryNow = pickByKeywords(
+        controller.currentAssetsBreakdown,
+        ['inventory'],
+      );
+      final rawDepNow = pickByKeywords(controller.fixedAssetsBreakdown, [
+        'depreciation',
+        'amortization',
+        'accumulated',
+      ]);
+      final depNow = rawDepNow > 0 ? -rawDepNow : rawDepNow;
+      cashVals[lastIdx] = cashNow;
+      arVals[lastIdx] = arNow;
+      inventoryVals[lastIdx] = inventoryNow;
+      shortTermInvestmentsVals[lastIdx] =
+          dashboardCurrentAssets - cashNow - arNow - inventoryNow;
+      depreciationVals[lastIdx] = depNow;
+      ppeVals[lastIdx] = dashboardFixedAssets - depNow;
+
+      final moneyFmt = NumberFormat('#,##0.00');
+      String amountText(double v) {
+        if (v == 0) return '-';
+        final core = moneyFmt.format(v.abs());
+        return v < 0 ? '- $core' : core;
+      }
 
       final pdf = pdf_gen.PdfDocument();
+      pdf.pageSettings.orientation = pdf_gen.PdfPageOrientation.landscape;
       final page = pdf.pages.add();
       final size = page.getClientSize();
-      final titleFont = pdf_gen.PdfStandardFont(
-        pdf_gen.PdfFontFamily.helvetica,
-        18,
-        style: pdf_gen.PdfFontStyle.bold,
-      );
+      final contentX = 12.0;
+      final contentWidth = size.width - (contentX * 2);
+      final titleFont = pdf_gen.PdfStandardFont(pdf_gen.PdfFontFamily.helvetica, 14, style: pdf_gen.PdfFontStyle.bold);
       final subtitleFont = pdf_gen.PdfStandardFont(
         pdf_gen.PdfFontFamily.helvetica,
-        11,
+        7,
       );
       final bodyFont = pdf_gen.PdfStandardFont(
         pdf_gen.PdfFontFamily.helvetica,
-        10,
+        7,
       );
       final boldFont = pdf_gen.PdfStandardFont(
         pdf_gen.PdfFontFamily.helvetica,
-        10,
+        7.2,
         style: pdf_gen.PdfFontStyle.bold,
       );
+      final smallFont = pdf_gen.PdfStandardFont(pdf_gen.PdfFontFamily.helvetica, 7);
 
       page.graphics.drawString(
         orgName,
-        titleFont,
-        bounds: Rect.fromLTWH(20, 18, size.width - 40, 24),
-      );
-      page.graphics.drawString(
-        'Balance Sheet',
         boldFont,
-        bounds: Rect.fromLTWH(20, 44, size.width - 40, 18),
+        bounds: Rect.fromLTWH(contentX, 14, contentWidth * 0.34, 18),
       );
       page.graphics.drawString(
-        'As of ${DateFormat('MMM dd, yyyy').format(asOfDate)}',
+        streetLine,
+        smallFont,
+        bounds: Rect.fromLTWH(contentX, 30, contentWidth * 0.34, 12),
+      );
+      page.graphics.drawString(
+        cityStateZipLine,
+        smallFont,
+        bounds: Rect.fromLTWH(contentX, 42, contentWidth * 0.34, 12),
+      );
+      page.graphics.drawString(
+        'BALANCE SHEET',
+        titleFont,
+        bounds: Rect.fromLTWH(contentX + (contentWidth * 0.36), 14, contentWidth * 0.36, 22),
+      );
+      page.graphics.drawString(
+        'Date Prepared:',
+        smallFont,
+        bounds: Rect.fromLTWH(contentX + (contentWidth * 0.42), 30, contentWidth * 0.28, 12),
+      );
+      page.graphics.drawString(
+        'As of ${DateFormat('MMMM dd, yyyy').format(asOfDate)}',
         subtitleFont,
-        bounds: Rect.fromLTWH(20, 62, size.width - 40, 16),
+        bounds: Rect.fromLTWH(contentX + (contentWidth * 0.36), 42, contentWidth * 0.36, 12),
       );
 
       final grid = pdf_gen.PdfGrid();
-      grid.columns.add(count: 2);
-      grid.columns[0].width = size.width * 0.68;
-      grid.columns[1].width = size.width * 0.28;
+      final colCount = 1 + (yearCount * 2);
+      grid.columns.add(count: colCount);
+      grid.columns[0].width = contentWidth * 0.50;
+      for (int i = 0; i < yearCount; i++) {
+        grid.columns[1 + (i * 2)].width = contentWidth * 0.018;
+        grid.columns[2 + (i * 2)].width = contentWidth * 0.058;
+      }
       final header = grid.headers.add(1)[0];
-      header.cells[0].value = 'Line Item';
-      header.cells[1].value = 'Amount';
+      header.cells[0].value = 'ASSETS';
+      for (int i = 0; i < yearCount; i++) {
+        header.cells[1 + (i * 2)].value = labels[i];
+      }
       header.style = pdf_gen.PdfGridRowStyle(
-        backgroundBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(15, 30, 55)),
+        backgroundBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(31, 78, 120)),
         textBrush: pdf_gen.PdfBrushes.white,
         font: boldFont,
       );
-
-      void addSection(String title) {
-        final row = grid.rows.add();
-        row.cells[0].value = title;
-        row.cells[0].columnSpan = 2;
-        row.style = pdf_gen.PdfGridRowStyle(
-          font: boldFont,
-          textBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(15, 30, 55)),
-        );
-      }
-
-      void addRows(Map<String, double> data) {
-        data.forEach((label, value) {
-          final row = grid.rows.add();
-          row.cells[0].value =
-              label.contains(']') ? label.split(']').last.trim() : label;
-          row.cells[1].value = fmt(value);
-          row.cells[1].style = pdf_gen.PdfGridCellStyle(
-            format: pdf_gen.PdfStringFormat(
-              alignment: pdf_gen.PdfTextAlignment.right,
-            ),
-          );
-          row.style = pdf_gen.PdfGridRowStyle(font: bodyFont);
-        });
-      }
-
-      void addTotal(String label, double value) {
-        final row = grid.rows.add();
-        row.cells[0].value = label;
-        row.cells[1].value = fmt(value);
-        row.style = pdf_gen.PdfGridRowStyle(
-          font: boldFont,
-          backgroundBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(233, 240, 250)),
-        );
-        row.cells[1].style = pdf_gen.PdfGridCellStyle(
+      for (int i = 0; i < yearCount; i++) {
+        header.cells[1 + (i * 2)].columnSpan = 2;
+        header.cells[1 + (i * 2)].style = pdf_gen.PdfGridCellStyle(
           format: pdf_gen.PdfStringFormat(
-            alignment: pdf_gen.PdfTextAlignment.right,
+            alignment: pdf_gen.PdfTextAlignment.center,
+            lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
+          ),
+          borders: pdf_gen.PdfBorders(
+            bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(31, 78, 120), width: 0.8),
+            left: pdf_gen.PdfPens.transparent,
+            right: pdf_gen.PdfPens.transparent,
+            top: pdf_gen.PdfPens.transparent,
           ),
         );
       }
+      header.cells[0].style = pdf_gen.PdfGridCellStyle(
+        borders: pdf_gen.PdfBorders(
+          bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(31, 78, 120), width: 0.8),
+          left: pdf_gen.PdfPens.transparent,
+          right: pdf_gen.PdfPens.transparent,
+          top: pdf_gen.PdfPens.transparent,
+        ),
+      );
 
-      addSection('ASSETS');
-      addSection('Current Assets');
-      addRows(controller.currentAssetsBreakdown);
-      addSection('Fixed Assets');
-      addRows(controller.fixedAssetsBreakdown);
-      addSection('Other Assets');
-      addRows(controller.otherAssetsBreakdown);
-      addTotal('TOTAL ASSETS', totalAssets);
+      void addTemplateRow(
+        String label,
+        List<double> values, {
+        bool bold = false,
+        bool shaded = false,
+        bool indent = false,
+        bool redNegativeValues = false,
+      }) {
+        final row = grid.rows.add();
+        row.cells[0].value = indent ? '      $label' : label;
+        for (int i = 0; i < yearCount; i++) {
+          row.cells[1 + (i * 2)].value = '\$';
+          row.cells[1 + (i * 2)].style = pdf_gen.PdfGridCellStyle(
+            borders: pdf_gen.PdfBorders(
+              bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(236, 236, 236), width: 0.25),
+              left: pdf_gen.PdfPens.transparent,
+              right: pdf_gen.PdfPens.transparent,
+              top: pdf_gen.PdfPens.transparent,
+            ),
+          );
+          row.cells[2 + (i * 2)].value = amountText(values[i]);
+          row.cells[2 + (i * 2)].style = pdf_gen.PdfGridCellStyle(
+            format: pdf_gen.PdfStringFormat(
+              alignment: pdf_gen.PdfTextAlignment.right,
+            ),
+            textBrush: redNegativeValues && values[i] < 0
+                ? pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(190, 65, 65))
+                : null,
+            borders: pdf_gen.PdfBorders(
+              bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(236, 236, 236), width: 0.25),
+              left: pdf_gen.PdfPens.transparent,
+              right: pdf_gen.PdfPens.transparent,
+              top: pdf_gen.PdfPens.transparent,
+            ),
+          );
+        }
+        row.cells[0].style = pdf_gen.PdfGridCellStyle(
+          borders: pdf_gen.PdfBorders(
+            bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(236, 236, 236), width: 0.25),
+            left: pdf_gen.PdfPens.transparent,
+            right: pdf_gen.PdfPens.transparent,
+            top: pdf_gen.PdfPens.transparent,
+          ),
+        );
+        row.style = pdf_gen.PdfGridRowStyle(
+          font: bold ? boldFont : bodyFont,
+          backgroundBrush: shaded
+              ? pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(233, 240, 250))
+              : null,
+        );
+      }
 
-      addSection('LIABILITIES');
-      addSection('Current Liabilities');
-      addRows(controller.currentLiabilitiesBreakdown);
-      addSection('Long-Term Liabilities');
-      addRows(controller.longTermLiabilitiesBreakdown);
-      addTotal('TOTAL LIABILITIES', totalLiabilities);
+      void addHeaderRow(String title) {
+        final row = grid.rows.add();
+        row.cells[0].value = title;
+        for (int i = 0; i < yearCount; i++) {
+          row.cells[1 + (i * 2)].value = labels[i];
+          row.cells[1 + (i * 2)].columnSpan = 2;
+          row.cells[1 + (i * 2)].style = pdf_gen.PdfGridCellStyle(
+            format: pdf_gen.PdfStringFormat(
+              alignment: pdf_gen.PdfTextAlignment.center,
+              lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
+            ),
+            borders: pdf_gen.PdfBorders(
+              bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(31, 78, 120), width: 0.8),
+              left: pdf_gen.PdfPens.transparent,
+              right: pdf_gen.PdfPens.transparent,
+              top: pdf_gen.PdfPens.transparent,
+            ),
+          );
+        }
+        row.cells[0].style = pdf_gen.PdfGridCellStyle(
+          borders: pdf_gen.PdfBorders(
+            bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(31, 78, 120), width: 0.8),
+            left: pdf_gen.PdfPens.transparent,
+            right: pdf_gen.PdfPens.transparent,
+            top: pdf_gen.PdfPens.transparent,
+          ),
+        );
+        row.style = pdf_gen.PdfGridRowStyle(
+          font: boldFont,
+          backgroundBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(31, 78, 120)),
+          textBrush: pdf_gen.PdfBrushes.white,
+        );
+      }
 
-      addSection('OWNER\'S EQUITY');
-      addRows(equityMap);
-      addTotal('TOTAL EQUITY', totalEquity);
-      addTotal('TOTAL LIABILITIES + EQUITY', totalLiabilities + totalEquity);
+      addTemplateRow(
+        'CURRENT ASSETS',
+        List<double>.filled(yearCount, 0),
+        bold: true,
+      );
+      addTemplateRow('Cash', cashVals, indent: true);
+      addTemplateRow('Accounts Receivable', arVals, indent: true);
+      addTemplateRow('Inventory', inventoryVals, indent: true);
+      addTemplateRow(
+        'Prepaid Expenses',
+        List<double>.filled(yearCount, 0),
+        indent: true,
+      );
+      addTemplateRow(
+        'Short-Term Investments',
+        shortTermInvestmentsVals,
+        indent: true,
+      );
+      addTemplateRow(
+        'TOTAL CURRENT ASSETS',
+        currentAssetsVals,
+        bold: true,
+        shaded: true,
+      );
+
+      addTemplateRow(
+        'FIXED (LONG-TERM) ASSETS',
+        List<double>.filled(yearCount, 0),
+        bold: true,
+      );
+      addTemplateRow(
+        'Long-Term Investments',
+        List<double>.filled(yearCount, 0),
+        indent: true,
+      );
+      addTemplateRow(
+        'Property, Plant, and Equipment',
+        ppeVals,
+        indent: true,
+      );
+      addTemplateRow(
+        'Intangible Assets',
+        List<double>.filled(yearCount, 0),
+        indent: true,
+      );
+      addTemplateRow(
+        'Accumulated Depreciation',
+        depreciationVals,
+        indent: true,
+        redNegativeValues: true,
+      );
+      addTemplateRow(
+        'TOTAL FIXED (LONG-TERM) ASSETS',
+        fixedAssetsVals,
+        bold: true,
+        shaded: true,
+      );
+
+      addTemplateRow(
+        'OTHER ASSETS',
+        List<double>.filled(yearCount, 0),
+        bold: true,
+      );
+      addTemplateRow(
+        'Deferred Income Tax',
+        List<double>.filled(yearCount, 0),
+        indent: true,
+      );
+      addTemplateRow('Other', otherAssetsVals, indent: true);
+      addTemplateRow(
+        'TOTAL OTHER ASSETS',
+        otherAssetsVals,
+        bold: true,
+        shaded: true,
+      );
+      addTemplateRow('TOTAL ASSETS', totalAssetsVals, bold: true, shaded: true);
+
+      addHeaderRow('LIABILITIES AND OWNERS EQUITY');
+      addTemplateRow(
+        'CURRENT LIABILITIES',
+        List<double>.filled(yearCount, 0),
+        bold: true,
+      );
+      addTemplateRow(
+        'Accounts Payable',
+        currentLiabilitiesVals,
+        indent: true,
+      );
+      addTemplateRow(
+        'Short-Term Loans',
+        List<double>.filled(yearCount, 0),
+        indent: true,
+      );
+      addTemplateRow(
+        'Income Taxes Payable',
+        List<double>.filled(yearCount, 0),
+        indent: true,
+      );
+      addTemplateRow(
+        'Accrued Salaries and Wages',
+        List<double>.filled(yearCount, 0),
+        indent: true,
+      );
+      addTemplateRow(
+        'Unearned Revenue',
+        List<double>.filled(yearCount, 0),
+        indent: true,
+      );
+      addTemplateRow(
+        'Current Portion of Long-Term Debt',
+        List<double>.filled(yearCount, 0),
+        indent: true,
+      );
+      addTemplateRow(
+        'TOTAL CURRENT LIABILITIES',
+        currentLiabilitiesVals,
+        bold: true,
+        shaded: true,
+      );
+
+      addTemplateRow(
+        'LONG-TERM LIABILITIES',
+        List<double>.filled(yearCount, 0),
+        bold: true,
+      );
+      addTemplateRow('Long-term debt', longTermLiabilitiesVals, indent: true);
+      addTemplateRow(
+        'Deferred income tax',
+        List<double>.filled(yearCount, 0),
+        indent: true,
+      );
+      addTemplateRow('Other', List<double>.filled(yearCount, 0), indent: true);
+      addTemplateRow(
+        'TOTAL LONG-TERM LIABILITIES',
+        longTermLiabilitiesVals,
+        bold: true,
+        shaded: true,
+      );
+
+      addTemplateRow(
+        'OWNER\'S EQUITY',
+        List<double>.filled(yearCount, 0),
+        bold: true,
+      );
+      addTemplateRow('Owner\'s Investment', ownerInvestmentVals, indent: true);
+      addTemplateRow('Retained Earnings', retainedEarningsVals, indent: true);
+      addTemplateRow('Other', List<double>.filled(yearCount, 0), indent: true);
+      addTemplateRow(
+        'TOTAL OWNER\'S EQUITY',
+        totalEquityVals,
+        bold: true,
+        shaded: true,
+      );
+      addTemplateRow(
+        'TOTAL LIABILITIES AND OWNERS EQUITY',
+        List<double>.generate(
+          yearCount,
+          (i) => totalLiabilitiesVals[i] + totalEquityVals[i],
+        ),
+        bold: true,
+        shaded: true,
+      );
 
       grid.style = pdf_gen.PdfGridStyle(
-        cellPadding: pdf_gen.PdfPaddings(left: 6, right: 6, top: 5, bottom: 5),
+        cellPadding: pdf_gen.PdfPaddings(left: 2, right: 2, top: 1, bottom: 1),
       );
       grid.draw(
         page: page,
-        bounds: Rect.fromLTWH(20, 90, size.width - 40, 0),
+        bounds: Rect.fromLTWH(contentX, 56, contentWidth, 0),
       );
 
       final bytes = await pdf.save();

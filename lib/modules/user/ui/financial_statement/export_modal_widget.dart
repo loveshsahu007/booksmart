@@ -109,10 +109,10 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
     super.initState();
     final now = DateTime.now();
     _endDate = widget.initialEndDate ?? DateTime(now.year, now.month, now.day);
-    _startDate = widget.useSingleDate
-        ? _endDate
-        : (widget.initialStartDate ??
-            DateTime(_endDate.year, _endDate.month - 2, 1));
+    _startDate = widget.initialStartDate ??
+        (widget.useSingleDate
+            ? _endDate
+            : DateTime(_endDate.year, _endDate.month - 2, 1));
     _validate();
   }
 
@@ -143,9 +143,7 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
     if (picked == null) return;
     setState(() {
       _endDate = DateTime(picked.year, picked.month, picked.day);
-      if (widget.useSingleDate) {
-        _startDate = _endDate;
-      } else if (_endDate.isBefore(_startDate)) {
+      if (_endDate.isBefore(_startDate)) {
         _startDate = _endDate;
       }
       _validate();
@@ -153,10 +151,6 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
   }
 
   void _validate() {
-    if (widget.useSingleDate) {
-      _validationError = null;
-      return;
-    }
     _validationError = _service.validateRange(_startDate, _endDate, _viewType);
   }
 
@@ -187,10 +181,9 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
     setState(() => _isExporting = true);
     try {
       final DateTime startForExport =
-          widget.useSingleDate ? _endDate : _startDate;
+          _startDate;
       final DateTime endForExport = _endDate;
-      final PdfViewType viewTypeForExport =
-          widget.useSingleDate ? PdfViewType.monthly : _viewType;
+      final PdfViewType viewTypeForExport = _viewType;
       final request = PdfExportRequest(
         startDate: startForExport,
         endDate: endForExport,
