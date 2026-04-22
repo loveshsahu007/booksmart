@@ -22,9 +22,9 @@ void showUploadTaxDocumentDialog({String? type}) {
                 : Colors.white,
           ),
           constraints: const BoxConstraints(maxWidth: 400),
-          child: const Material(
+          child: Material(
             color: Colors.transparent,
-            child: UploadTaxDocWidget(),
+            child: UploadTaxDocWidget(type: type),
           ),
         ),
       );
@@ -35,7 +35,9 @@ void showUploadTaxDocumentDialog({String? type}) {
 }
 
 class UploadTaxDocWidget extends StatefulWidget {
-  const UploadTaxDocWidget({super.key});
+  const UploadTaxDocWidget({super.key, this.type});
+
+  final String? type;
 
   @override
   State<UploadTaxDocWidget> createState() => _UploadTaxDocWidgetState();
@@ -58,6 +60,7 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
   String? selectedCategory;
 
   late final TaxDocumentController _ctrl;
+  bool get _isBalanceSheetUpload => widget.type?.toLowerCase() == 'bs';
 
   @override
   void initState() {
@@ -79,6 +82,7 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
       name: nameCtrl.text,
       taxYear: selectedYear,
       category: selectedCategory,
+      type: widget.type,
     );
     if (fileUrl != null) {
       Get.back();
@@ -234,13 +238,14 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
               ),
               const SizedBox(height: 10),
 
-              CustomDropDownWidget<String>(
-                dropDownKey: categoryDropdownKey,
-                label: 'Category',
-                hint: 'Select Category',
-                items: categories,
-                onChanged: (v) => setState(() => selectedCategory = v),
-              ),
+              if (!_isBalanceSheetUpload)
+                CustomDropDownWidget<String>(
+                  dropDownKey: categoryDropdownKey,
+                  label: 'Category',
+                  hint: 'Select Category',
+                  items: categories,
+                  onChanged: (v) => setState(() => selectedCategory = v),
+                ),
               const SizedBox(height: 20),
 
               // ── Actions ─────────────────────────────────────────────────
@@ -248,21 +253,33 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
                 spacing: 10,
                 children: [
                   Expanded(
-                    child: outlineButton(
-                      "Cancel",
-                      onPressed: () {
-                        ctrl.pickedFile = null;
-                        Get.back();
-                      },
+                    child: SizedBox(
+                      height: 44,
+                      child: outlineButton(
+                        "Close",
+                        onPressed: () {
+                          ctrl.pickedFile = null;
+                          Get.back();
+                        },
+                      ),
                     ),
                   ),
                   Expanded(
-                    child: Obx(
-                      () => AppButton(
-                        buttonText: ctrl.isUploading.value
-                            ? 'Uploading…'
-                            : 'Save',
-                        onTapFunction: ctrl.isUploading.value ? null : _save,
+                    child: SizedBox(
+                      height: 44,
+                      child: Obx(
+                        () => AppButton(
+                          buttonText: ctrl.isUploading.value
+                              ? 'Uploading…'
+                              : 'Save',
+                          onTapFunction: ctrl.isUploading.value ? null : _save,
+                          radius: 10,
+                          fontSize: 12,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 10,
+                          ),
+                        ),
                       ),
                     ),
                   ),
