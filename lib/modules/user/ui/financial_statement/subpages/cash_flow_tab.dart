@@ -564,7 +564,10 @@ class _CashFlowTabState extends State<CashFlowTab> {
     return sum;
   }
 
-  void _exportExcel(FinancialReportController controller) async {
+  void _exportExcel(
+    FinancialReportController controller, {
+    PdfExportRequest? request,
+  }) async {
     try {
       final org = getCurrentOrganization;
       if (org == null) {
@@ -638,10 +641,11 @@ class _CashFlowTabState extends State<CashFlowTab> {
 
       final totalMonths =
           (reportEnd.year - reportStart.year) * 12 + reportEnd.month - reportStart.month + 1;
-      final PdfViewType viewType = _selectedFilterIdx == 4
-          ? PdfViewType.yearly
-          : (totalMonths <= 5 ? PdfViewType.monthly : PdfViewType.quarterly);
-      final request = PdfExportRequest(
+      final PdfViewType viewType = request?.viewType ??
+          (_selectedFilterIdx == 4
+              ? PdfViewType.yearly
+              : (totalMonths <= 5 ? PdfViewType.monthly : PdfViewType.quarterly));
+      final pdfRequest = PdfExportRequest(
         startDate: reportStart,
         endDate: reportEnd,
         viewType: viewType,
@@ -649,7 +653,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
         companyName: orgName,
         companyAddress: '',
       );
-      final liveData = await _buildCashFlowPdfData(controller, request);
+      final liveData = await _buildCashFlowPdfData(controller, pdfRequest);
       final bucketLabels =
           PdfExportService().buildBucketLabels(reportStart, reportEnd, viewType);
       final keys = List<String>.generate(bucketLabels.length, (i) => 'b$i');
@@ -721,521 +725,569 @@ class _CashFlowTabState extends State<CashFlowTab> {
       alignPeriodTotal(financingMap, controller.financingCashFlow.value);
       alignPeriodTotal(netChangeMap, controller.netChangeInCash.value);
 
-      final reconciliationTotalMap = {
-        for (final k in keys)
-          k: (netIncomeMap[k] ?? 0) + (adjustmentsMap[k] ?? 0) + (wcMap[k] ?? 0),
-      };
-      final varianceMap = {
-        for (final k in keys)
-          k: (reconciliationTotalMap[k] ?? 0) - (netChangeMap[k] ?? 0),
+      List<List<String>> buildBucketMonthKeys() {
+        String monthKey(DateTime d) =>
+            DateFormat('yyyy-MM').format(DateTime(d.year, d.month, 1));
+        switch (viewType) {
+          case PdfViewType.monthly:
+            final out = <List<String>>[];
+            var cursor = DateTime(reportStart.year, reportStart.month, 1);
+            final last = DateTime(reportEnd.year, reportEnd.month, 1);
+            while (!cursor.isAfter(last)) {
+              out.add([monthKey(cursor)]);
+              cursor = DateTime(cursor.year, cursor.month + 1, 1);
+            }
+            return out;
+          case PdfViewType.quarterly:
+            final out = <List<String>>[];
+            var cursor = DateTime(
+              reportStart.year,
+              (((reportStart.month - 1) ~/ 3) * 3) + 1,
+              1,
+            );
+            while (!cursor.isAfter(reportEnd)) {
+              out.add([
+                monthKey(cursor),
+                monthKey(DateTime(cursor.year, cursor.month + 1, 1)),
+                monthKey(DateTime(cursor.year, cursor.month + 2, 1)),
+              ]);
+              cursor = DateTime(cursor.year, cursor.month + 3, 1);
+            }
+            return out;
+          case PdfViewType.yearly:
+            return [
+              for (int y = reportStart.year; y <= reportEnd.year; y++)
+                [for (int m = 1; m <= 12; m++) monthKey(DateTime(y, m, 1))],
+            ];
+        }
+      }
+
+      final bucketMonthKeys = buildBucketMonthKeys();
+
+      Map<String, double> zeroMap() => {
+        for (final k in keys) k: 0.0,
       };
 
-      final rangeRes = await supabase
-          .from(SupabaseTable.transaction)
-          .select()
-          .eq('org_id', org.id)
-          .gte('date_time', sqlDateLocal(reportStart))
-          .lt('date_time', sqlDateLocal(nextDay(reportEnd)));
+      Map<String, double> addMaps(List<Map<String, double>> maps) {
+        final out = zeroMap();
+        for (final m in maps) {
+          for (final k in keys) {
+            out[k] = (out[k] ?? 0.0) + (m[k] ?? 0.0);
+          }
+        }
+        return out;
+      }
 
-      final transactions = (rangeRes as List)
-          .map((e) => TransactionModel.fromJson(e))
-          .toList()
-        ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      Map<String, double> subtractMap(
+        Map<String, double> a,
+        Map<String, double> b,
+      ) {
+        final out = zeroMap();
+        for (final k in keys) {
+          out[k] = (a[k] ?? 0.0) - (b[k] ?? 0.0);
+        }
+        return out;
+      }
+
+      Map<String, double> bucketizeByKeywords(
+        Map<String, Map<String, double>> periodic,
+        List<String> keywords,
+      ) {
+        final out = zeroMap();
+        for (int i = 0; i < keys.length; i++) {
+          double total = 0;
+          for (final mk in bucketMonthKeys[i]) {
+            final rows = periodic[mk];
+            if (rows == null) continue;
+            for (final entry in rows.entries) {
+              final key = entry.key.toLowerCase();
+              if (keywords.any((kw) => key.contains(kw))) {
+                total += entry.value;
+              }
+            }
+          }
+          out[keys[i]] = total;
+        }
+        return out;
+      }
+
+      final receivableMap = bucketizeByKeywords(
+        controller.periodicOperatingActivities,
+        const ['receivable'],
+      );
+      final inventoryMap = bucketizeByKeywords(
+        controller.periodicOperatingActivities,
+        const ['inventory'],
+      );
+      final accountsPayableMap = bucketizeByKeywords(
+        controller.periodicOperatingActivities,
+        const ['payable'],
+      );
+      final unearnedRevenueMap = bucketizeByKeywords(
+        controller.periodicOperatingActivities,
+        const ['unearned', 'deferred revenue'],
+      );
+      final incomeTaxesMap = bucketizeByKeywords(
+        controller.periodicOperatingActivities,
+        const ['income tax'],
+      );
+      final otherCurrentLiabilitiesMap = bucketizeByKeywords(
+        controller.periodicOperatingActivities,
+        const ['accrued', 'current liabilities'],
+      );
+      final workingCapitalKnown = addMaps([
+        receivableMap,
+        inventoryMap,
+        accountsPayableMap,
+        unearnedRevenueMap,
+        incomeTaxesMap,
+        otherCurrentLiabilitiesMap,
+      ]);
+      final workingCapitalOtherMap = subtractMap(wcMap, workingCapitalKnown);
+
+      final proceedsSaleMap = bucketizeByKeywords(
+        controller.periodicInvestingActivities,
+        const ['proceeds', 'sale'],
+      );
+      final ppePurchasesMap = bucketizeByKeywords(
+        controller.periodicInvestingActivities,
+        const ['property', 'plant', 'equipment', 'asset purchase', 'capex'],
+      );
+      final intangiblePurchasesMap = bucketizeByKeywords(
+        controller.periodicInvestingActivities,
+        const ['intangible'],
+      );
+      final investingKnown = addMaps([
+        proceedsSaleMap,
+        ppePurchasesMap,
+        intangiblePurchasesMap,
+      ]);
+      final investingOtherTemplateMap = subtractMap(investingMap, investingKnown);
+
+      final issueShareCapitalMap = bucketizeByKeywords(
+        controller.periodicFinancingActivities,
+        const ['issue of share', 'share capital'],
+      );
+      final stockIssuanceMap = bucketizeByKeywords(
+        controller.periodicFinancingActivities,
+        const ['stock issuance', 'stock issued', 'equity issuance', 'contribution'],
+      );
+      final interestPaidMap = bucketizeByKeywords(
+        controller.periodicFinancingActivities,
+        const ['interest paid', 'interest'],
+      );
+      final capitalRepaymentsMap = bucketizeByKeywords(
+        controller.periodicFinancingActivities,
+        const ['capital repayment', 'buy-back', 'share buy', 'debt repayment', 'principal repayment'],
+      );
+      final loanPaidMap = bucketizeByKeywords(
+        controller.periodicFinancingActivities,
+        const ['loan paid', 'loan repayment', 'principal'],
+      );
+      final financingKnown = addMaps([
+        issueShareCapitalMap,
+        stockIssuanceMap,
+        interestPaidMap,
+        capitalRepaymentsMap,
+        loanPaidMap,
+      ]);
+      final financingOtherTemplateMap = subtractMap(financingMap, financingKnown);
 
       final excel = excel_lib.Excel.createExcel();
-      final summary = excel['Cash Flow Summary'];
-      final detail = excel['Transaction Detail'];
-      final recon = excel['Reconciliation'];
+      final sheet = excel['Cash Flow Statement'];
       final existingSheets = List<String>.from(excel.tables.keys);
       for (final name in existingSheets) {
-        final isDefaultSheet = name.toLowerCase().startsWith('sheet');
-        if (isDefaultSheet &&
-            name != 'Cash Flow Summary' &&
-            name != 'Transaction Detail' &&
-            name != 'Reconciliation') {
+        if (name != 'Cash Flow Statement') {
           excel.delete(name);
         }
       }
 
-      final int totalCols = keys.length + 2; // Description + buckets + period total
-      const descCol = 0;
-      const firstMonthCol = 1;
-      final int ytdCol = keys.length + 1;
+      final int labelCol = 0;
+      final int firstSymbolCol = 1;
+      int symbolCol(int index) => firstSymbolCol + (index * 2);
+      int amountCol(int index) => symbolCol(index) + 1;
+      final int lastAmountCol = amountCol(keys.length - 1);
+
+      final displayLabels = (() {
+        final years = bucketLabels
+            .map(
+              (label) =>
+                  RegExp(r'(19|20)\d{2}').firstMatch(label)?.group(0) ?? label,
+            )
+            .toList();
+        return years.toSet().length == years.length ? years : bucketLabels;
+      })();
 
       final titleStyle = excel_lib.CellStyle(
         bold: true,
-        fontSize: 16,
-        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF134A85'),
+        fontSize: 17,
         horizontalAlign: excel_lib.HorizontalAlign.Center,
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
-      final subTitleStyle = excel_lib.CellStyle(
-        bold: false,
-        fontSize: 11,
-        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF1F5C99'),
+      final metaStyle = excel_lib.CellStyle(
+        fontSize: 8,
         horizontalAlign: excel_lib.HorizontalAlign.Center,
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
-      final quarterBandStyle = excel_lib.CellStyle(
+      final companyStyle = excel_lib.CellStyle(
         bold: true,
-        fontColorHex: excel_lib.ExcelColor.fromHexString('FF134A85'),
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE7F1FC'),
-        horizontalAlign: excel_lib.HorizontalAlign.Center,
-      );
-      final headerStyle = excel_lib.CellStyle(
-        bold: true,
-        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF134A85'),
-        horizontalAlign: excel_lib.HorizontalAlign.Center,
-      );
-      final sectionStyle = excel_lib.CellStyle(
-        bold: true,
-        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF3B6EA5'),
-      );
-      final labelStyle = excel_lib.CellStyle(
+        fontSize: 13,
         horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final companyMetaStyle = excel_lib.CellStyle(
+        fontSize: 8,
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final headerBlueStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 9,
+        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF7090AF'),
+        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final sectionLabelStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 9,
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final lineLabelStyle = excel_lib.CellStyle(
+        fontSize: 8,
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final totalLabelStyle = excel_lib.CellStyle(
         bold: true,
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE7F1FC'),
+        fontSize: 9,
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFF4F7FC'),
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
-      final currencyStyle = excel_lib.CellStyle(
-        horizontalAlign: excel_lib.HorizontalAlign.Right,
-        numberFormat: const excel_lib.CustomNumericNumFormat(
-          formatCode: r'$#,##0.00;[Red]-$#,##0.00',
-        ),
-      );
-      final currencyTotalStyle = excel_lib.CellStyle(
+      final cashBandLabelStyle = excel_lib.CellStyle(
         bold: true,
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE7F1FC'),
-        horizontalAlign: excel_lib.HorizontalAlign.Right,
+        fontSize: 9,
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF7090AF'),
+        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final dollarStyle = excel_lib.CellStyle(
+        fontSize: 8,
+        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final amountStyle = excel_lib.CellStyle(
+        fontSize: 8,
         numberFormat: const excel_lib.CustomNumericNumFormat(
-          formatCode: r'$#,##0.00;[Red]-$#,##0.00',
+          formatCode: r'#,##0.00;[Red](#,##0.00);"-"',
         ),
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final totalDollarStyle = dollarStyle.copyWith(
+        boldVal: true,
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFF4F7FC'),
+      );
+      final totalAmountStyle = amountStyle.copyWith(
+        boldVal: true,
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFF4F7FC'),
+      );
+      final totalDarkLabelStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 9,
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFDCDCDC'),
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final totalDarkDollarStyle = dollarStyle.copyWith(
+        boldVal: true,
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFDCDCDC'),
+      );
+      final totalDarkAmountStyle = amountStyle.copyWith(
+        boldVal: true,
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFDCDCDC'),
+      );
+      final cashBandDollarStyle = dollarStyle.copyWith(
+        boldVal: true,
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FF7090AF'),
+        fontColorHexVal: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
+      );
+      final cashBandAmountStyle = amountStyle.copyWith(
+        boldVal: true,
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FF7090AF'),
+        fontColorHexVal: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
+      );
+      final dividerStyle = excel_lib.CellStyle(
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE1E6ED'),
       );
 
       void setCell(
-        excel_lib.Sheet sheet,
-        int col,
-        int row,
-        excel_lib.CellValue value, [
+        int c,
+        int r,
+        excel_lib.CellValue v, [
         excel_lib.CellStyle? style,
       ]) {
         final cell = sheet.cell(
-          excel_lib.CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row),
+          excel_lib.CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r),
         );
-        cell.value = value;
-        if (style != null) {
-          cell.cellStyle = style;
-        }
+        cell.value = v;
+        if (style != null) cell.cellStyle = style;
       }
 
-      // Tab 1: Cash Flow Summary
-      summary.setColumnWidth(descCol, 40);
-      for (var c = firstMonthCol; c <= ytdCol; c++) {
-        summary.setColumnWidth(c, c == ytdCol ? 18 : 16);
+      sheet.setColumnWidth(labelCol, 46);
+      for (int i = 0; i < keys.length; i++) {
+        sheet.setColumnWidth(symbolCol(i), 2.8);
+        sheet.setColumnWidth(amountCol(i), 8.2);
       }
+      sheet.setRowHeight(1, 24);
+      sheet.setRowHeight(2, 14);
+      sheet.setRowHeight(3, 14);
+      sheet.setRowHeight(6, 18);
 
-      for (int c = 0; c < totalCols; c++) {
-        setCell(
-          summary,
-          c,
-          0,
-          excel_lib.TextCellValue('Cash Flow Summary'),
-          titleStyle,
-        );
-        setCell(summary, c, 1, excel_lib.TextCellValue(orgName), subTitleStyle);
-        setCell(
-          summary,
-          c,
-          2,
-          excel_lib.TextCellValue(
-            'Period ${DateFormat('MMM dd, yyyy').format(reportStart)} - ${DateFormat('MMM dd, yyyy').format(reportEnd)}',
-          ),
-          subTitleStyle,
-        );
-      }
-      summary.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: ytdCol, rowIndex: 0),
+      final titleStartCol = keys.length >= 3 ? symbolCol(keys.length - 3) : firstSymbolCol;
+      final titleEndCol = lastAmountCol;
+      final streetLine = (org.street ?? '').trim();
+      final cityStateZipLine = [
+        (org.city ?? '').trim(),
+        (org.state ?? '').trim(),
+        (org.zip ?? '').trim(),
+      ].where((e) => e.isNotEmpty).join(', ');
+
+      setCell(labelCol, 1, excel_lib.TextCellValue(orgName), companyStyle);
+      setCell(labelCol, 2, excel_lib.TextCellValue(streetLine), companyMetaStyle);
+      setCell(labelCol, 3, excel_lib.TextCellValue(cityStateZipLine), companyMetaStyle);
+
+      setCell(titleStartCol, 1, excel_lib.TextCellValue('Cash Flow Statement'), titleStyle);
+      sheet.merge(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: titleStartCol, rowIndex: 1),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: titleEndCol, rowIndex: 1),
       );
-      summary.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: ytdCol, rowIndex: 1),
-      );
-      summary.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 2),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: ytdCol, rowIndex: 2),
-      );
-      summary.setMergedCellStyle(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
+      sheet.setMergedCellStyle(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: titleStartCol, rowIndex: 1),
         titleStyle,
       );
-      summary.setMergedCellStyle(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1),
-        subTitleStyle,
+
+      setCell(
+        titleStartCol,
+        2,
+        excel_lib.TextCellValue(
+          'Date Prepared: ${DateFormat('MM/dd/yyyy').format(DateTime.now())}',
+        ),
+        metaStyle,
       );
-      summary.setMergedCellStyle(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 2),
-        subTitleStyle,
+      sheet.merge(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: titleStartCol, rowIndex: 2),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: titleEndCol, rowIndex: 2),
+      );
+      sheet.setMergedCellStyle(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: titleStartCol, rowIndex: 2),
+        metaStyle,
       );
 
-      setCell(summary, 0, 4, excel_lib.TextCellValue('Grouped Columns'), quarterBandStyle);
-      if (keys.isNotEmpty) {
-        summary.merge(
-          excel_lib.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 4),
-          excel_lib.CellIndex.indexByColumnRow(columnIndex: ytdCol - 1, rowIndex: 4),
-        );
-        setCell(
-          summary,
-          1,
-          4,
-          excel_lib.TextCellValue('Months (expand/collapse)'),
-          quarterBandStyle,
-        );
-      }
-      setCell(summary, ytdCol, 4, excel_lib.TextCellValue('Period Total'), quarterBandStyle);
+      setCell(
+        titleStartCol,
+        3,
+        excel_lib.TextCellValue('As of ${DateFormat('MMMM dd,').format(reportEnd)}'),
+        metaStyle,
+      );
+      sheet.merge(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: titleStartCol, rowIndex: 3),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: titleEndCol, rowIndex: 3),
+      );
+      sheet.setMergedCellStyle(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: titleStartCol, rowIndex: 3),
+        metaStyle,
+      );
 
-      setCell(summary, 0, 5, excel_lib.TextCellValue('Line Item'), headerStyle);
-      for (int i = 0; i < keys.length; i++) {
-        setCell(
-          summary,
-          i + 1,
-          5,
-          excel_lib.TextCellValue(keyToLabel[keys[i]] ?? keys[i]),
-          headerStyle,
-        );
+      for (int c = firstSymbolCol; c <= lastAmountCol; c++) {
+        setCell(c, 5, excel_lib.TextCellValue(' '), dividerStyle);
       }
-      setCell(summary, ytdCol, 5, excel_lib.TextCellValue('Period Total'), headerStyle);
+      sheet.setRowHeight(5, 2.5);
 
-      int row = 7;
-      void writeSection(String title) {
-        for (int c = 0; c <= ytdCol; c++) {
-          setCell(summary, c, row, excel_lib.TextCellValue(' '), sectionStyle);
-        }
-        setCell(summary, 0, row, excel_lib.TextCellValue(title), sectionStyle);
-        row++;
-      }
-
-      void writeMetricRow(
-        String label,
-        Map<String, double> values, {
-        bool total = false,
-        double? periodTotalOverride,
-      }) {
-        setCell(
-          summary,
-          0,
-          row,
-          excel_lib.TextCellValue(label),
-          total ? totalLabelStyle : labelStyle,
-        );
+      int row = 6;
+      void writePeriodHeader(String title, {bool includePeriods = true}) {
+        setCell(labelCol, row, excel_lib.TextCellValue(title), headerBlueStyle);
         for (int i = 0; i < keys.length; i++) {
-          final v = values[keys[i]] ?? 0.0;
           setCell(
-            summary,
-            i + 1,
+            amountCol(i),
             row,
-            excel_lib.DoubleCellValue(v),
-            total ? currencyTotalStyle : currencyStyle,
+            excel_lib.TextCellValue(includePeriods ? displayLabels[i] : ' '),
+            headerBlueStyle,
+          );
+          sheet.merge(
+            excel_lib.CellIndex.indexByColumnRow(columnIndex: symbolCol(i), rowIndex: row),
+            excel_lib.CellIndex.indexByColumnRow(columnIndex: amountCol(i), rowIndex: row),
+          );
+          sheet.setMergedCellStyle(
+            excel_lib.CellIndex.indexByColumnRow(columnIndex: symbolCol(i), rowIndex: row),
+            headerBlueStyle,
           );
         }
-        setCell(
-          summary,
-          ytdCol,
-          row,
-          excel_lib.DoubleCellValue(periodTotalOverride ?? periodTotal(values)),
-          total ? currencyTotalStyle : currencyStyle,
-        );
+        sheet.setRowHeight(row, 18);
         row++;
       }
 
-      writeSection('Operating Activities');
-      writeMetricRow(
-        'Net Income',
-        netIncomeMap,
-        periodTotalOverride: controller.netIncome.value,
-      );
-      writeMetricRow(
-        'Adjustments',
-        adjustmentsMap,
-        periodTotalOverride: controller.operatingAdjustments.value,
-      );
-      writeMetricRow(
-        'Balance Sheet Changes',
-        wcMap,
-        periodTotalOverride: controller.workingCapitalChanges.value,
-      );
-      writeMetricRow(
+      void writeLineLabel(
+        String label, {
+        bool indent = false,
+        bool bold = false,
+        bool total = false,
+        bool cashBand = false,
+      }) {
+        setCell(
+          labelCol,
+          row,
+          excel_lib.TextCellValue(indent ? '   $label' : label),
+          cashBand
+              ? cashBandLabelStyle
+              : (total
+                  ? totalLabelStyle
+                  : (bold ? sectionLabelStyle : lineLabelStyle)),
+        );
+      }
+
+      void writeValueCells(
+        Map<String, double> values, {
+        bool total = false,
+        bool cashBand = false,
+        bool darkTotal = false,
+      }) {
+        for (int i = 0; i < keys.length; i++) {
+          final v = values[keys[i]] ?? 0.0;
+          final symbolStyle = cashBand
+              ? cashBandDollarStyle
+              : (darkTotal
+                    ? totalDarkDollarStyle
+                    : (total ? totalDollarStyle : dollarStyle));
+          final valueStyle = cashBand
+              ? cashBandAmountStyle
+              : (darkTotal
+                    ? totalDarkAmountStyle
+                    : (total ? totalAmountStyle : amountStyle));
+          setCell(symbolCol(i), row, excel_lib.TextCellValue('\$'), symbolStyle);
+          setCell(amountCol(i), row, excel_lib.DoubleCellValue(v), valueStyle);
+        }
+      }
+
+      void writeRow(
+        String label,
+        Map<String, double> values, {
+        bool indent = false,
+        bool total = false,
+        bool section = false,
+        bool cashBand = false,
+        bool darkTotal = false,
+      }) {
+        writeLineLabel(
+          label,
+          indent: indent,
+          bold: section,
+          total: darkTotal ? false : total,
+          cashBand: cashBand,
+        );
+        if (darkTotal) {
+          setCell(
+            labelCol,
+            row,
+            excel_lib.TextCellValue(indent ? '   $label' : label),
+            totalDarkLabelStyle,
+          );
+        }
+        writeValueCells(
+          values,
+          total: total,
+          cashBand: cashBand,
+          darkTotal: darkTotal,
+        );
+        sheet.setRowHeight(row, total || cashBand ? 18 : 16);
+        row++;
+      }
+
+      void writeTextOnly(String label, {bool indent = false, bool bold = false}) {
+        writeLineLabel(label, indent: indent, bold: bold);
+        sheet.setRowHeight(row, 16);
+        row++;
+      }
+
+      writePeriodHeader('Operating Activities', includePeriods: true);
+      writeRow('Net income', netIncomeMap, indent: true);
+      writeTextOnly('Adjustments for Non-Cash Items', indent: true);
+      writeRow('Depreciation', depAmortMap, indent: true);
+      writeRow('Amortization', zeroMap(), indent: true);
+      writeRow('Goodwill/Intangible Impairment', zeroMap(), indent: true);
+      writeRow('Deferred Income Tax', zeroMap(), indent: true);
+      writeTextOnly('Changes in Working Capital:', indent: true);
+      writeRow('Accounts Receivable', receivableMap, indent: true);
+      writeRow('Inventory Asset', inventoryMap, indent: true);
+      writeRow('Accounts Payable', accountsPayableMap, indent: true);
+      writeRow('Unearned Revenue', unearnedRevenueMap, indent: true);
+      writeRow('Income taxes', incomeTaxesMap, indent: true);
+      writeRow('Other Current Liabilities', otherCurrentLiabilitiesMap, indent: true);
+      writeRow('Other', workingCapitalOtherMap, indent: true);
+      writeRow(
         'Net Cash from Operating Activities',
         operatingMap,
         total: true,
-        periodTotalOverride: controller.operatingCashFlow.value,
+        darkTotal: true,
       );
-      row++;
 
-      writeSection('Investing Activities');
-      writeMetricRow(
+      row++;
+      writePeriodHeader('Investing Activities', includePeriods: false);
+      writeRow('Proceeds from sales of long-term assets', proceedsSaleMap, indent: true);
+      writeRow('Purchases of property, plant and equipment', ppePurchasesMap, indent: true);
+      writeRow('Purchases of intangible assets', intangiblePurchasesMap, indent: true);
+      writeRow('Other', investingOtherTemplateMap, indent: true);
+      writeRow(
         'Net Cash from Investing Activities',
         investingMap,
         total: true,
-        periodTotalOverride: controller.investingCashFlow.value,
+        darkTotal: true,
       );
-      row++;
 
-      writeSection('Financing Activities');
-      writeMetricRow(
+      row++;
+      writePeriodHeader('Financing Activities', includePeriods: false);
+      writeRow('Issue of share capital', issueShareCapitalMap, indent: true);
+      writeRow('Stock issuance', stockIssuanceMap, indent: true);
+      writeRow('Interest paid', interestPaidMap, indent: true);
+      writeRow('Capital repayments (including share buy-backs)', capitalRepaymentsMap, indent: true);
+      writeRow('Loan paid', loanPaidMap, indent: true);
+      writeRow('Other', financingOtherTemplateMap, indent: true);
+      writeRow(
         'Net Cash from Financing Activities',
         financingMap,
         total: true,
-        periodTotalOverride: controller.financingCashFlow.value,
+        darkTotal: true,
       );
+
       row++;
+      writeRow('Beginning Cash Balance', beginningCashMap, cashBand: true);
+      writeRow('Change in Cash & Cash Equivalents', netChangeMap, cashBand: false);
+      writeRow('Ending Cash Balance', endingCashMap, cashBand: true);
 
-      writeSection('Cash Position');
-      writeMetricRow(
-        'Net Change in Cash',
-        netChangeMap,
-        total: true,
-        periodTotalOverride: controller.netChangeInCash.value,
-      );
-      writeMetricRow('Beginning Cash', beginningCashMap);
-      writeMetricRow('Ending Cash', endingCashMap, total: true);
-
-      // Tab 2: Transaction Detail
-      detail.setColumnWidth(0, 14);
-      detail.setColumnWidth(1, 36);
-      detail.setColumnWidth(2, 14);
-      detail.setColumnWidth(3, 14);
-      detail.setColumnWidth(4, 18);
-      detail.setColumnWidth(5, 18);
-      detail.setColumnWidth(6, 12);
-      detail.setColumnWidth(7, 12);
-
-      for (int c = 0; c < 8; c++) {
-        setCell(
-          detail,
-          c,
-          0,
-          excel_lib.TextCellValue('Cash Flow Transaction Detail'),
-          titleStyle,
-        );
-        setCell(
-          detail,
-          c,
-          1,
-          excel_lib.TextCellValue(
-            '${DateFormat('MMM dd, yyyy').format(reportStart)} - ${DateFormat('MMM dd, yyyy').format(reportEnd)} | Generated ${DateFormat('MMM dd, yyyy').format(DateTime.now())}',
-          ),
-          subTitleStyle,
-        );
-      }
-      detail.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 0),
-      );
-      detail.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: 1),
-      );
-      detail.setMergedCellStyle(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-        titleStyle,
-      );
-      detail.setMergedCellStyle(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1),
-        subTitleStyle,
-      );
-
-      final detailHeaders = [
-        'Date',
-        'Transaction',
-        'Amount',
-        'Flow Section',
-        'Category',
-        'Tag',
-        'Type',
-        'Deductible',
-      ];
-      for (int c = 0; c < detailHeaders.length; c++) {
-        setCell(detail, c, 3, excel_lib.TextCellValue(detailHeaders[c]), headerStyle);
-      }
-
-      int detailRow = 4;
-      for (final tx in transactions) {
-        final tags = extractTags(tx.title);
-        final titleLower = tx.title.toLowerCase();
-        final category = (tx.plaidCategory?['primary']?.toString().trim().isNotEmpty ?? false)
-            ? tx.plaidCategory!['primary'].toString()
-            : (tx.category != null ? 'Category #${tx.category}' : 'Uncategorized');
-        final tagText = tags.isEmpty ? '-' : tags.join(', ');
-
-        setCell(
-          detail,
-          0,
-          detailRow,
-          excel_lib.TextCellValue(DateFormat('yyyy-MM-dd').format(tx.dateTime)),
-        );
-        setCell(detail, 1, detailRow, excel_lib.TextCellValue(cleanTitle(tx.title)));
-        setCell(
-          detail,
-          2,
-          detailRow,
-          excel_lib.DoubleCellValue(tx.amount),
-          currencyStyle,
-        );
-        setCell(
-          detail,
-          3,
-          detailRow,
-          excel_lib.TextCellValue(classifyFlowSection(titleLower)),
-        );
-        setCell(detail, 4, detailRow, excel_lib.TextCellValue(category));
-        setCell(detail, 5, detailRow, excel_lib.TextCellValue(tagText));
-        setCell(detail, 6, detailRow, excel_lib.TextCellValue(tx.type));
-        setCell(
-          detail,
-          7,
-          detailRow,
-          excel_lib.TextCellValue(tx.deductible ? 'Yes' : 'No'),
-        );
-        detailRow++;
-      }
-
-      // Tab 3: Reconciliation
-      recon.setColumnWidth(descCol, 40);
-      for (var c = firstMonthCol; c <= ytdCol; c++) {
-        recon.setColumnWidth(c, c == ytdCol ? 15 : 11);
-      }
-
-      for (int c = 0; c < totalCols; c++) {
-        setCell(
-          recon,
-          c,
-          0,
-          excel_lib.TextCellValue('Cash Flow Reconciliation'),
-          titleStyle,
-        );
-      }
-      recon.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: ytdCol, rowIndex: 0),
-      );
-      recon.setMergedCellStyle(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-        titleStyle,
-      );
-
-      setCell(recon, 0, 2, excel_lib.TextCellValue('Line Item'), headerStyle);
-      for (int i = 0; i < keys.length; i++) {
-        setCell(
-          recon,
-          i + 1,
-          2,
-          excel_lib.TextCellValue(keyToLabel[keys[i]] ?? keys[i]),
-          headerStyle,
-        );
-      }
-      setCell(recon, ytdCol, 2, excel_lib.TextCellValue('Period Total'), headerStyle);
-
-      int reconRow = 4;
-      void writeReconRow(String label, Map<String, double> values, {bool total = false}) {
-        setCell(
-          recon,
-          0,
-          reconRow,
-          excel_lib.TextCellValue(label),
-          total ? totalLabelStyle : labelStyle,
-        );
-        for (int i = 0; i < keys.length; i++) {
-          setCell(
-            recon,
-            i + 1,
-            reconRow,
-            excel_lib.DoubleCellValue(values[keys[i]] ?? 0),
-            total ? currencyTotalStyle : currencyStyle,
-          );
-        }
-        setCell(
-          recon,
-          ytdCol,
-          reconRow,
-          excel_lib.DoubleCellValue(periodTotal(values)),
-          total ? currencyTotalStyle : currencyStyle,
-        );
-        reconRow++;
-      }
-
-      writeReconRow('Net Income', netIncomeMap);
-      writeReconRow('Adjustments', adjustmentsMap);
-      writeReconRow('Balance Sheet Changes', wcMap);
-      writeReconRow('Reconciliation Total', reconciliationTotalMap, total: true);
-      writeReconRow('Net Change in Cash', netChangeMap, total: true);
-      writeReconRow('Variance', varianceMap, total: true);
-
-      List<int> applySummaryMonthGrouping(List<int> xlsxBytes) {
+      List<int> hideGridLines(List<int> xlsxBytes) {
         try {
-          final archive = ZipDecoder().decodeBytes(xlsxBytes);
-          final sheetFile = archive.findFile('xl/worksheets/sheet1.xml');
-          if (sheetFile == null || sheetFile.content == null) return xlsxBytes;
-
-          final xmlText = utf8.decode(sheetFile.content as List<int>);
-          final doc = XmlDocument.parse(xmlText);
-          final worksheet = doc.rootElement;
-          final sheetData = worksheet.getElement('sheetData');
-          if (sheetData == null) return xlsxBytes;
-
-          XmlElement? cols = worksheet.getElement('cols');
-          if (cols == null) {
-            cols = XmlElement(XmlName('cols'));
-            final idx = worksheet.children.indexOf(sheetData);
-            if (idx >= 0) {
-              worksheet.children.insert(idx, cols);
-            } else {
-              worksheet.children.add(cols);
-            }
+          final archive = ZipDecoder().decodeBytes(xlsxBytes, verify: false);
+          bool changed = false;
+          for (final file in archive.files) {
+            if (!file.isFile) continue;
+            if (!file.name.startsWith('xl/worksheets/sheet')) continue;
+            if (!file.name.endsWith('.xml')) continue;
+            final xmlText = utf8.decode(file.content as List<int>);
+            final doc = XmlDocument.parse(xmlText);
+            final worksheet = doc.rootElement;
+            final sheetViews = worksheet.getElement('sheetViews');
+            if (sheetViews == null) continue;
+            final views = sheetViews.findElements('sheetView');
+            if (views.isEmpty) continue;
+            views.first.setAttribute('showGridLines', '0');
+            final patched = utf8.encode(doc.toXmlString(pretty: false));
+            archive.addFile(ArchiveFile(file.name, patched.length, patched));
+            changed = true;
           }
-
-          cols.children.add(
-            XmlElement(
-              XmlName('col'),
-              [
-                XmlAttribute(XmlName('min'), '2'),
-                XmlAttribute(
-                  XmlName('max'),
-                  (keys.length + 1).toString(),
-                ),
-                XmlAttribute(XmlName('outlineLevel'), '1'),
-              ],
-            ),
-          );
-
-          final sheetFormatPr = worksheet.getElement('sheetFormatPr');
-          sheetFormatPr?.setAttribute('outlineLevelCol', '1');
-
-          XmlElement? sheetPr = worksheet.getElement('sheetPr');
-          if (sheetPr == null) {
-            sheetPr = XmlElement(XmlName('sheetPr'));
-            worksheet.children.insert(0, sheetPr);
-          }
-          if (sheetPr.getElement('outlinePr') == null) {
-            sheetPr.children.add(
-              XmlElement(
-                XmlName('outlinePr'),
-                [
-                  XmlAttribute(XmlName('summaryBelow'), '1'),
-                  XmlAttribute(XmlName('summaryRight'), '1'),
-                ],
-              ),
-            );
-          }
-
-          final patched = utf8.encode(doc.toXmlString());
-          archive.addFile(
-            ArchiveFile('xl/worksheets/sheet1.xml', patched.length, patched),
-          );
-          return ZipEncoder().encode(archive) ?? xlsxBytes;
+          return changed ? (ZipEncoder().encode(archive) ?? xlsxBytes) : xlsxBytes;
         } catch (_) {
           return xlsxBytes;
         }
@@ -1245,13 +1297,12 @@ class _CashFlowTabState extends State<CashFlowTab> {
       if (bytes == null) {
         throw Exception('Unable to generate Excel file.');
       }
-      final groupedBytes = applySummaryMonthGrouping(bytes);
 
+      final outputBytes = hideGridLines(bytes);
       await downloadFile(
-        '${orgName.replaceAll(' ', '_')}_Cash_Flow_Analysis_${DateFormat('yyyyMMdd').format(reportStart)}_${DateFormat('yyyyMMdd').format(reportEnd)}.xlsx',
-        groupedBytes,
-        mimeType:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        '${orgName.replaceAll(' ', '_')}_Cash_Flow_Statement_${DateFormat('yyyyMMdd').format(reportEnd)}.xlsx',
+        outputBytes,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
     } catch (e, st) {
       dev.log('Excel Export Error: $e\n$st');
@@ -1577,7 +1628,14 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                         ? (getCurrentOrganization?.name ?? '')
                                               .trim()
                                         : 'Booksmart',
-                                companyAddress: 'Address not available',
+                                companyAddress: [
+                                  (getCurrentOrganization?.street ?? '').trim(),
+                                  [
+                                    (getCurrentOrganization?.city ?? '').trim(),
+                                    (getCurrentOrganization?.state ?? '').trim(),
+                                    (getCurrentOrganization?.zip ?? '').trim(),
+                                  ].where((e) => e.isNotEmpty).join(', '),
+                                ].where((e) => e.isNotEmpty).join('\n'),
                                 reportType: ExportPdfReportType.cashFlow,
                                 initialStartDate: _startDate,
                                 initialEndDate: _endDate,
@@ -1618,7 +1676,14 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                         ? (getCurrentOrganization?.name ?? '')
                                               .trim()
                                         : 'Booksmart',
-                                companyAddress: 'Address not available',
+                                companyAddress: [
+                                  (getCurrentOrganization?.street ?? '').trim(),
+                                  [
+                                    (getCurrentOrganization?.city ?? '').trim(),
+                                    (getCurrentOrganization?.state ?? '').trim(),
+                                    (getCurrentOrganization?.zip ?? '').trim(),
+                                  ].where((e) => e.isNotEmpty).join(', '),
+                                ].where((e) => e.isNotEmpty).join('\n'),
                                 reportType: ExportPdfReportType.cashFlow,
                                 initialStartDate: _startDate,
                                 initialEndDate: _endDate,
@@ -1637,7 +1702,10 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                       endDate: request.endDate,
                                     );
                                   }
-                                  _exportExcel(controller);
+                                  _exportExcel(
+                                    controller,
+                                    request: request,
+                                  );
                                 },
                               );
                             }

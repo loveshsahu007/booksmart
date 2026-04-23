@@ -16,10 +16,12 @@ import 'package:booksmart/widgets/snackbar.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as pdf_gen;
 import 'dart:convert';
 import 'dart:developer' as dev;
+import 'package:archive/archive.dart';
 import 'package:booksmart/utils/downloader.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/balance_sheet_excel_service.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/export_modal_widget.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/pdf_export_service.dart';
+import 'package:xml/xml.dart';
 
 class BalanceSheetTab extends StatefulWidget {
   const BalanceSheetTab({super.key});
@@ -207,7 +209,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         org?.state.trim() ?? '',
         org?.zip.trim() ?? '',
       ].where((e) => e.isNotEmpty).join(', ');
-      final asOfLine = 'As of ${DateFormat('MMMM dd, yyyy').format(asOfDate)}';
+      final asOfLine = 'As of ${DateFormat('MMMM dd,').format(asOfDate)}';
       final exportService = PdfExportService();
       final exportStart =
           request?.startDate ??
@@ -220,6 +222,16 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         exportEnd,
         exportViewType,
       );
+      final candidateYearLabels = bucketLabels
+          .map(
+            (label) =>
+                RegExp(r'(19|20)\d{2}').firstMatch(label)?.group(0) ?? label,
+          )
+          .toList();
+      final displayBucketLabels =
+          candidateYearLabels.toSet().length == candidateYearLabels.length
+          ? candidateYearLabels
+          : bucketLabels;
       if (bucketLabels.isEmpty) {
         throw Exception('No Excel columns available for selected range.');
       }
@@ -237,73 +249,134 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       final int yearCount = bucketLabels.length;
       int symbolCol(int index) => firstSymbolCol + (index * 2);
       int amountCol(int index) => symbolCol(index) + 1;
+      final int titleStartCol = yearCount >= 3
+          ? symbolCol(yearCount - 3)
+          : firstSymbolCol;
+      final int titleEndCol = amountCol(yearCount - 1);
 
       final titleStyle = excel_lib.CellStyle(
         bold: true,
-        fontSize: 20,
-        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        fontSize: 17,
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final metaCenterStyle = excel_lib.CellStyle(
-        fontSize: 10,
-        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        fontSize: 9,
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final companyStyle = excel_lib.CellStyle(
         bold: true,
-        fontSize: 16,
+        fontSize: 13,
         horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final headerStyle = excel_lib.CellStyle(
         bold: true,
-        fontSize: 10,
+        fontSize: 9,
         fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF1F4E78'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF6F8DAB'),
         horizontalAlign: excel_lib.HorizontalAlign.Center,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final liabilityHeaderStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 9,
+        fontColorHex: excel_lib.ExcelColor.fromHexString('FF1F1F1F'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFD9D9D9'),
+        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final sectionLabelStyle = excel_lib.CellStyle(
         bold: true,
-        fontSize: 10,
+        fontSize: 9,
         horizontalAlign: excel_lib.HorizontalAlign.Left,
       );
       final lineLabelStyle = excel_lib.CellStyle(
-        fontSize: 10,
+        fontSize: 9,
         horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final totalLabelStyle = excel_lib.CellStyle(
         bold: true,
-        fontSize: 10,
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE8EEF6'),
+        fontSize: 9,
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFF2F6FB'),
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+      );
+      final liabilityTotalLabelStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 9,
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFD9D9D9'),
         horizontalAlign: excel_lib.HorizontalAlign.Left,
       );
       final ratioHeaderStyle = excel_lib.CellStyle(
         bold: true,
-        fontSize: 10,
-        fontColorHex: excel_lib.ExcelColor.fromHexString('FF1F1F1F'),
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFBFD3E8'),
+        fontSize: 9,
+        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF6F8DAB'),
         horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final ratioLabelStyle = excel_lib.CellStyle(
-        fontSize: 10,
+        fontSize: 9,
         horizontalAlign: excel_lib.HorizontalAlign.Left,
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFD8E6F4'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE8F0F9'),
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final ratioValueStyle = excel_lib.CellStyle(
+        fontSize: 9,
+        numberFormat: const excel_lib.CustomNumericNumFormat(
+          formatCode: r'0.00;[Red](0.00);"-"',
+        ),
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE8F0F9'),
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final ratioWorkingCapitalStyle = excel_lib.CellStyle(
+        fontSize: 9,
+        numberFormat: const excel_lib.CustomNumericNumFormat(
+          formatCode: r'#,##0.00;[Red](#,##0.00);"-"',
+        ),
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE8F0F9'),
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final ratioDollarStyle = excel_lib.CellStyle(
+        fontSize: 9,
+        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE8F0F9'),
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final dividerLineStyle = excel_lib.CellStyle(
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE1E6ED'),
+        verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final dollarStyle = excel_lib.CellStyle(
-        fontSize: 10,
+        fontSize: 9,
         horizontalAlign: excel_lib.HorizontalAlign.Center,
       );
       final currencyStyle = excel_lib.CellStyle(
-        fontSize: 10,
+        fontSize: 9,
         numberFormat: const excel_lib.CustomNumericNumFormat(
-          formatCode: r'_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)',
+          formatCode: r'#,##0.00;[Red](#,##0.00);"-"',
         ),
-        horizontalAlign: excel_lib.HorizontalAlign.Right,
+        horizontalAlign: excel_lib.HorizontalAlign.Center,
       );
       final totalCurrencyStyle = currencyStyle.copyWith(
         boldVal: true,
-        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFE8EEF6'),
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFF2F6FB'),
       );
       final totalDollarStyle = dollarStyle.copyWith(
         boldVal: true,
-        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFE8EEF6'),
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFF2F6FB'),
+      );
+      final liabilityTotalCurrencyStyle = currencyStyle.copyWith(
+        boldVal: true,
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFD9D9D9'),
+      );
+      final liabilityTotalDollarStyle = dollarStyle.copyWith(
+        boldVal: true,
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFD9D9D9'),
       );
 
       void setCell(
@@ -422,63 +495,107 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         if (c == labelCol) {
           sheet.setColumnWidth(c, 34);
         } else if (c.isOdd) {
-          sheet.setColumnWidth(c, 4);
+          // Keep symbol/value pair visually centered under merged month header.
+          sheet.setColumnWidth(c, 5.2);
         } else {
-          sheet.setColumnWidth(c, 11);
+          sheet.setColumnWidth(c, 7.8);
         }
       }
-      sheet.setColumnWidth(amountCol(yearCount - 1) + 1, 6);
-      sheet.setColumnWidth(amountCol(yearCount - 1) + 2, 34);
       sheet.setRowHeight(1, 24);
-      sheet.setRowHeight(2, 16);
-      sheet.setRowHeight(3, 16);
-      sheet.setRowHeight(4, 16);
-      sheet.setRowHeight(5, 6);
+      sheet.setRowHeight(2, 14);
+      sheet.setRowHeight(3, 14);
+      sheet.setRowHeight(4, 14);
+      sheet.setRowHeight(5, 2.5);
 
       setCell(labelCol, 1, excel_lib.TextCellValue(orgName), companyStyle);
       setCell(labelCol, 2, excel_lib.TextCellValue(streetLine));
       setCell(labelCol, 3, excel_lib.TextCellValue(cityStateZipLine));
-      setCell(firstSymbolCol, 1, excel_lib.TextCellValue('BALANCE SHEET'), titleStyle);
-      sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 1),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: amountCol(yearCount - 1), rowIndex: 1),
-      );
-      sheet.setMergedCellStyle(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 1),
+      setCell(
+        titleStartCol,
+        1,
+        excel_lib.TextCellValue('BALANCE SHEET'),
         titleStyle,
       );
-      setCell(firstSymbolCol, 2, excel_lib.TextCellValue('Date Prepared:'));
       sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 2),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: amountCol(yearCount - 1), rowIndex: 2),
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: titleStartCol,
+          rowIndex: 1,
+        ),
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: titleEndCol,
+          rowIndex: 1,
+        ),
       );
       sheet.setMergedCellStyle(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 2),
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: titleStartCol,
+          rowIndex: 1,
+        ),
+        titleStyle,
+      );
+      setCell(
+        titleStartCol,
+        2,
+        excel_lib.TextCellValue('Date Prepared:'),
+        metaCenterStyle,
+      );
+      sheet.merge(
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: titleStartCol,
+          rowIndex: 2,
+        ),
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: titleEndCol,
+          rowIndex: 2,
+        ),
+      );
+      sheet.setMergedCellStyle(
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: titleStartCol,
+          rowIndex: 2,
+        ),
         metaCenterStyle,
       );
       setCell(
-        firstSymbolCol,
+        titleStartCol,
         3,
         excel_lib.TextCellValue(asOfLine),
-      );
-      sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 3),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: amountCol(yearCount - 1), rowIndex: 3),
-      );
-      sheet.setMergedCellStyle(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: firstSymbolCol, rowIndex: 3),
         metaCenterStyle,
       );
+      sheet.merge(
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: titleStartCol,
+          rowIndex: 3,
+        ),
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: titleEndCol,
+          rowIndex: 3,
+        ),
+      );
+      sheet.setMergedCellStyle(
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: titleStartCol,
+          rowIndex: 3,
+        ),
+        metaCenterStyle,
+      );
+      for (int c = firstSymbolCol; c <= amountCol(yearCount - 1); c++) {
+        setCell(c, 5, excel_lib.TextCellValue(' '), dividerLineStyle);
+      }
 
       int row = 6;
-      void writeYearHeader(String label) {
-        setCell(labelCol, row, excel_lib.TextCellValue(label), headerStyle);
+      void writeYearHeader(
+        String label, {
+        excel_lib.CellStyle? bandStyle,
+      }) {
+        final style = bandStyle ?? headerStyle;
+        setCell(labelCol, row, excel_lib.TextCellValue(label), style);
         for (int i = 0; i < yearCount; i++) {
           setCell(
             amountCol(i),
             row,
-            excel_lib.TextCellValue(bucketLabels[i]),
-            headerStyle,
+            excel_lib.TextCellValue(displayBucketLabels[i]),
+            style,
           );
           sheet.merge(
             excel_lib.CellIndex.indexByColumnRow(columnIndex: symbolCol(i), rowIndex: row),
@@ -486,7 +603,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
           );
           sheet.setMergedCellStyle(
             excel_lib.CellIndex.indexByColumnRow(columnIndex: symbolCol(i), rowIndex: row),
-            headerStyle,
+            style,
           );
         }
         row++;
@@ -500,11 +617,16 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         Map<int, String>? formulasByYearIndex,
         bool indent = false,
         bool ratioLine = false,
+        bool showDollar = true,
+        bool ratioUsesCurrency = false,
+        bool useLiabilityTotalStyle = false,
       }) {
         final lineStyle = isSection
             ? sectionLabelStyle
             : isTotal
-                ? totalLabelStyle
+                ? (useLiabilityTotalStyle
+                      ? liabilityTotalLabelStyle
+                      : totalLabelStyle)
                 : ratioLine
                     ? ratioLabelStyle
                     : lineLabelStyle;
@@ -517,21 +639,26 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
 
         for (int i = 0; i < yearCount; i++) {
           final excel_lib.CellStyle moneyStyle = isTotal
-              ? totalCurrencyStyle
+              ? (useLiabilityTotalStyle
+                    ? liabilityTotalCurrencyStyle
+                    : totalCurrencyStyle)
               : ratioLine
-                  ? currencyStyle.copyWith(
-                      backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFD8E6F4'),
-                    )
+                  ? (ratioUsesCurrency ? ratioWorkingCapitalStyle : ratioValueStyle)
                   : currencyStyle;
           final excel_lib.CellStyle moneyDollarStyle = isTotal
-              ? totalDollarStyle
+              ? (useLiabilityTotalStyle
+                    ? liabilityTotalDollarStyle
+                    : totalDollarStyle)
               : ratioLine
-                  ? dollarStyle.copyWith(
-                      backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFD8E6F4'),
-                    )
+                  ? ratioDollarStyle
                   : dollarStyle;
 
-          setCell(symbolCol(i), row, excel_lib.TextCellValue('\$'), moneyDollarStyle);
+          setCell(
+            symbolCol(i),
+            row,
+            excel_lib.TextCellValue(showDollar ? '\$' : ' '),
+            moneyDollarStyle,
+          );
           if (formulasByYearIndex != null && formulasByYearIndex.containsKey(i)) {
             setCell(
               amountCol(i),
@@ -759,7 +886,10 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         valuesByYearIndex: valuesMap(totalAssetsVals),
       );
 
-      writeYearHeader('LIABILITIES AND OWNERS EQUITY');
+      writeYearHeader(
+        'LIABILITIES AND OWNERS EQUITY',
+        bandStyle: liabilityHeaderStyle,
+      );
 
       writeLine('CURRENT LIABILITIES', isSection: true);
       writeLine(
@@ -845,6 +975,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       final rTotalLiabEq = writeLine(
         'TOTAL LIABILITIES AND OWNERS EQUITY',
         isTotal: true,
+        useLiabilityTotalStyle: true,
         valuesByYearIndex: valuesMap(
           List<double>.generate(
             yearCount,
@@ -855,11 +986,12 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
 
       row++;
       setCell(labelCol, row, excel_lib.TextCellValue('FINANCIAL RATIOS'), ratioHeaderStyle);
+      sheet.setRowHeight(row, 20);
       for (int i = 0; i < yearCount; i++) {
         setCell(
           amountCol(i),
           row,
-          excel_lib.TextCellValue(bucketLabels[i]),
+          excel_lib.TextCellValue(displayBucketLabels[i]),
           ratioHeaderStyle,
         );
         sheet.merge(
@@ -873,65 +1005,108 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       }
       row++;
 
-      writeLine(
-        'Debt Ratio (Total Liabilities / Total Assets)',
+      final ratioRow1 = writeLine(
+        'Debt Ratio',
         ratioLine: true,
+        showDollar: false,
         formulasByYearIndex: {
           for (int i = 0; i < yearCount; i++)
             i:
-                '=IFERROR((${colLetter(amountCol(i))}${rTotalCurrentLiab + 1}+${colLetter(amountCol(i))}${rTotalLongTermLiab + 1})/${colLetter(amountCol(i))}${rTotalAssets + 1},0)',
+                '=IF(${colLetter(amountCol(i))}${rTotalAssets + 1}=0,"-",(${colLetter(amountCol(i))}${rTotalCurrentLiab + 1}+${colLetter(amountCol(i))}${rTotalLongTermLiab + 1})/${colLetter(amountCol(i))}${rTotalAssets + 1})',
         },
       );
-      writeLine(
-        'Current Ratio (Current Assets / Current Liabilities)',
+      final ratioRow2 = writeLine(
+        'Current Ratio',
         ratioLine: true,
+        showDollar: false,
         formulasByYearIndex: {
           for (int i = 0; i < yearCount; i++)
             i:
-                '=IFERROR(${colLetter(amountCol(i))}${rTotalCurrentAssets + 1}/${colLetter(amountCol(i))}${rTotalCurrentLiab + 1},0)',
+                '=IF(${colLetter(amountCol(i))}${rTotalCurrentLiab + 1}=0,"-",${colLetter(amountCol(i))}${rTotalCurrentAssets + 1}/${colLetter(amountCol(i))}${rTotalCurrentLiab + 1})',
         },
       );
-      writeLine(
-        'Working Capital (Current Assets - Current Liabilities)',
+      final ratioRow3 = writeLine(
+        'Working Capital',
         ratioLine: true,
+        showDollar: true,
+        ratioUsesCurrency: true,
         formulasByYearIndex: {
           for (int i = 0; i < yearCount; i++)
             i:
                 '=${colLetter(amountCol(i))}${rTotalCurrentAssets + 1}-${colLetter(amountCol(i))}${rTotalCurrentLiab + 1}',
         },
       );
-      writeLine(
-        'Assets-to-Equity Ratio (Total Assets / Owner\'s Equity)',
+      final ratioRow4 = writeLine(
+        'Assets-to-Equity Ratio',
         ratioLine: true,
+        showDollar: false,
         formulasByYearIndex: {
           for (int i = 0; i < yearCount; i++)
             i:
-                '=IFERROR(${colLetter(amountCol(i))}${rTotalAssets + 1}/${colLetter(amountCol(i))}${rTotalEquity + 1},0)',
+                '=IF(${colLetter(amountCol(i))}${rTotalEquity + 1}=0,"-",${colLetter(amountCol(i))}${rTotalAssets + 1}/${colLetter(amountCol(i))}${rTotalEquity + 1})',
         },
       );
-      writeLine(
-        'Debt-to-Equity Ratio (Total Liabilities / Owner\'s Equity)',
+      final ratioRow5 = writeLine(
+        'Debt-to-Equity Ratio',
         ratioLine: true,
+        showDollar: false,
         formulasByYearIndex: {
           for (int i = 0; i < yearCount; i++)
             i:
-                '=IFERROR((${colLetter(amountCol(i))}${rTotalCurrentLiab + 1}+${colLetter(amountCol(i))}${rTotalLongTermLiab + 1})/${colLetter(amountCol(i))}${rTotalEquity + 1},0)',
+                '=IF(${colLetter(amountCol(i))}${rTotalEquity + 1}=0,"-",(${colLetter(amountCol(i))}${rTotalCurrentLiab + 1}+${colLetter(amountCol(i))}${rTotalLongTermLiab + 1})/${colLetter(amountCol(i))}${rTotalEquity + 1})',
         },
       );
+      for (final rr in [ratioRow1, ratioRow2, ratioRow3, ratioRow4, ratioRow5]) {
+        sheet.setRowHeight(rr, 20);
+      }
 
       final bytes = excel.save();
       if (bytes == null) {
         throw Exception('Unable to generate Excel file.');
       }
+      final outputBytes = _hideGridLinesInFirstSheet(bytes);
       await downloadFile(
         'Balance_Sheet_${DateFormat('yyyyMMdd').format(asOfDate)}.xlsx',
-        bytes,
+        outputBytes,
         mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
     } catch (e, st) {
       dev.log('Excel Export Error: $e\n$st');
       showSnackBar('Please review Excel generation: $e', isError: true);
+    }
+  }
+
+  List<int> _hideGridLinesInFirstSheet(List<int> xlsxBytes) {
+    try {
+      final archive = ZipDecoder().decodeBytes(xlsxBytes, verify: false);
+      bool changed = false;
+      for (final file in archive.files) {
+        if (!file.isFile) continue;
+        if (!file.name.startsWith('xl/worksheets/sheet')) continue;
+        if (!file.name.endsWith('.xml')) continue;
+
+        final xmlText = utf8.decode(file.content as List<int>);
+        final doc = XmlDocument.parse(xmlText);
+        final worksheet = doc.rootElement;
+        final sheetViews = worksheet.getElement('sheetViews');
+        if (sheetViews == null) continue;
+        final views = sheetViews.findElements('sheetView');
+        if (views.isEmpty) continue;
+
+        views.first.setAttribute('showGridLines', '0');
+        final patched = utf8.encode(doc.toXmlString(pretty: false));
+        archive.addFile(ArchiveFile(file.name, patched.length, patched));
+        changed = true;
+      }
+
+      if (!changed) {
+        return xlsxBytes;
+      }
+
+      return ZipEncoder().encode(archive) ?? xlsxBytes;
+    } catch (_) {
+      return xlsxBytes;
     }
   }
 
@@ -2009,6 +2184,14 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         exportEnd,
         exportViewType,
       );
+      final displayLabels = <String>[
+        for (final label in labels)
+          switch (exportViewType) {
+            PdfViewType.monthly => label,
+            PdfViewType.quarterly => label,
+            PdfViewType.yearly => label,
+          },
+      ];
       if (labels.isEmpty) {
         throw Exception('No PDF columns available for selected range.');
       }
@@ -2256,91 +2439,111 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
 
       final moneyFmt = NumberFormat('#,##0.00');
       String amountText(double v) {
-        if (v == 0) return '-';
+        if (v == 0) return '\$ -';
         final core = moneyFmt.format(v.abs());
-        return v < 0 ? '- $core' : core;
+        return v < 0 ? '\$ ($core)' : '\$ $core';
       }
 
       final pdf = pdf_gen.PdfDocument();
-      pdf.pageSettings.orientation = pdf_gen.PdfPageOrientation.landscape;
+      pdf.pageSettings.orientation = pdf_gen.PdfPageOrientation.portrait;
       final page = pdf.pages.add();
       final size = page.getClientSize();
-      final contentX = 12.0;
+      final contentX = 20.0;
       final contentWidth = size.width - (contentX * 2);
-      final titleFont = pdf_gen.PdfStandardFont(pdf_gen.PdfFontFamily.helvetica, 14, style: pdf_gen.PdfFontStyle.bold);
+      final companyFont = pdf_gen.PdfStandardFont(
+        pdf_gen.PdfFontFamily.helvetica,
+        9.2,
+      );
+      final titleFont = pdf_gen.PdfStandardFont(
+        pdf_gen.PdfFontFamily.helvetica,
+        11.2,
+        style: pdf_gen.PdfFontStyle.bold,
+      );
       final subtitleFont = pdf_gen.PdfStandardFont(
         pdf_gen.PdfFontFamily.helvetica,
-        7,
+        6.4,
       );
       final bodyFont = pdf_gen.PdfStandardFont(
         pdf_gen.PdfFontFamily.helvetica,
-        7,
+        6.4,
       );
       final boldFont = pdf_gen.PdfStandardFont(
         pdf_gen.PdfFontFamily.helvetica,
-        7.2,
+        6.5,
         style: pdf_gen.PdfFontStyle.bold,
       );
-      final smallFont = pdf_gen.PdfStandardFont(pdf_gen.PdfFontFamily.helvetica, 7);
+      final smallFont = pdf_gen.PdfStandardFont(
+        pdf_gen.PdfFontFamily.helvetica,
+        6.1,
+      );
+      final templateHeaderBlue = pdf_gen.PdfColor(106, 135, 164);
+      final templateTotalBand = pdf_gen.PdfColor(247, 249, 253);
 
       page.graphics.drawString(
         orgName,
-        boldFont,
-        bounds: Rect.fromLTWH(contentX, 14, contentWidth * 0.34, 18),
+        companyFont,
+        bounds: Rect.fromLTWH(contentX, 15, contentWidth * 0.40, 14),
       );
       page.graphics.drawString(
         streetLine,
         smallFont,
-        bounds: Rect.fromLTWH(contentX, 30, contentWidth * 0.34, 12),
+        bounds: Rect.fromLTWH(contentX, 26, contentWidth * 0.40, 9),
       );
       page.graphics.drawString(
         cityStateZipLine,
         smallFont,
-        bounds: Rect.fromLTWH(contentX, 42, contentWidth * 0.34, 12),
+        bounds: Rect.fromLTWH(contentX, 35, contentWidth * 0.40, 9),
       );
       page.graphics.drawString(
         'BALANCE SHEET',
         titleFont,
-        bounds: Rect.fromLTWH(contentX + (contentWidth * 0.36), 14, contentWidth * 0.36, 22),
+        bounds: Rect.fromLTWH(contentX + (contentWidth * 0.58), 15, contentWidth * 0.40, 16),
+        format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
       );
       page.graphics.drawString(
         'Date Prepared:',
         smallFont,
-        bounds: Rect.fromLTWH(contentX + (contentWidth * 0.42), 30, contentWidth * 0.28, 12),
+        bounds: Rect.fromLTWH(contentX + (contentWidth * 0.58), 27, contentWidth * 0.40, 9),
+        format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
       );
       page.graphics.drawString(
-        'As of ${DateFormat('MMMM dd, yyyy').format(asOfDate)}',
+        'As of ${DateFormat('MMMM dd').format(asOfDate)}',
         subtitleFont,
-        bounds: Rect.fromLTWH(contentX + (contentWidth * 0.36), 42, contentWidth * 0.36, 12),
+        bounds: Rect.fromLTWH(contentX + (contentWidth * 0.58), 35, contentWidth * 0.40, 10),
+        format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
+      );
+      page.graphics.drawLine(
+        pdf_gen.PdfPen(pdf_gen.PdfColor(223, 229, 237), width: 0.4),
+        Offset(contentX, 50),
+        Offset(contentX + contentWidth, 50),
       );
 
       final grid = pdf_gen.PdfGrid();
-      final colCount = 1 + (yearCount * 2);
+      final colCount = 1 + yearCount;
       grid.columns.add(count: colCount);
-      grid.columns[0].width = contentWidth * 0.50;
+      grid.columns[0].width = contentWidth * 0.46;
+      final amountWidth = (contentWidth - grid.columns[0].width) / yearCount;
       for (int i = 0; i < yearCount; i++) {
-        grid.columns[1 + (i * 2)].width = contentWidth * 0.018;
-        grid.columns[2 + (i * 2)].width = contentWidth * 0.058;
+        grid.columns[1 + i].width = amountWidth;
       }
       final header = grid.headers.add(1)[0];
       header.cells[0].value = 'ASSETS';
       for (int i = 0; i < yearCount; i++) {
-        header.cells[1 + (i * 2)].value = labels[i];
+        header.cells[1 + i].value = displayLabels[i];
       }
       header.style = pdf_gen.PdfGridRowStyle(
-        backgroundBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(31, 78, 120)),
+        backgroundBrush: pdf_gen.PdfSolidBrush(templateHeaderBlue),
         textBrush: pdf_gen.PdfBrushes.white,
         font: boldFont,
       );
       for (int i = 0; i < yearCount; i++) {
-        header.cells[1 + (i * 2)].columnSpan = 2;
-        header.cells[1 + (i * 2)].style = pdf_gen.PdfGridCellStyle(
+        header.cells[1 + i].style = pdf_gen.PdfGridCellStyle(
           format: pdf_gen.PdfStringFormat(
             alignment: pdf_gen.PdfTextAlignment.center,
             lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
           ),
           borders: pdf_gen.PdfBorders(
-            bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(31, 78, 120), width: 0.8),
+            bottom: pdf_gen.PdfPens.transparent,
             left: pdf_gen.PdfPens.transparent,
             right: pdf_gen.PdfPens.transparent,
             top: pdf_gen.PdfPens.transparent,
@@ -2349,7 +2552,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       }
       header.cells[0].style = pdf_gen.PdfGridCellStyle(
         borders: pdf_gen.PdfBorders(
-          bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(31, 78, 120), width: 0.8),
+          bottom: pdf_gen.PdfPens.transparent,
           left: pdf_gen.PdfPens.transparent,
           right: pdf_gen.PdfPens.transparent,
           top: pdf_gen.PdfPens.transparent,
@@ -2362,30 +2565,18 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         bool bold = false,
         bool shaded = false,
         bool indent = false,
-        bool redNegativeValues = false,
       }) {
         final row = grid.rows.add();
         row.cells[0].value = indent ? '      $label' : label;
         for (int i = 0; i < yearCount; i++) {
-          row.cells[1 + (i * 2)].value = '\$';
-          row.cells[1 + (i * 2)].style = pdf_gen.PdfGridCellStyle(
-            borders: pdf_gen.PdfBorders(
-              bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(236, 236, 236), width: 0.25),
-              left: pdf_gen.PdfPens.transparent,
-              right: pdf_gen.PdfPens.transparent,
-              top: pdf_gen.PdfPens.transparent,
-            ),
-          );
-          row.cells[2 + (i * 2)].value = amountText(values[i]);
-          row.cells[2 + (i * 2)].style = pdf_gen.PdfGridCellStyle(
+          row.cells[1 + i].value = amountText(values[i]);
+          row.cells[1 + i].style = pdf_gen.PdfGridCellStyle(
             format: pdf_gen.PdfStringFormat(
-              alignment: pdf_gen.PdfTextAlignment.right,
+              alignment: pdf_gen.PdfTextAlignment.center,
+              lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
             ),
-            textBrush: redNegativeValues && values[i] < 0
-                ? pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(190, 65, 65))
-                : null,
             borders: pdf_gen.PdfBorders(
-              bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(236, 236, 236), width: 0.25),
+              bottom: pdf_gen.PdfPens.transparent,
               left: pdf_gen.PdfPens.transparent,
               right: pdf_gen.PdfPens.transparent,
               top: pdf_gen.PdfPens.transparent,
@@ -2394,7 +2585,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         }
         row.cells[0].style = pdf_gen.PdfGridCellStyle(
           borders: pdf_gen.PdfBorders(
-            bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(236, 236, 236), width: 0.25),
+            bottom: pdf_gen.PdfPens.transparent,
             left: pdf_gen.PdfPens.transparent,
             right: pdf_gen.PdfPens.transparent,
             top: pdf_gen.PdfPens.transparent,
@@ -2403,7 +2594,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         row.style = pdf_gen.PdfGridRowStyle(
           font: bold ? boldFont : bodyFont,
           backgroundBrush: shaded
-              ? pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(233, 240, 250))
+              ? pdf_gen.PdfSolidBrush(templateTotalBand)
               : null,
         );
       }
@@ -2412,15 +2603,14 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         final row = grid.rows.add();
         row.cells[0].value = title;
         for (int i = 0; i < yearCount; i++) {
-          row.cells[1 + (i * 2)].value = labels[i];
-          row.cells[1 + (i * 2)].columnSpan = 2;
-          row.cells[1 + (i * 2)].style = pdf_gen.PdfGridCellStyle(
+          row.cells[1 + i].value = displayLabels[i];
+          row.cells[1 + i].style = pdf_gen.PdfGridCellStyle(
             format: pdf_gen.PdfStringFormat(
               alignment: pdf_gen.PdfTextAlignment.center,
               lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
             ),
             borders: pdf_gen.PdfBorders(
-              bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(31, 78, 120), width: 0.8),
+              bottom: pdf_gen.PdfPens.transparent,
               left: pdf_gen.PdfPens.transparent,
               right: pdf_gen.PdfPens.transparent,
               top: pdf_gen.PdfPens.transparent,
@@ -2429,7 +2619,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         }
         row.cells[0].style = pdf_gen.PdfGridCellStyle(
           borders: pdf_gen.PdfBorders(
-            bottom: pdf_gen.PdfPen(pdf_gen.PdfColor(31, 78, 120), width: 0.8),
+            bottom: pdf_gen.PdfPens.transparent,
             left: pdf_gen.PdfPens.transparent,
             right: pdf_gen.PdfPens.transparent,
             top: pdf_gen.PdfPens.transparent,
@@ -2437,7 +2627,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         );
         row.style = pdf_gen.PdfGridRowStyle(
           font: boldFont,
-          backgroundBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(31, 78, 120)),
+          backgroundBrush: pdf_gen.PdfSolidBrush(templateHeaderBlue),
           textBrush: pdf_gen.PdfBrushes.white,
         );
       }
@@ -2491,7 +2681,6 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         'Accumulated Depreciation',
         depreciationVals,
         indent: true,
-        redNegativeValues: true,
       );
       addTemplateRow(
         'TOTAL FIXED (LONG-TERM) ASSETS',
@@ -2582,15 +2771,15 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       );
 
       addTemplateRow(
-        'OWNER\'S EQUITY',
+        'OWNERS EQUITY',
         List<double>.filled(yearCount, 0),
         bold: true,
       );
-      addTemplateRow('Owner\'s Investment', ownerInvestmentVals, indent: true);
+      addTemplateRow('Owners Investment', ownerInvestmentVals, indent: true);
       addTemplateRow('Retained Earnings', retainedEarningsVals, indent: true);
       addTemplateRow('Other', List<double>.filled(yearCount, 0), indent: true);
       addTemplateRow(
-        'TOTAL OWNER\'S EQUITY',
+        'TOTAL OWNERS EQUITY',
         totalEquityVals,
         bold: true,
         shaded: true,
@@ -2606,11 +2795,11 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       );
 
       grid.style = pdf_gen.PdfGridStyle(
-        cellPadding: pdf_gen.PdfPaddings(left: 2, right: 2, top: 1, bottom: 1),
+        cellPadding: pdf_gen.PdfPaddings(left: 2, right: 2, top: 3.6, bottom: 3.6),
       );
       grid.draw(
         page: page,
-        bounds: Rect.fromLTWH(contentX, 56, contentWidth, 0),
+        bounds: Rect.fromLTWH(contentX, 54, contentWidth, 0),
       );
 
       final bytes = await pdf.save();
