@@ -466,20 +466,25 @@ class PdfExportService {
     required _StatementDummy statement,
   }) {
     final grid = pdf_gen.PdfGrid();
-    final colCount = labels.length + 2; // Description + periods + total
+    final colCount = labels.length + 2;
     grid.columns.add(count: colCount);
-    grid.columns[0].width = 220;
-    for (var i = 1; i < colCount; i++) {
-      grid.columns[i].width =
-          (page.getClientSize().width - 260) / (labels.length + 1);
+    final totalWidth = page.getClientSize().width - 40;
+    final descriptionWidth = 220.0;
+    final totalAmountWidth = 110.0;
+    grid.columns[0].width = descriptionWidth;
+    final dataColumnWidth =
+        (totalWidth - descriptionWidth - totalAmountWidth) / labels.length;
+    for (var i = 1; i <= labels.length; i++) {
+      grid.columns[i].width = dataColumnWidth;
     }
+    grid.columns[colCount - 1].width = totalAmountWidth;
 
     final header = grid.headers.add(1)[0];
     header.cells[0].value = statement.sections.first.title;
     for (var i = 0; i < labels.length; i++) {
       header.cells[i + 1].value = labels[i];
     }
-    header.cells[colCount - 1].value = 'TOTAL';
+    header.cells[colCount - 1].value = 'Total Amount';
     header.style = pdf_gen.PdfGridRowStyle(
       backgroundBrush: pdf_gen.PdfSolidBrush(sectionColor),
       textBrush: pdf_gen.PdfBrushes.white,
@@ -505,7 +510,7 @@ class PdfExportService {
       for (final row in section.rows.where((r) => !r.values.every((v) => v == 0))) {
         final dataRow = grid.rows.add();
         dataRow.cells[0].value = row.label;
-        double rowTotal = 0;
+        var rowTotal = 0.0;
         for (var i = 0; i < labels.length; i++) {
           final value = row.values[i];
           rowTotal += value;
@@ -528,7 +533,7 @@ class PdfExportService {
 
     final netRow = grid.rows.add();
     netRow.cells[0].value = 'Net Profit';
-    double netTotal = 0;
+    var netTotal = 0.0;
     for (var i = 0; i < labels.length; i++) {
       final value = statement.netProfit[i];
       netTotal += value;

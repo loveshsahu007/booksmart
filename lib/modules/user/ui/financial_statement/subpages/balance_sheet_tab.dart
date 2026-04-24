@@ -12,6 +12,7 @@ import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:booksmart/modules/user/ui/tax_filling/upload_tax_doc_dialog.dart';
 import 'package:booksmart/widgets/recent_documents_widget.dart';
 import 'package:booksmart/widgets/app_button.dart';
+import 'package:booksmart/widgets/kpi_info_tooltip.dart';
 import 'package:booksmart/widgets/snackbar.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as pdf_gen;
 import 'dart:convert';
@@ -39,10 +40,39 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
   @override
   void initState() {
     super.initState();
-    // Initialize with default 3 months (Index 1)
+    // Initialize with default 3 months
     final now = DateTime.now();
     _startDate = now.subtract(const Duration(days: 90));
     _endDate = now;
+  }
+
+  bool _isSyncingControllerRange = false;
+
+  bool _isSameDate(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  void _syncRangeIfNeeded(FinancialReportController controller) {
+    if (!TickerMode.of(context)) return;
+    if (_isSyncingControllerRange || _startDate == null || _endDate == null) {
+      return;
+    }
+    if (_isSameDate(controller.lastStartDate, _startDate) &&
+        _isSameDate(controller.lastEndDate, _endDate)) {
+      return;
+    }
+    _isSyncingControllerRange = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await controller.fetchAndAggregateData(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+      if (mounted) {
+        _isSyncingControllerRange = false;
+      }
+    });
   }
 
   Future<void> _selectDate(BuildContext context, FinancialReportController controller) async {
@@ -1221,6 +1251,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     String? timeframe,
     Color? borderColor,
     double? borderWidth,
+    bool showInfoIcon = true,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isPositive = change >= 0;
@@ -1230,6 +1261,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     
     final bool isNegativeValue = value.contains('-') || (isCurrency && value.startsWith('-\$'));
     final Color valueColor = isNegativeValue ? softRed : (isDark ? Colors.white : Colors.black87);
+    final tooltipText = showInfoIcon ? kpiTooltipTextForTitle(title) : null;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -1245,58 +1277,72 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Stack(
+        alignment: Alignment.topCenter,
         children: [
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              title,
-              style: TextStyle(
-                fontFamily: 'Outfit',
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: isDark ? Colors.white70 : Colors.black54,
-              ),
-              softWrap: false,
-              overflow: TextOverflow.visible,
-            ),
-          ),
-          const SizedBox(height: 12),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: AppText(value, fontSize: 28, fontWeight: FontWeight.w900, color: valueColor),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 4,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isPositive ? changeColor.withValues(alpha: 0.15) : softRed.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(changeIcon, size: 12, color: changeColor),
-                    const SizedBox(width: 4),
-                    AppText(
-                      "${change.abs().toStringAsFixed(1)}%",
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: changeColor,
-                    ),
-                  ],
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontFamily: 'Outfit',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                  softWrap: false,
+                  overflow: TextOverflow.visible,
                 ),
               ),
-              AppText("vs previous $timeframe", fontSize: 11, color: isDark ? Colors.white30 : Colors.black38, disableFormat: true),
+              const SizedBox(height: 12),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AppText(value, fontSize: 28, fontWeight: FontWeight.w900, color: valueColor),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isPositive ? changeColor.withValues(alpha: 0.15) : softRed.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(changeIcon, size: 12, color: changeColor),
+                        const SizedBox(width: 4),
+                        AppText(
+                          "${change.abs().toStringAsFixed(1)}%",
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: changeColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                  AppText("vs previous $timeframe", fontSize: 11, color: isDark ? Colors.white30 : Colors.black38, disableFormat: true),
+                ],
+              ),
             ],
           ),
+          if (tooltipText != null)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: KpiInfoTooltipIcon(
+                message: tooltipText,
+                semanticLabel: "More information about $title",
+              ),
+            ),
         ],
       ),
     );
@@ -1310,6 +1356,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         if (controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator(color: orangeColor));
         }
+        _syncRangeIfNeeded(controller);
 
         final totalAssets = controller.totalAssets.value;
         final totalLiabilities = controller.totalLiabilities.value;
@@ -1554,6 +1601,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                         timeframe: _getTimeframeLabel(),
                         borderColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.15) : Colors.black12,
                         borderWidth: 0.8,
+                        showInfoIcon: false,
                       ),
                     ),
                     SizedBox(
@@ -1595,6 +1643,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           timeframe: _getTimeframeLabel(),
                           borderColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.15) : Colors.black12,
                           borderWidth: 0.8,
+                          showInfoIcon: false,
                         ),
                       ),
                       const SizedBox(width: 12),

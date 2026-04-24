@@ -90,6 +90,8 @@ class FinancialReportController extends GetxController {
   RxDouble beginningCashBalance = 0.0.obs;
   RxDouble netChangeInCash = 0.0.obs;
   RxDouble endingCashBalance = 0.0.obs;
+  RxDouble cashInflow = 0.0.obs;
+  RxDouble cashOutflow = 0.0.obs;
 
   // Previous Period Comparison for KPIs
   RxDouble prevPeriodIncome = 0.0.obs;
@@ -103,6 +105,10 @@ class FinancialReportController extends GetxController {
   RxDouble prevPeriodLiabilities = 0.0.obs;
   RxDouble prevPeriodCurrentAssets = 0.0.obs;
   RxDouble prevPeriodCurrentLiabilities = 0.0.obs;
+  RxDouble prevPeriodCashInflow = 0.0.obs;
+  RxDouble prevPeriodCashOutflow = 0.0.obs;
+
+  int _latestFetchRequestId = 0;
 
   // Granular Growth Data for Charts
   RxList<Map<String, dynamic>> chartData = <Map<String, dynamic>>[].obs;
@@ -267,6 +273,7 @@ class FinancialReportController extends GetxController {
     DateTime? startDate,
     DateTime? endDate,
   }) async {
+    final int requestId = ++_latestFetchRequestId;
     if (isDemoMode.value) return;
 
     final DateTime now = DateTime.now();
@@ -312,6 +319,7 @@ class FinancialReportController extends GetxController {
       query = query.lt('date_time', _sqlDateLocal(_nextDay(effectiveEnd)));
 
       final res = await query;
+      if (requestId != _latestFetchRequestId) return;
       final List<TransactionModel> currentTransactions = (res as List)
           .map((e) => TransactionModel.fromJson(e))
           .toList();
@@ -324,6 +332,7 @@ class FinancialReportController extends GetxController {
           .lt('date_time', _sqlDateLocal(_nextDay(pEnd)));
 
       final prevRes = await prevQuery;
+      if (requestId != _latestFetchRequestId) return;
       final List<TransactionModel> previousTransactions = (prevRes as List)
           .map((e) => TransactionModel.fromJson(e))
           .toList();
@@ -334,6 +343,7 @@ class FinancialReportController extends GetxController {
           .select()
           .eq('org_id', orgId)
           .lt('date_time', _sqlDateLocal(reportStart));
+      if (requestId != _latestFetchRequestId) return;
       final List<TransactionModel> openingTransactions = (openingRes as List)
           .map((e) => TransactionModel.fromJson(e))
           .toList();
@@ -360,6 +370,7 @@ class FinancialReportController extends GetxController {
       log("❌ [FRC] fetchAndAggregateData error: $e");
       log(s.toString());
     } finally {
+      if (requestId != _latestFetchRequestId) return;
       isLoading.value = false;
       update();
     }
@@ -374,6 +385,25 @@ class FinancialReportController extends GetxController {
     required DateTime prevEnd,
     required double openingCash,
   }) {
+    Map<String, double> getCashTotals(List<TransactionModel> txs) {
+      double inflow = 0.0;
+      double outflow = 0.0;
+      for (final tx in txs) {
+        final title = tx.title.toLowerCase();
+        final bool isInternalTransfer =
+            title.contains('credit card payment') ||
+            title.contains('transfer to') ||
+            title.contains('autopay');
+        if (isInternalTransfer) continue;
+        if (tx.amount > 0) {
+          inflow += tx.amount;
+        } else if (tx.amount < 0) {
+          outflow += tx.amount.abs();
+        }
+      }
+      return {'inflow': inflow, 'outflow': outflow};
+    }
+
     Map<String, double> getTotals(List<TransactionModel> txs) {
       double inc = 0, exp = 0, cg = 0, opx = 0, dep = 0;
       for (var tx in txs) {
@@ -454,6 +484,12 @@ class FinancialReportController extends GetxController {
     prevPeriodNetIncome.value =
         prevPeriodIncome.value - prevPeriodExpenses.value;
     prevPeriodEbitda.value = prevPeriodNetIncome.value + pT['dep']!;
+    final cCash = getCashTotals(transactions);
+    final pCash = getCashTotals(prevTransactions);
+    cashInflow.value = cCash['inflow'] ?? 0.0;
+    cashOutflow.value = cCash['outflow'] ?? 0.0;
+    prevPeriodCashInflow.value = pCash['inflow'] ?? 0.0;
+    prevPeriodCashOutflow.value = pCash['outflow'] ?? 0.0;
 
     double taxDeductions = 0;
     double opAdj = 0,

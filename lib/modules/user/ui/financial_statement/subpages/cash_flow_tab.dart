@@ -13,6 +13,7 @@ import 'package:archive/archive.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:booksmart/modules/user/ui/tax_filling/upload_tax_doc_dialog.dart';
 import 'package:booksmart/widgets/recent_documents_widget.dart';
+import 'package:booksmart/widgets/kpi_info_tooltip.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/pdf_export_service.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/export_modal_widget.dart';
 import 'package:booksmart/modules/user/utils/cash_flow_manual_entry_service.dart';
@@ -47,6 +48,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
   bool _showMoneyOut = true;
   bool _showNetCash = true;
   bool _comparePriorPeriod = false;
+  bool _isSyncingControllerRange = false;
 
   final Map<String, bool> _expandedCards = {
     "Operating Activities": false,
@@ -63,12 +65,29 @@ class _CashFlowTabState extends State<CashFlowTab> {
     _endDate = today;
   }
 
-  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+  bool _isSameDate(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
 
-  bool _isSameRange(DateTime start, DateTime end) {
-    if (_startDate == null || _endDate == null) return false;
-    return _dateOnly(_startDate!) == _dateOnly(start) &&
-        _dateOnly(_endDate!) == _dateOnly(end);
+  void _syncRangeIfNeeded(FinancialReportController controller) {
+    if (!TickerMode.of(context)) return;
+    if (_isSyncingControllerRange || _startDate == null || _endDate == null) return;
+    if (_isSameDate(controller.lastStartDate, _startDate) &&
+        _isSameDate(controller.lastEndDate, _endDate)) {
+      return;
+    }
+    _isSyncingControllerRange = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await controller.fetchAndAggregateData(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+      if (mounted) {
+        _isSyncingControllerRange = false;
+      }
+    });
   }
 
   void _exportCSV(FinancialReportController controller) async {
@@ -1523,25 +1542,21 @@ class _CashFlowTabState extends State<CashFlowTab> {
           if (controller.isLoading.value) {
             return const Center(child: CircularProgressIndicator());
           }
+          _syncRangeIfNeeded(controller);
 
           final trendSeries = controller.trendChartSeries;
           final operatingCash = controller.operatingCashFlow.value;
           final investingCash = controller.investingCashFlow.value;
           final financingCash = controller.financingCashFlow.value;
 
-          final totalIn = (operatingCash > 0 ? operatingCash : 0.0) +
-              (investingCash > 0 ? investingCash : 0.0) +
-              (financingCash > 0 ? financingCash : 0.0);
-          final totalOut = (operatingCash < 0 ? -operatingCash : 0.0) +
-              (investingCash < 0 ? -investingCash : 0.0) +
-              (financingCash < 0 ? -financingCash : 0.0);
-          final netCash = operatingCash + investingCash + financingCash;
+          final totalIn = controller.cashInflow.value;
+          final totalOut = controller.cashOutflow.value;
+          final netCash = totalIn - totalOut;
+          final statementNetCash = operatingCash + investingCash + financingCash;
 
-          final netInvestingFinancing = netCash;
-
-          final prevIn = controller.prevPeriodIncome.value;
-          final prevOut = controller.prevPeriodExpenses.value;
-          final prevNet = controller.prevPeriodNetIncome.value;
+          final prevIn = controller.prevPeriodCashInflow.value;
+          final prevOut = controller.prevPeriodCashOutflow.value;
+          final prevNet = prevIn - prevOut;
 
           final double incomeChange = prevIn != 0 ? ((totalIn - prevIn) / prevIn) * 100 : (totalIn > 0 ? 100 : 0);
           final double expensesChange = prevOut != 0 ? ((totalOut - prevOut) / prevOut) * 100 : (totalOut > 0 ? 100 : 0);
@@ -2067,10 +2082,10 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                   color: isDark ? Colors.white : Colors.black87,
                                 ),
                                 AppText(
-                                  _formatCurrencyExact(netInvestingFinancing),
+                                  _formatCurrencyExact(statementNetCash),
                                   fontSize: 18,
                                   fontWeight: FontWeight.w900,
-                                  color: netCash < 0 ? const Color(0xFFE57373) : const Color(0xFF19C37D),
+                                  color: statementNetCash < 0 ? const Color(0xFFE57373) : const Color(0xFF19C37D),
                                 ),
                               ],
                             ),
@@ -2111,6 +2126,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
     if (isNetCash) {
       displayValueColor = cashGreen; // ✅ Consistently Green as per req
     }
+    final tooltipText = kpiTooltipTextForTitle(title);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -2126,60 +2142,74 @@ class _CashFlowTabState extends State<CashFlowTab> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Stack(
+        alignment: Alignment.topCenter,
         children: [
-          AppText(
-            title,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: isDark ? Colors.white70 : Colors.black54,
-          ),
-          const SizedBox(height: 12),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: AppText(
-              value,
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              color: displayValueColor,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 4,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isPositive ? changeColor.withOpacity(0.15) : softRed.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(changeIcon, size: 12, color: changeColor),
-                    const SizedBox(width: 4),
-                    AppText(
-                      "${change.abs().toStringAsFixed(1)}%",
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: changeColor,
-                    ),
-                  ],
+              AppText(
+                title,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+              const SizedBox(height: 12),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AppText(
+                  value,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: displayValueColor,
                 ),
               ),
-              AppText(
-                "vs previous $timeframe",
-                fontSize: 11,
-                color: Colors.white30,
-                disableFormat: true, // ✅ Force lowercase vs
+              const SizedBox(height: 16),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isPositive ? changeColor.withOpacity(0.15) : softRed.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(changeIcon, size: 12, color: changeColor),
+                        const SizedBox(width: 4),
+                        AppText(
+                          "${change.abs().toStringAsFixed(1)}%",
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: changeColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                  AppText(
+                    "vs previous $timeframe",
+                    fontSize: 11,
+                    color: Colors.white30,
+                    disableFormat: true, // ✅ Force lowercase vs
+                  ),
+                ],
               ),
             ],
           ),
+          if (tooltipText != null)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: KpiInfoTooltipIcon(
+                message: tooltipText,
+                semanticLabel: "More information about $title",
+              ),
+            ),
         ],
       ),
     );

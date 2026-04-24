@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:booksmart/modules/user/ui/tax_filling/upload_tax_doc_dialog.dart';
 import 'package:booksmart/widgets/recent_documents_widget.dart';
+import 'package:booksmart/widgets/kpi_info_tooltip.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as pdf_gen;
 import 'dart:convert';
 import 'dart:developer' as dev;
@@ -67,6 +68,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
   bool _showExpenses = true;
   bool _showProfit = true;
   bool _comparePriorPeriod = false;
+  bool _isSyncingControllerRange = false;
 
   @override
   void initState() {
@@ -75,6 +77,31 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     final today = DateTime(now.year, now.month, now.day);
     _startDate = today.subtract(const Duration(days: 89));
     _endDate = today;
+  }
+
+  bool _isSameDate(DateTime? a, DateTime? b) {
+    if (a == null || b == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  void _syncRangeIfNeeded(FinancialReportController controller) {
+    if (!TickerMode.of(context)) return;
+    if (_isSyncingControllerRange || _startDate == null || _endDate == null) return;
+    if (_isSameDate(controller.lastStartDate, _startDate) &&
+        _isSameDate(controller.lastEndDate, _endDate)) {
+      return;
+    }
+    _isSyncingControllerRange = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await controller.fetchAndAggregateData(
+        startDate: _startDate,
+        endDate: _endDate,
+      );
+      if (mounted) {
+        _isSyncingControllerRange = false;
+      }
+    });
   }
 
   Future<void> _updateFilter(
@@ -1466,6 +1493,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         if (controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
         }
+        _syncRangeIfNeeded(controller);
 
         final numFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
 
@@ -1483,9 +1511,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         final double grossProfitChange =
             _percentChange(grossProfit, prevGrossProfit);
 
-        final double margin = controller.grossMarginPct.value.clamp(0, 100);
-        final double prevMargin = controller.prevPeriodGrossMarginPct.value
-            .clamp(0, 100);
+        final double margin = controller.grossMarginPct.value;
+        final double prevMargin = controller.prevPeriodGrossMarginPct.value;
         final double marginChange = _percentChange(margin, prevMargin);
 
         final double ebitda = controller.ebitda.value;
@@ -1915,6 +1942,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     final Color valueColor = isNegativeValue
         ? softRed
         : (isDark ? Colors.white : Colors.black87);
+    final tooltipText = kpiTooltipTextForTitle(title);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -1935,62 +1963,76 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Stack(
+        alignment: Alignment.topCenter,
         children: [
-          AppText(
-            title,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: isDark ? Colors.white70 : Colors.black54,
-          ),
-          const SizedBox(height: 12),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: AppText(
-              value,
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              color: valueColor,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 4,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isPositive
-                      ? changeColor.withValues(alpha: 0.15)
-                      : softRed.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(changeIcon, size: 12, color: changeColor),
-                    const SizedBox(width: 4),
-                    AppText(
-                      "${change.abs().toStringAsFixed(1)}%",
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: changeColor,
-                    ),
-                  ],
+              AppText(
+                title,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+              const SizedBox(height: 12),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AppText(
+                  value,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: valueColor,
                 ),
               ),
-              AppText(
-                "vs previous $timeframe",
-                fontSize: 11,
-                color: isDark ? Colors.white30 : Colors.black45,
-                disableFormat: true,
+              const SizedBox(height: 16),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isPositive
+                          ? changeColor.withValues(alpha: 0.15)
+                          : softRed.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(changeIcon, size: 12, color: changeColor),
+                        const SizedBox(width: 4),
+                        AppText(
+                          "${change.abs().toStringAsFixed(1)}%",
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: changeColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                  AppText(
+                    "vs previous $timeframe",
+                    fontSize: 11,
+                    color: isDark ? Colors.white30 : Colors.black45,
+                    disableFormat: true,
+                  ),
+                ],
               ),
             ],
           ),
+          if (tooltipText != null)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: KpiInfoTooltipIcon(
+                message: tooltipText,
+                semanticLabel: "More information about $title",
+              ),
+            ),
         ],
       ),
     );
