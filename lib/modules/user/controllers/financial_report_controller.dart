@@ -37,6 +37,8 @@ class FinancialReportController extends GetxController {
   // using the same date range the user last selected.
   DateTime? lastStartDate;
   DateTime? lastEndDate;
+  int? _availableYearsOrgId;
+  RxList<int> availableYears = <int>[].obs;
 
   // Aggregate Metrics over all time (or a specific default range)
   RxDouble totalIncome = 0.0.obs;
@@ -310,6 +312,7 @@ class FinancialReportController extends GetxController {
         log("⚠️ [FRC] Organization ID is null. Aborting fetch.");
         return;
       }
+      await _ensureAvailableYears(orgId);
 
       dynamic query = supabase
           .from(SupabaseTable.transaction)
@@ -374,6 +377,38 @@ class FinancialReportController extends GetxController {
       isLoading.value = false;
       update();
     }
+  }
+
+  Future<void> _ensureAvailableYears(int orgId) async {
+    if (_availableYearsOrgId == orgId && availableYears.isNotEmpty) return;
+    final years = <int>{};
+    const pageSize = 1000;
+    var offset = 0;
+
+    while (true) {
+      final rows = await supabase
+          .from(SupabaseTable.transaction)
+          .select('date_time')
+          .eq('org_id', orgId)
+          .order('date_time', ascending: false)
+          .range(offset, offset + pageSize - 1);
+
+      final page = (rows as List);
+      if (page.isEmpty) break;
+
+      for (final row in page) {
+        final rawDate = (row['date_time'] ?? '').toString();
+        final parsed = DateTime.tryParse(rawDate);
+        if (parsed != null) years.add(parsed.year);
+      }
+
+      if (page.length < pageSize) break;
+      offset += pageSize;
+    }
+
+    final sorted = years.toList()..sort((a, b) => b.compareTo(a));
+    _availableYearsOrgId = orgId;
+    availableYears.assignAll(sorted);
   }
 
   void _calculateMetrics(
@@ -1245,6 +1280,21 @@ class FinancialReportController extends GetxController {
   ) {
     double? prevRevenue;
     double? prevExpense;
+    const double minBaseForGrowthPct = 100.0;
+    const double growthCapPct = 500.0;
+
+    ({double value, bool isNew}) growthFromPrevious(
+      double current,
+      double? previous,
+    ) {
+      if (previous == null) return (value: 0.0, isNew: false);
+      if (previous.abs() < minBaseForGrowthPct) {
+        return (value: 0.0, isNew: current.abs() >= minBaseForGrowthPct);
+      }
+      final raw = ((current - previous) / previous) * 100;
+      return (value: raw.clamp(-growthCapPct, growthCapPct), isNew: false);
+    }
+
     return trendSeries.map((row) {
       final currentRevenue = (row['income'] as num?)?.toDouble() ?? 0.0;
       final currentExpense = (row['expense'] as num?)?.toDouble() ?? 0.0;
@@ -1252,20 +1302,18 @@ class FinancialReportController extends GetxController {
       final bucket = row['bucketStart'];
       final tooltipDate = row['tooltipDate'];
       final label = row['label'];
-      final revenueGrowth = (prevRevenue != null && prevRevenue! != 0)
-          ? ((currentRevenue - prevRevenue!) / prevRevenue!) * 100
-          : 0.0;
-      final expenseGrowth = (prevExpense != null && prevExpense! != 0)
-          ? ((currentExpense - prevExpense!) / prevExpense!) * 100
-          : 0.0;
+      final revenueGrowthData = growthFromPrevious(currentRevenue, prevRevenue);
+      final expenseGrowthData = growthFromPrevious(currentExpense, prevExpense);
       prevRevenue = currentRevenue;
       prevExpense = currentExpense;
       return <String, dynamic>{
         'bucketStart': bucket,
         'name': label,
         'tooltipDate': tooltipDate,
-        'revenueGrowth': revenueGrowth,
-        'expenseGrowth': expenseGrowth,
+        'revenueGrowth': revenueGrowthData.value,
+        'expenseGrowth': expenseGrowthData.value,
+        'revenueGrowthIsNew': revenueGrowthData.isNew,
+        'expenseGrowthIsNew': expenseGrowthData.isNew,
         'revenue': currentRevenue,
         'cogsPct': currentRevenue != 0
             ? (currentCogs / currentRevenue) * 100

@@ -123,7 +123,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       case 2:
         return end.subtract(const Duration(days: 90));
       case 3:
-        return end.subtract(const Duration(days: 180));
+        return end.subtract(const Duration(days: 364));
       case 4:
         final yr = _selectedYear ?? end.year;
         return DateTime(yr, 1, 1);
@@ -566,7 +566,9 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       setCell(
         titleStartCol,
         2,
-        excel_lib.TextCellValue('Date Prepared:'),
+        excel_lib.TextCellValue(
+          'Date Prepared: ${DateFormat('MMMM dd, yyyy').format(DateTime.now())}',
+        ),
         metaCenterStyle,
       );
       sheet.merge(
@@ -883,7 +885,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
       );
       writeLine(
-        'Accumulated Depreciation',
+        'Accumulated Depreciation (*enter as negative)',
         indent: true,
         valuesByYearIndex: valuesMap(List<double>.filled(yearCount, 0)),
       );
@@ -917,7 +919,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       );
 
       writeYearHeader(
-        'LIABILITIES AND OWNERS EQUITY',
+        "LIABILITIES AND OWNER'S EQUITY",
         bandStyle: liabilityHeaderStyle,
       );
 
@@ -1003,7 +1005,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       );
 
       final rTotalLiabEq = writeLine(
-        'TOTAL LIABILITIES AND OWNERS EQUITY',
+        "TOTAL LIABILITIES AND OWNER'S EQUITY",
         isTotal: true,
         useLiabilityTotalStyle: true,
         valuesByYearIndex: valuesMap(
@@ -1090,13 +1092,15 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         sheet.setRowHeight(rr, 20);
       }
 
-      final bytes = excel.save();
+      final exportName =
+          'Balance_Sheet_${DateFormat('yyyyMMdd').format(asOfDate)}.xlsx';
+      final bytes = excel.encode();
       if (bytes == null) {
         throw Exception('Unable to generate Excel file.');
       }
       final outputBytes = _hideGridLinesInFirstSheet(bytes);
       await downloadFile(
-        'Balance_Sheet_${DateFormat('yyyyMMdd').format(asOfDate)}.xlsx',
+        exportName,
         outputBytes,
         mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1208,7 +1212,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       case 2:
         return "3 months";
       case 3:
-        return "6 months";
+        return "12 months";
       case 4:
         return "year";
       default:
@@ -1281,56 +1285,56 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         alignment: Alignment.topCenter,
         children: [
           Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              title,
+              style: TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+              softWrap: false,
+              overflow: TextOverflow.visible,
+            ),
+          ),
+          const SizedBox(height: 12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: AppText(value, fontSize: 28, fontWeight: FontWeight.w900, color: valueColor),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontFamily: 'Outfit',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white70 : Colors.black54,
-                  ),
-                  softWrap: false,
-                  overflow: TextOverflow.visible,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: isPositive ? changeColor.withValues(alpha: 0.15) : softRed.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(changeIcon, size: 12, color: changeColor),
+                    const SizedBox(width: 4),
+                    AppText(
+                      "${change.abs().toStringAsFixed(1)}%",
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                      color: changeColor,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: AppText(value, fontSize: 28, fontWeight: FontWeight.w900, color: valueColor),
-              ),
-              const SizedBox(height: 16),
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: isPositive ? changeColor.withValues(alpha: 0.15) : softRed.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(changeIcon, size: 12, color: changeColor),
-                        const SizedBox(width: 4),
-                        AppText(
-                          "${change.abs().toStringAsFixed(1)}%",
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
-                          color: changeColor,
-                        ),
-                      ],
-                    ),
-                  ),
-                  AppText("vs previous $timeframe", fontSize: 11, color: isDark ? Colors.white30 : Colors.black38, disableFormat: true),
-                ],
+              AppText("vs previous $timeframe", fontSize: 11, color: isDark ? Colors.white30 : Colors.black38, disableFormat: true),
+            ],
               ),
             ],
           ),
@@ -1342,7 +1346,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                 message: tooltipText,
                 semanticLabel: "More information about $title",
               ),
-            ),
+          ),
         ],
       ),
     );
@@ -1376,6 +1380,20 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
           controller.returnOnEquity,
           controller.prevPeriodReturnOnEquity,
         );
+        final curLiabilities = controller.currentLiabilitiesBreakdown.values.fold(
+          0.0,
+          (a, b) => a + b,
+        );
+        final currentRatioValue = curLiabilities.abs() < 0.000001
+            ? "N/A"
+            : controller.currentRatio.toStringAsFixed(2);
+        final equityBase = totalAssets - totalLiabilities;
+        final debtToEquityValue = equityBase.abs() < 0.000001
+            ? "N/A"
+            : controller.debtToEquity.toStringAsFixed(2);
+        final roeValue = equityBase.abs() < 0.000001
+            ? "N/A"
+            : "${controller.returnOnEquity.toStringAsFixed(1)}%";
 
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final screenWidth = MediaQuery.sizeOf(context).width;
@@ -1685,7 +1703,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                       width: screenWidth - 36,
                       child: _premiumKPICard(
                         title: "Current Ratio",
-                        value: controller.currentRatio.toStringAsFixed(2),
+                        value: currentRatioValue,
                         change: currentRatioChange,
                         isCurrency: false,
                         timeframe: _getTimeframeLabel(),
@@ -1697,7 +1715,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                       width: screenWidth - 36,
                       child: _premiumKPICard(
                         title: "Debt / Equity Ratio",
-                        value: controller.debtToEquity.toStringAsFixed(2),
+                        value: debtToEquityValue,
                         change: debtToEquityChange,
                         isCurrency: false,
                         timeframe: _getTimeframeLabel(),
@@ -1709,7 +1727,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                       width: screenWidth - 36,
                       child: _premiumKPICard(
                         title: "Return on Equity (ROE)",
-                        value: "${controller.returnOnEquity.toStringAsFixed(1)}%",
+                        value: roeValue,
                         change: roeChange,
                         isCurrency: false,
                         timeframe: _getTimeframeLabel(),
@@ -1738,7 +1756,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                       Expanded(
                         child: _premiumKPICard(
                           title: "Current Ratio",
-                          value: controller.currentRatio.toStringAsFixed(2),
+                          value: currentRatioValue,
                           change: currentRatioChange,
                           isCurrency: false,
                           timeframe: _getTimeframeLabel(),
@@ -1750,7 +1768,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                       Expanded(
                         child: _premiumKPICard(
                           title: "Debt / Equity Ratio",
-                          value: controller.debtToEquity.toStringAsFixed(2),
+                          value: debtToEquityValue,
                           change: debtToEquityChange,
                           isCurrency: false,
                           timeframe: _getTimeframeLabel(),
@@ -1762,7 +1780,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                       Expanded(
                         child: _premiumKPICard(
                           title: "Return on Equity (ROE)",
-                          value: "${controller.returnOnEquity.toStringAsFixed(1)}%",
+                          value: roeValue,
                           change: roeChange,
                           isCurrency: false,
                           timeframe: _getTimeframeLabel(),
@@ -1873,7 +1891,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     } else if (index == 2) {
       start = now.subtract(const Duration(days: 90));
     } else if (index == 3) {
-      start = now.subtract(const Duration(days: 180));
+      start = now.subtract(const Duration(days: 364));
     } else if (index == 4) {
       // Specific Year
       final yr = year ?? _selectedYear ?? now.year;
@@ -1909,7 +1927,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
           _filterItem("7 Days", _selectedFilterIdx == 0, () => _updateFilter(0, controller)),
           _filterItem("30 Days", _selectedFilterIdx == 1, () => _updateFilter(1, controller)),
           _filterItem("3 Months", _selectedFilterIdx == 2, () => _updateFilter(2, controller)),
-          _filterItem("6 Months", _selectedFilterIdx == 3, () => _updateFilter(3, controller)),
+          _filterItem("12 Months", _selectedFilterIdx == 3, () => _updateFilter(3, controller)),
           _buildYearDropdown(controller),
           _filterItem("Custom", _selectedFilterIdx == 5, () => _selectCustomRange(controller)),
         ],
@@ -1920,7 +1938,9 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
   Widget _buildYearDropdown(FinancialReportController controller) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final int currentYear = DateTime.now().year;
-    final List<int> years = List.generate(5, (index) => currentYear - index);
+    final List<int> years = controller.availableYears.isNotEmpty
+        ? List<int>.from(controller.availableYears)
+        : List.generate(5, (index) => currentYear - index);
     final bool isSelected = _selectedFilterIdx == 4;
 
     return PopupMenuButton<int>(
@@ -1933,9 +1953,15 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? (isDark ? const Color(0xFF1E293B) : Colors.black.withValues(alpha: 0.05)) : Colors.transparent,
+          color: isSelected
+              ? (isDark
+                    ? orangeColor.withValues(alpha: 0.28)
+                    : orangeColor.withValues(alpha: 0.16))
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: isDark ? Colors.white12 : Colors.black12) : null,
+          border: isSelected
+              ? Border.all(color: orangeColor.withValues(alpha: 0.8))
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -2550,7 +2576,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
       );
       page.graphics.drawString(
-        'Date Prepared:',
+        'Date Prepared: ${DateFormat('MMMM dd, yyyy').format(DateTime.now())}',
         smallFont,
         bounds: Rect.fromLTWH(contentX + (contentWidth * 0.58), 27, contentWidth * 0.40, 9),
         format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
@@ -2615,10 +2641,49 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         bool shaded = false,
         bool indent = false,
       }) {
-        final row = grid.rows.add();
+          final row = grid.rows.add();
         row.cells[0].value = indent ? '      $label' : label;
         for (int i = 0; i < yearCount; i++) {
           row.cells[1 + i].value = amountText(values[i]);
+          row.cells[1 + i].style = pdf_gen.PdfGridCellStyle(
+            format: pdf_gen.PdfStringFormat(
+              alignment: pdf_gen.PdfTextAlignment.center,
+              lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
+            ),
+            borders: pdf_gen.PdfBorders(
+              bottom: pdf_gen.PdfPens.transparent,
+              left: pdf_gen.PdfPens.transparent,
+              right: pdf_gen.PdfPens.transparent,
+              top: pdf_gen.PdfPens.transparent,
+            ),
+          );
+        }
+        row.cells[0].style = pdf_gen.PdfGridCellStyle(
+          borders: pdf_gen.PdfBorders(
+            bottom: pdf_gen.PdfPens.transparent,
+            left: pdf_gen.PdfPens.transparent,
+            right: pdf_gen.PdfPens.transparent,
+            top: pdf_gen.PdfPens.transparent,
+          ),
+        );
+        row.style = pdf_gen.PdfGridRowStyle(
+          font: bold ? boldFont : bodyFont,
+          backgroundBrush: shaded
+              ? pdf_gen.PdfSolidBrush(templateTotalBand)
+              : null,
+        );
+      }
+
+      void addTemplateTextRow(
+        String label,
+        List<String> values, {
+        bool bold = false,
+        bool shaded = false,
+      }) {
+        final row = grid.rows.add();
+        row.cells[0].value = label;
+        for (int i = 0; i < yearCount; i++) {
+          row.cells[1 + i].value = values[i];
           row.cells[1 + i].style = pdf_gen.PdfGridCellStyle(
             format: pdf_gen.PdfStringFormat(
               alignment: pdf_gen.PdfTextAlignment.center,
@@ -2654,7 +2719,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         for (int i = 0; i < yearCount; i++) {
           row.cells[1 + i].value = displayLabels[i];
           row.cells[1 + i].style = pdf_gen.PdfGridCellStyle(
-            format: pdf_gen.PdfStringFormat(
+          format: pdf_gen.PdfStringFormat(
               alignment: pdf_gen.PdfTextAlignment.center,
               lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
             ),
@@ -2727,7 +2792,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         indent: true,
       );
       addTemplateRow(
-        'Accumulated Depreciation',
+        'Accumulated Depreciation (*enter as negative)',
         depreciationVals,
         indent: true,
       );
@@ -2755,9 +2820,14 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         bold: true,
         shaded: true,
       );
-      addTemplateRow('TOTAL ASSETS', totalAssetsVals, bold: true, shaded: true);
+      addTemplateRow(
+        'TOTAL ASSETS',
+        totalAssetsVals,
+        bold: true,
+        shaded: true,
+      );
 
-      addHeaderRow('LIABILITIES AND OWNERS EQUITY');
+      addHeaderRow("LIABILITIES AND OWNER'S EQUITY");
       addTemplateRow(
         'CURRENT LIABILITIES',
         List<double>.filled(yearCount, 0),
@@ -2818,9 +2888,15 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         bold: true,
         shaded: true,
       );
+      addTemplateRow(
+        'TOTAL LIABILITIES',
+        totalLiabilitiesVals,
+        bold: true,
+        shaded: true,
+      );
 
       addTemplateRow(
-        'OWNERS EQUITY',
+        "OWNER'S EQUITY",
         List<double>.filled(yearCount, 0),
         bold: true,
       );
@@ -2828,13 +2904,13 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       addTemplateRow('Retained Earnings', retainedEarningsVals, indent: true);
       addTemplateRow('Other', List<double>.filled(yearCount, 0), indent: true);
       addTemplateRow(
-        'TOTAL OWNERS EQUITY',
+        "TOTAL OWNER'S EQUITY",
         totalEquityVals,
         bold: true,
         shaded: true,
       );
       addTemplateRow(
-        'TOTAL LIABILITIES AND OWNERS EQUITY',
+        "TOTAL LIABILITIES AND OWNER'S EQUITY",
         List<double>.generate(
           yearCount,
           (i) => totalLiabilitiesVals[i] + totalEquityVals[i],
@@ -2842,7 +2918,6 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         bold: true,
         shaded: true,
       );
-
       grid.style = pdf_gen.PdfGridStyle(
         cellPadding: pdf_gen.PdfPaddings(left: 2, right: 2, top: 3.6, bottom: 3.6),
       );

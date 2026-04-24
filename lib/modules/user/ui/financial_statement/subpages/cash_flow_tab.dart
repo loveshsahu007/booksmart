@@ -70,6 +70,14 @@ class _CashFlowTabState extends State<CashFlowTab> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  bool _isSameRange(DateTime start, DateTime end) {
+    if (_startDate == null || _endDate == null) return false;
+    return _dateOnly(_startDate!) == _dateOnly(start) &&
+        _dateOnly(_endDate!) == _dateOnly(end);
+  }
+
   void _syncRangeIfNeeded(FinancialReportController controller) {
     if (!TickerMode.of(context)) return;
     if (_isSyncingControllerRange || _startDate == null || _endDate == null) return;
@@ -854,6 +862,14 @@ class _CashFlowTabState extends State<CashFlowTab> {
         controller.periodicOperatingActivities,
         const ['accrued', 'current liabilities'],
       );
+      final otherLongTermLiabilitiesMap = bucketizeByKeywords(
+        controller.periodicOperatingActivities,
+        const ['long-term liabilities', 'long term liabilities'],
+      );
+      final dividendsOperatingMap = bucketizeByKeywords(
+        controller.periodicOperatingActivities,
+        const ['dividend', 'dividends'],
+      );
       final workingCapitalKnown = addMaps([
         receivableMap,
         inventoryMap,
@@ -861,6 +877,8 @@ class _CashFlowTabState extends State<CashFlowTab> {
         unearnedRevenueMap,
         incomeTaxesMap,
         otherCurrentLiabilitiesMap,
+        otherLongTermLiabilitiesMap,
+        dividendsOperatingMap,
       ]);
       final workingCapitalOtherMap = subtractMap(wcMap, workingCapitalKnown);
 
@@ -903,12 +921,17 @@ class _CashFlowTabState extends State<CashFlowTab> {
         controller.periodicFinancingActivities,
         const ['loan paid', 'loan repayment', 'principal'],
       );
+      final dividendsFinancingMap = bucketizeByKeywords(
+        controller.periodicFinancingActivities,
+        const ['dividend', 'dividends'],
+      );
       final financingKnown = addMaps([
         issueShareCapitalMap,
         stockIssuanceMap,
         interestPaidMap,
         capitalRepaymentsMap,
         loanPaidMap,
+        dividendsFinancingMap,
       ]);
       final financingOtherTemplateMap = subtractMap(financingMap, financingKnown);
 
@@ -940,12 +963,12 @@ class _CashFlowTabState extends State<CashFlowTab> {
       final titleStyle = excel_lib.CellStyle(
         bold: true,
         fontSize: 17,
-        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
         verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final metaStyle = excel_lib.CellStyle(
         fontSize: 8,
-        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
         verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final companyStyle = excel_lib.CellStyle(
@@ -963,7 +986,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
         bold: true,
         fontSize: 9,
         fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF7090AF'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF7A94B3'),
         horizontalAlign: excel_lib.HorizontalAlign.Center,
         verticalAlign: excel_lib.VerticalAlign.Center,
       );
@@ -988,7 +1011,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
       final cashBandLabelStyle = excel_lib.CellStyle(
         bold: true,
         fontSize: 9,
-        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF7090AF'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF7A94B3'),
         fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
         horizontalAlign: excel_lib.HorizontalAlign.Left,
         verticalAlign: excel_lib.VerticalAlign.Center,
@@ -1031,12 +1054,12 @@ class _CashFlowTabState extends State<CashFlowTab> {
       );
       final cashBandDollarStyle = dollarStyle.copyWith(
         boldVal: true,
-        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FF7090AF'),
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FF7A94B3'),
         fontColorHexVal: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
       );
       final cashBandAmountStyle = amountStyle.copyWith(
         boldVal: true,
-        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FF7090AF'),
+        backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FF7A94B3'),
         fontColorHexVal: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
       );
       final dividerStyle = excel_lib.CellStyle(
@@ -1109,7 +1132,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
       setCell(
         titleStartCol,
         3,
-        excel_lib.TextCellValue('As of ${DateFormat('MMMM dd,').format(reportEnd)}'),
+        excel_lib.TextCellValue(
+          'As of ${DateFormat('MMMM dd, yyyy').format(DateTime(reportEnd.year, 12, 31))}',
+        ),
         metaStyle,
       );
       sheet.merge(
@@ -1200,6 +1225,12 @@ class _CashFlowTabState extends State<CashFlowTab> {
         bool cashBand = false,
         bool darkTotal = false,
       }) {
+        if (total || darkTotal || cashBand) {
+          // subtle divider above totals for professional statement hierarchy
+          for (int c = labelCol; c <= lastAmountCol; c++) {
+            setCell(c, row - 1, excel_lib.TextCellValue(' '), dividerStyle);
+          }
+        }
         writeLineLabel(
           label,
           indent: indent,
@@ -1240,11 +1271,13 @@ class _CashFlowTabState extends State<CashFlowTab> {
       writeRow('Deferred Income Tax', zeroMap(), indent: true);
       writeTextOnly('Changes in Working Capital:', indent: true);
       writeRow('Accounts Receivable', receivableMap, indent: true);
-      writeRow('Inventory Asset', inventoryMap, indent: true);
+      writeRow('Inventory', inventoryMap, indent: true);
       writeRow('Accounts Payable', accountsPayableMap, indent: true);
       writeRow('Unearned Revenue', unearnedRevenueMap, indent: true);
       writeRow('Income taxes', incomeTaxesMap, indent: true);
       writeRow('Other Current Liabilities', otherCurrentLiabilitiesMap, indent: true);
+      writeRow('Other long-term liabilities', otherLongTermLiabilitiesMap, indent: true);
+      writeRow('Dividends', dividendsOperatingMap, indent: true);
       writeRow('Other', workingCapitalOtherMap, indent: true);
       writeRow(
         'Net Cash from Operating Activities',
@@ -1273,6 +1306,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
       writeRow('Interest paid', interestPaidMap, indent: true);
       writeRow('Capital repayments (including share buy-backs)', capitalRepaymentsMap, indent: true);
       writeRow('Loan paid', loanPaidMap, indent: true);
+      writeRow('Dividends', dividendsFinancingMap, indent: true);
       writeRow('Other', financingOtherTemplateMap, indent: true);
       writeRow(
         'Net Cash from Financing Activities',
@@ -1312,14 +1346,16 @@ class _CashFlowTabState extends State<CashFlowTab> {
         }
       }
 
-      final bytes = excel.save();
+      final exportName =
+          '${orgName.replaceAll(' ', '_')}_Cash_Flow_Statement_${DateFormat('yyyyMMdd').format(reportEnd)}.xlsx';
+      final bytes = excel.encode();
       if (bytes == null) {
         throw Exception('Unable to generate Excel file.');
       }
 
       final outputBytes = hideGridLines(bytes);
       await downloadFile(
-        '${orgName.replaceAll(' ', '_')}_Cash_Flow_Statement_${DateFormat('yyyyMMdd').format(reportEnd)}.xlsx',
+        exportName,
         outputBytes,
         mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
@@ -1467,7 +1503,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
 
   Widget _buildYearDropdown(FinancialReportController controller) {
     final int currentYear = DateTime.now().year;
-    final List<int> years = List.generate(5, (index) => currentYear - index);
+    final List<int> years = controller.availableYears.isNotEmpty
+        ? List<int>.from(controller.availableYears)
+        : List.generate(5, (index) => currentYear - index);
     final bool isSelected = _selectedFilterIdx == 4;
 
     return PopupMenuButton<int>(
@@ -1480,9 +1518,15 @@ class _CashFlowTabState extends State<CashFlowTab> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? (Theme.of(context).brightness == Brightness.dark ? const Color(0xFF1E293B) : Colors.black.withValues(alpha: 0.05)) : Colors.transparent,
+          color: isSelected
+              ? (Theme.of(context).brightness == Brightness.dark
+                    ? orangeColor.withValues(alpha: 0.28)
+                    : orangeColor.withValues(alpha: 0.16))
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: isSelected ? Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.white12 : Colors.black12) : null,
+          border: isSelected
+              ? Border.all(color: orangeColor.withValues(alpha: 0.8))
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1524,6 +1568,15 @@ class _CashFlowTabState extends State<CashFlowTab> {
     );
   }
 
+  double _percentChange(double current, double previous) {
+    if (previous.abs() < 0.000001) return 0.0;
+    return ((current - previous) / previous.abs()) * 100;
+  }
+
+  bool _isComparisonUnavailable(double current, double previous) {
+    return previous.abs() < 0.000001 && current.abs() >= 0.000001;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1558,9 +1611,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
           final prevOut = controller.prevPeriodCashOutflow.value;
           final prevNet = prevIn - prevOut;
 
-          final double incomeChange = prevIn != 0 ? ((totalIn - prevIn) / prevIn) * 100 : (totalIn > 0 ? 100 : 0);
-          final double expensesChange = prevOut != 0 ? ((totalOut - prevOut) / prevOut) * 100 : (totalOut > 0 ? 100 : 0);
-          final double netCashChange = prevNet != 0 ? ((netCash - prevNet) / prevNet) * 100 : (netCash > 0 ? 100 : 0);
+          final double incomeChange = _percentChange(totalIn, prevIn);
+          final double expensesChange = _percentChange(totalOut, prevOut);
+          final double netCashChange = _percentChange(netCash, prevNet);
 
           return Container(
             color: backgroundColor,
@@ -1809,15 +1862,15 @@ class _CashFlowTabState extends State<CashFlowTab> {
                             children: [
                               SizedBox(
                                 width: screenWidth - 32,
-                                child: _premiumKPICard(title: "Money In", value: _formatCurrency(totalIn), change: incomeChange, isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: moneyInColor),
+                                child: _premiumKPICard(title: "Money In", value: _formatCurrency(totalIn), change: incomeChange, comparisonUnavailable: _isComparisonUnavailable(totalIn, prevIn), isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: moneyInColor),
                               ),
                               SizedBox(
                                 width: screenWidth - 32,
-                                child: _premiumKPICard(title: "Money Out", value: _formatCurrency(totalOut), change: expensesChange, isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: isDark ? Colors.white : Colors.black87),
+                                child: _premiumKPICard(title: "Money Out", value: _formatCurrency(totalOut), change: expensesChange, invertTrendColors: true, comparisonUnavailable: _isComparisonUnavailable(totalOut, prevOut), isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: isDark ? Colors.white : Colors.black87),
                               ),
                               SizedBox(
                                 width: screenWidth - 32,
-                                child: _premiumKPICard(title: "Net Cash", value: _formatCurrency(netCash), change: netCashChange, isCurrency: true, timeframe: _getTimeframeLabel(), isNetCash: true),
+                                child: _premiumKPICard(title: "Net Cash", value: _formatCurrency(netCash), change: netCashChange, comparisonUnavailable: _isComparisonUnavailable(netCash, prevNet), isCurrency: true, timeframe: _getTimeframeLabel(), isNetCash: true),
                               ),
                             ],
                           )
@@ -1825,11 +1878,11 @@ class _CashFlowTabState extends State<CashFlowTab> {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                Expanded(child: _premiumKPICard(title: "Money In", value: _formatCurrency(totalIn), change: incomeChange, isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: moneyInColor)),
+                                Expanded(child: _premiumKPICard(title: "Money In", value: _formatCurrency(totalIn), change: incomeChange, comparisonUnavailable: _isComparisonUnavailable(totalIn, prevIn), isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: moneyInColor)),
                                 const SizedBox(width: 12),
-                                Expanded(child: _premiumKPICard(title: "Money Out", value: _formatCurrency(totalOut), change: expensesChange, isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: isDark ? Colors.white : Colors.black87)),
+                                Expanded(child: _premiumKPICard(title: "Money Out", value: _formatCurrency(totalOut), change: expensesChange, invertTrendColors: true, comparisonUnavailable: _isComparisonUnavailable(totalOut, prevOut), isCurrency: true, timeframe: _getTimeframeLabel(), valueColor: isDark ? Colors.white : Colors.black87)),
                                 const SizedBox(width: 12),
-                                Expanded(child: _premiumKPICard(title: "Net Cash", value: _formatCurrency(netCash), change: netCashChange, isCurrency: true, timeframe: _getTimeframeLabel(), isNetCash: true)),
+                                Expanded(child: _premiumKPICard(title: "Net Cash", value: _formatCurrency(netCash), change: netCashChange, comparisonUnavailable: _isComparisonUnavailable(netCash, prevNet), isCurrency: true, timeframe: _getTimeframeLabel(), isNetCash: true)),
                               ],
                             ),
                           );
@@ -2111,12 +2164,15 @@ class _CashFlowTabState extends State<CashFlowTab> {
     String? timeframe,
     Color? valueColor,
     bool isNetCash = false,
+    bool invertTrendColors = false,
+    bool comparisonUnavailable = false,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isPositive = change >= 0;
+    final bool isGoodTrend = invertTrendColors ? !isPositive : isPositive;
     const Color softRed = Color(0xFFE57373);
     const Color cashGreen = Color(0xFF19C37D);
-    final Color changeColor = isPositive ? cashGreen : softRed;
+    final Color changeColor = isGoodTrend ? cashGreen : softRed;
     final IconData changeIcon = isPositive ? Icons.arrow_upward : Icons.arrow_downward;
     
     final bool isNegativeValue = value.contains('-') || (isCurrency && value.startsWith('-\$'));
@@ -2174,19 +2230,27 @@ class _CashFlowTabState extends State<CashFlowTab> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: isPositive ? changeColor.withOpacity(0.15) : softRed.withOpacity(0.15),
+                      color: comparisonUnavailable
+                          ? Colors.grey.withOpacity(0.15)
+                          : changeColor.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(changeIcon, size: 12, color: changeColor),
-                        const SizedBox(width: 4),
+                        if (!comparisonUnavailable) ...[
+                          Icon(changeIcon, size: 12, color: changeColor),
+                          const SizedBox(width: 4),
+                        ],
                         AppText(
-                          "${change.abs().toStringAsFixed(1)}%",
+                          comparisonUnavailable
+                              ? "New"
+                              : "${change.abs().toStringAsFixed(1)}%",
                           fontSize: 12,
                           fontWeight: FontWeight.w900,
-                          color: changeColor,
+                          color: comparisonUnavailable
+                              ? (isDark ? Colors.white70 : Colors.black54)
+                              : changeColor,
                         ),
                       ],
                     ),
