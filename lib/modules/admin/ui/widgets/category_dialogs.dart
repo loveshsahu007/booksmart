@@ -1,4 +1,5 @@
 import 'package:booksmart/constant/exports.dart';
+import 'package:booksmart/helpers/currency_formatter.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/models/category.dart';
 import 'package:booksmart/widgets/custom_dialog.dart';
@@ -372,8 +373,8 @@ TableRow _buildRuleRow({
   String deductionText = '--';
   if (rule != null) {
     deductionText = rule.ruleType == RuleType.percentage
-        ? '${(rule.value * 100).toStringAsFixed(0)}%'
-        : '\$ ${rule.value.toInt()}';
+        ? '${(rule.value).toStringAsFixed(0)} %'
+        : CurrencyUtils.format(rule.value);
   }
 
   return TableRow(
@@ -458,68 +459,96 @@ void showSaveDeductionRuleDialog({
 
   final stateKey = GlobalKey<DropdownSearchState<StateModel?>>();
   final typeKey = GlobalKey<DropdownSearchState<RuleType>>();
+  final formKey = GlobalKey<FormState>();
 
   customDialog(
     title: rule == null ? 'Add Deduction Rule' : 'Edit Deduction Rule',
     maxWidth: 400,
     child: StatefulBuilder(
       builder: (context, setState) {
-        return Padding(
+        return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CustomDropDownWidget<StateModel?>(
-                dropDownKey: stateKey,
-                label: 'State (Federal if empty)',
-                hint: 'Select State',
-                selectedItem: selectedState,
-                items: [null, ...controller.states],
-                itemAsString: (s) => s?.name ?? 'Federal',
-                showSearchBox: true,
-                onChanged: (val) => setState(() => selectedState = val),
-              ),
-              0.02.verticalSpace,
-              CustomDropDownWidget<RuleType>(
-                dropDownKey: typeKey,
-                label: 'Rule Type',
-                hint: 'Select Type',
-                selectedItem: ruleType,
-                items: RuleType.values,
-                itemAsString: (t) => t.name.capitalizeFirst!,
-                onChanged: (val) => setState(() => ruleType = val!),
-              ),
-              0.02.verticalSpace,
-              AppTextField(
-                controller: valueController,
-                labelText: ruleType == RuleType.percentage
-                    ? 'Percentage (e.g. 0.23 for 23%)'
-                    : 'Fixed Amount',
-                hintText: ruleType == RuleType.percentage ? '0.23' : '45.00',
-                keyboardType: TextInputType.number,
-              ),
-              0.04.verticalSpace,
-              AppButton(
-                buttonText: rule == null ? 'Add' : 'Update',
-                onTapFunction: () {
-                  final val = double.tryParse(valueController.text.trim());
-                  if (val == null) {
-                    showSnackBar('Invalid value');
-                    return;
-                  }
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CustomDropDownWidget<StateModel?>(
+                  dropDownKey: stateKey,
+                  label: 'State (Federal if empty)',
+                  hint: 'Select State',
+                  selectedItem: selectedState,
+                  items: [null, ...controller.states],
+                  itemAsString: (s) => s?.name ?? 'Federal',
+                  showSearchBox: true,
+                  onChanged: (val) => setState(() => selectedState = val),
+                ),
+                0.02.verticalSpace,
+                CustomDropDownWidget<RuleType>(
+                  dropDownKey: typeKey,
+                  label: 'Rule Type',
+                  hint: 'Select Type',
+                  selectedItem: ruleType,
+                  items: RuleType.values,
+                  itemAsString: (t) => t.name.capitalizeFirst!,
+                  onChanged: (val) => setState(() => ruleType = val!),
+                ),
+                0.02.verticalSpace,
+                AppTextField(
+                  controller: valueController,
+                  labelText: ruleType == RuleType.percentage
+                      ? 'Percentage (e.g. 23%)'
+                      : 'Fixed Amount',
+                  hintText: ruleType == RuleType.percentage ? '23' : '45.00',
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    if (ruleType == RuleType.fixed)
+                      CurrencyTextInputFormatter(),
+                  ],
+                  fieldValidator: (v) {
+                    if (v == null || v.isEmpty) {
+                      return 'Please enter a value';
+                    }
+                    final double? val = ruleType == RuleType.fixed
+                        ? CurrencyUtils.parse(v.trim())
+                        : double.tryParse(v.trim());
+                    if (val == null || val == 0) return 'Invalid value';
+                    if (ruleType == RuleType.percentage &&
+                        (val <= 0 || val > 100)) {
+                      return 'Percentage must be between 0 and 100';
+                    }
+                    return null;
+                  },
+                ),
+                0.04.verticalSpace,
+                AppButton(
+                  buttonText: rule == null ? 'Add' : 'Update',
+                  onTapFunction: () {
+                    if (formKey.currentState?.validate() == false) {
+                      return;
+                    }
 
-                  controller.saveDeductionRule(
-                    id: rule?.id,
-                    categoryId: categoryId,
-                    subCategoryId: subCategoryId,
-                    stateId: selectedState?.id,
-                    ruleType: ruleType,
-                    value: val,
-                  );
-                  Get.back();
-                },
-              ),
-            ],
+                    final double? val = ruleType == RuleType.fixed
+                        ? CurrencyUtils.parse(valueController.text.trim())
+                        : double.tryParse(valueController.text.trim());
+                    if (val == null || val == 0) {
+                      showSnackBar('Invalid value');
+                      return;
+                    }
+
+                    controller.saveDeductionRule(
+                      id: rule?.id,
+                      categoryId: categoryId,
+                      subCategoryId: subCategoryId,
+                      stateId: selectedState?.id,
+                      ruleType: ruleType,
+                      value: val,
+                    );
+                    Get.back();
+                  },
+                ),
+              ],
+            ),
           ),
         );
       },
