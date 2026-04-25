@@ -1,8 +1,18 @@
 import 'dart:async';
-import 'package:booksmart/widgets/date_range_picker.dart';
-import 'package:pie_chart/pie_chart.dart';
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/helpers/currency_formatter.dart';
+import 'package:booksmart/models/category.dart';
+import 'package:booksmart/models/transaction_model.dart';
+import 'package:booksmart/modules/admin/controllers/category_controler.dart';
+import 'package:booksmart/modules/user/controllers/organization_controller.dart';
+import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
+import 'package:booksmart/supabase/tables.dart';
+import 'package:booksmart/utils/supabase.dart';
+import 'package:booksmart/widgets/confirmation_dialog.dart';
+import 'package:booksmart/widgets/date_range_picker.dart';
+import 'package:get/get.dart';
+import 'package:pie_chart/pie_chart.dart';
+import 'dart:developer' as dev;
 
 class AIDeductionPage extends StatefulWidget {
   const AIDeductionPage({super.key});
@@ -12,184 +22,105 @@ class AIDeductionPage extends StatefulWidget {
 }
 
 class _AIDeductionPageState extends State<AIDeductionPage> {
-  final List<CategoryData> _categories = [];
-  final Map<String, GlobalKey> _categoryKeys = {};
-  final ScrollController _accordionScroll = ScrollController();
+  late CategoryAdminController _catCtrl;
+  late TransactionController _txCtrl;
+
+  final Map<int, bool> _expandedCats = {};
   final TextEditingController _searchCtrl = TextEditingController();
   Timer? _debounce;
   String _search = '';
-  final DateTimeRange _activeRange = DateTimeRange(
-    start: DateTime.now().subtract(const Duration(days: 90)),
+
+  DateTimeRange _activeRange = DateTimeRange(
+    start: DateTime.now().subtract(const Duration(days: 365)),
     end: DateTime.now(),
   );
-  DateTime? lastUpdated;
+
+  bool _isLoading = false;
+  final Map<int, List<TransactionModel>> _txBySubCat = {};
+  final Map<int, double> _subCatTotals = {};
+  final Map<int, double> _parentCatTotals = {};
 
   @override
   void initState() {
     super.initState();
-    _seedDummyData();
+
+    // Register or find CategoryAdminController
+    if (Get.isRegistered<CategoryAdminController>()) {
+      _catCtrl = Get.find<CategoryAdminController>();
+    } else {
+      _catCtrl = Get.put(CategoryAdminController());
+    }
+
+    final tag = getCurrentOrganization!.id.toString();
+    if (Get.isRegistered<TransactionController>(tag: tag)) {
+      _txCtrl = Get.find<TransactionController>(tag: tag);
+    } else {
+      _txCtrl = Get.put(TransactionController(), tag: tag);
+    }
+
+    _loadData();
     _searchCtrl.addListener(_onSearchChanged);
   }
 
-  /// Rule for business meal:
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      if (_catCtrl.categories.isEmpty) {
+        await _catCtrl.fetchAll();
+      }
 
-  void _seedDummyData() {
-    final now = DateTime.now();
-    final cats = [
-      CategoryData(
-        id: 'business_meals',
-        name: 'Business Meals',
-        transactions: [
-          Tx(
-            merchant: 'Central Cafe',
-            date: now.subtract(const Duration(days: 12)),
-            amount: 150.0,
-            hasReceipt: true,
-          ),
-          Tx(
-            merchant: 'John\'s Diner',
-            date: now.subtract(const Duration(days: 27)),
-            amount: 220.5,
-          ),
-          Tx(
-            merchant: 'Italian Bistro',
-            date: now.subtract(const Duration(days: 40)),
-            amount: 310.0,
-            hasReceipt: true,
-          ),
-          Tx(
-            merchant: 'Foodies Hub',
-            date: now.subtract(const Duration(days: 60)),
-            amount: 180.0,
-          ),
-        ],
-      ),
-      CategoryData(
-        id: 'utilities',
-        name: 'Utilities',
-        transactions: [
-          Tx(
-            merchant: 'Power Co',
-            date: now.subtract(const Duration(days: 20)),
-            amount: 120.0,
-          ),
-          Tx(
-            merchant: 'Water Works',
-            date: now.subtract(const Duration(days: 50)),
-            amount: 95.5,
-            hasReceipt: true,
-          ),
-          Tx(
-            merchant: 'FiberNet',
-            date: now.subtract(const Duration(days: 35)),
-            amount: 60.0,
-          ),
-        ],
-      ),
-      CategoryData(
-        id: 'office_supplies',
-        name: 'Office Supplies',
-        transactions: [
-          Tx(
-            merchant: 'BestBuy',
-            date: now.subtract(const Duration(days: 15)),
-            amount: 420.0,
-          ),
-          Tx(
-            merchant: 'Staples',
-            date: now.subtract(const Duration(days: 55)),
-            amount: 150.0,
-            hasReceipt: true,
-          ),
-        ],
-      ),
-      CategoryData(
-        id: 'travel',
-        name: 'Travel',
-        transactions: [
-          Tx(
-            merchant: 'Uber',
-            date: now.subtract(const Duration(days: 10)),
-            amount: 45.0,
-          ),
-          Tx(
-            merchant: 'Airbnb',
-            date: now.subtract(const Duration(days: 30)),
-            amount: 300.0,
-            hasReceipt: true,
-          ),
-          Tx(
-            merchant: 'Fuel Station',
-            date: now.subtract(const Duration(days: 5)),
-            amount: 80.0,
-          ),
-        ],
-      ),
-      CategoryData(
-        id: 'advertising',
-        name: 'Advertising',
-        transactions: [
-          Tx(
-            merchant: 'Facebook Ads',
-            date: now.subtract(const Duration(days: 25)),
-            amount: 600.0,
-            hasReceipt: true,
-          ),
-          Tx(
-            merchant: 'Google Ads',
-            date: now.subtract(const Duration(days: 70)),
-            amount: 850.0,
-          ),
-        ],
-      ),
-      CategoryData(
-        id: 'subscriptions',
-        name: 'Software Subscriptions',
-        transactions: [
-          Tx(
-            merchant: 'Adobe',
-            date: now.subtract(const Duration(days: 22)),
-            amount: 55.0,
-          ),
-          Tx(
-            merchant: 'Canva Pro',
-            date: now.subtract(const Duration(days: 45)),
-            amount: 25.0,
-          ),
-          Tx(
-            merchant: 'ChatGPT Plus',
-            date: now.subtract(const Duration(days: 5)),
-            amount: 20.0,
-            hasReceipt: true,
-          ),
-        ],
-      ),
-      CategoryData(
-        id: 'maintenance',
-        name: 'Maintenance & Repairs',
-        transactions: [
-          Tx(
-            merchant: 'IT Fixers',
-            date: now.subtract(const Duration(days: 33)),
-            amount: 270.0,
-            hasReceipt: true,
-          ),
-          Tx(
-            merchant: 'Plumber Joe',
-            date: now.subtract(const Duration(days: 44)),
-            amount: 180.0,
-          ),
-        ],
-      ),
-    ];
-    _categories.addAll(cats);
-    for (var c in _categories) {
-      _categoryKeys[c.id] = GlobalKey();
-      c.expanded = false;
+      final res = await supabase
+          .from(SupabaseTable.transaction)
+          .select()
+          .eq('org_id', getCurrentOrganization!.id)
+          .gte('date_time', _activeRange.start.toIso8601String().split('T')[0])
+          .lte('date_time', _activeRange.end.toIso8601String().split('T')[0]);
+
+      final List<TransactionModel> fetched = (res as List)
+          .map((e) => TransactionModel.fromJson(e))
+          .toList();
+
+      _processTransactions(fetched);
+    } catch (e) {
+      dev.log("Error loading AI Deduction data: $e");
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
-  Color _colorFor(String id, ThemeData theme) {
+  void _processTransactions(List<TransactionModel> txs) {
+    _txBySubCat.clear();
+    _subCatTotals.clear();
+    _parentCatTotals.clear();
+
+    for (var tx in txs) {
+      if (tx.category == null || tx.subcategory == null) continue;
+
+      _txBySubCat.putIfAbsent(tx.subcategory!, () => []).add(tx);
+
+      final amt = tx.amount.abs();
+      _subCatTotals[tx.subcategory!] =
+          (_subCatTotals[tx.subcategory!] ?? 0) + amt;
+      _parentCatTotals[tx.category!] =
+          (_parentCatTotals[tx.category!] ?? 0) + amt;
+    }
+  }
+
+  Map<String, double> _computePieData() {
+    final Map<String, double> map = {};
+    for (var cat in _catCtrl.categories) {
+      final total = _parentCatTotals[cat.id] ?? 0;
+      if (total > 0) {
+        if (_search.isEmpty ||
+            cat.name.toLowerCase().contains(_search.toLowerCase())) {
+          map[cat.name] = total;
+        }
+      }
+    }
+    return map;
+  }
+
+  Color _colorFor(int id, ThemeData theme) {
     final palette = [
       const Color(0xFF19C37D),
       const Color(0xFF0077CC),
@@ -203,29 +134,6 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     return palette[idx];
   }
 
-  Map<String, double> _computeTotals() {
-    final Map<String, double> map = {};
-    for (var c in _categories) {
-      final tot = c.transactions
-          .where((t) => _isInRange(t.date, _activeRange))
-          .where((t) => _matchesSearch(c, t))
-          .fold<double>(0.0, (s, t) => s + t.amount);
-      if (tot > 0) map[c.name] = tot;
-    }
-    return map;
-  }
-
-  bool _isInRange(DateTime d, DateTimeRange r) =>
-      !d.isBefore(r.start) && !d.isAfter(r.end);
-
-  bool _matchesSearch(CategoryData cat, Tx t) {
-    if (_search.trim().isEmpty) return true;
-    final q = _search.toLowerCase();
-    return cat.name.toLowerCase().contains(q) ||
-        t.merchant.toLowerCase().contains(q) ||
-        _formatCurrency(t.amount).toLowerCase().contains(q);
-  }
-
   void _onSearchChanged() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 250), () {
@@ -233,22 +141,22 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     });
   }
 
-  void _removeTx(String catId, Tx tx) {
-    final cat = _categories.firstWhere(
-      (c) => c.id == catId,
-      orElse: () => CategoryData.empty(),
+  Future<void> _removeTx(int txId) async {
+    await showConfirmationDialog(
+      title: 'Remove Transaction',
+      description:
+          'Are you sure you want to remove this transaction from this subcategory?',
+      onYes: () async {
+        Get.back(); // Close dialog
+        await _txCtrl.deleteTransaction(txId);
+        _loadData();
+      },
     );
-    if (cat.isEmpty) return;
-    setState(() {
-      cat.transactions.remove(tx);
-      lastUpdated = DateTime.now();
-    });
   }
 
   @override
   void dispose() {
     _debounce?.cancel();
-    _accordionScroll.dispose();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -257,10 +165,11 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final totals = _computeTotals();
-    final overall = totals.values.fold<double>(0.0, (a, b) => a + b);
 
-    final ordered = totals.entries.toList()
+    final pieData = _computePieData();
+    final overall = pieData.values.fold<double>(0.0, (a, b) => a + b);
+
+    final ordered = pieData.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
     final pieMap = Map<String, double>.fromEntries(
@@ -270,11 +179,10 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     final colorList = ordered.isEmpty
         ? [colorScheme.primary]
         : ordered.map((e) {
-            final cat = _categories.firstWhere(
+            final cat = _catCtrl.categories.firstWhereOrNull(
               (c) => c.name == e.key,
-              orElse: () => CategoryData.empty(),
             );
-            return _colorFor(cat.id, theme);
+            return _colorFor(cat?.id ?? 0, theme);
           }).toList();
 
     return Scaffold(
@@ -287,14 +195,19 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
               children: [
                 Expanded(
                   child: AppTextField(
-                    hintText: 'Search categories',
+                    hintText: 'Search merchant or category',
                     controller: _searchCtrl,
-                    suffixWidget: Icon(Icons.search),
+                    suffixWidget: const Icon(Icons.search),
                   ),
                 ),
                 const SizedBox(width: 12),
                 DateRangePickerWidget(
-                  onDateRangeSelected: (start, end) {},
+                  onDateRangeSelected: (start, end) {
+                    setState(() {
+                      _activeRange = DateTimeRange(start: start, end: end);
+                    });
+                    _loadData();
+                  },
                   initialText: "Select Date Range",
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -304,34 +217,39 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
               ],
             ),
           ),
-          // chart + legend + list
           Expanded(
             child: SingleChildScrollView(
               child: Column(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(16),
-                    child: PieChart(
-                      dataMap: pieMap,
-                      chartType: ChartType.ring,
-                      colorList: colorList,
-                      chartRadius: 160,
-                      ringStrokeWidth: 32,
-                      // centerText: 'Total\n${_formatCurrency(overall)}',
-                      centerWidget: Text(
-                        'Total\n${_formatCurrency(overall)}',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      chartValuesOptions: const ChartValuesOptions(
-                        showChartValues: false,
-                      ),
-                      legendOptions: const LegendOptions(showLegends: true),
-                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 160,
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        : PieChart(
+                            dataMap: pieMap,
+                            chartType: ChartType.ring,
+                            colorList: colorList,
+                            chartRadius: 160,
+                            ringStrokeWidth: 32,
+                            centerWidget: Text(
+                              'Total\n${_formatCurrency(overall)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            chartValuesOptions: const ChartValuesOptions(
+                              showChartValues: false,
+                            ),
+                            legendOptions: const LegendOptions(
+                              showLegends: true,
+                            ),
+                          ),
                   ),
                   Divider(
                     height: 1,
@@ -342,7 +260,9 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    child: _buildAccordionList(),
+                    child: _isLoading
+                        ? const SizedBox()
+                        : _buildAccordionList(),
                   ),
                 ],
               ),
@@ -354,22 +274,32 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
   }
 
   Widget _buildAccordionList() {
-    final visible = _categories.where((c) {
-      final anyTxInRange = c.transactions.any(
-        (t) => _isInRange(t.date, _activeRange),
-      );
-      if (!anyTxInRange) return false;
-      if (_search.trim().isEmpty) return true;
+    final visibleParents = _catCtrl.categories.where((c) {
+      final total = _parentCatTotals[c.id] ?? 0;
+      if (total <= 0) return false;
+      if (_search.isEmpty) return true;
       final q = _search.toLowerCase();
-      return c.name.toLowerCase().contains(q) ||
-          c.transactions.any((t) => t.merchant.toLowerCase().contains(q));
+      if (c.name.toLowerCase().contains(q)) return true;
+
+      final subs = _catCtrl.getSubCategoriesByCategory(c.id);
+      for (var sub in subs) {
+        if (sub.name.toLowerCase().contains(q)) return true;
+        final txs = _txBySubCat[sub.id] ?? [];
+        if (txs.any((t) => t.title.toLowerCase().contains(q))) return true;
+      }
+      return false;
     }).toList();
 
-    if (visible.isEmpty) {
+    if (visibleParents.isEmpty) {
       return Center(
-        child: AppText(
-          'No categories match your search.',
-          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 40),
+          child: AppText(
+            'No transactions found from\n${_formatShortDate(_activeRange.start)} to ${_formatShortDate(_activeRange.end)}',
+            // color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            textAlign: TextAlign.center,
+            fontSize: 14,
+          ),
         ),
       );
     }
@@ -377,11 +307,10 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: visible.length,
+      itemCount: visibleParents.length,
       itemBuilder: (context, idx) {
-        final cat = visible[idx];
+        final cat = visibleParents[idx];
         return Padding(
-          key: _categoryKeys[cat.id],
           padding: const EdgeInsets.only(bottom: 12),
           child: _buildCategoryTile(cat),
         );
@@ -389,15 +318,12 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     );
   }
 
-  Widget _buildCategoryTile(CategoryData cat) {
+  Widget _buildCategoryTile(CategoryModel cat) {
     final theme = Theme.of(context);
-    final filteredTxs = cat.transactions
-        .where(
-          (t) => _isInRange(t.date, _activeRange) && _matchesSearch(cat, t),
-        )
-        .toList();
-    final total = filteredTxs.fold<double>(0.0, (s, t) => s + t.amount);
     final color = _colorFor(cat.id, theme);
+    final total = _parentCatTotals[cat.id] ?? 0;
+
+    final subcategories = _catCtrl.getSubCategoriesByCategory(cat.id);
 
     return Card(
       color: theme.colorScheme.surfaceVariant,
@@ -405,13 +331,9 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ExpansionTile(
         key: PageStorageKey(cat.id),
-        initiallyExpanded: cat.expanded,
-        onExpansionChanged: (v) => setState(() => cat.expanded = v),
+        initiallyExpanded: _expandedCats[cat.id] ?? false,
+        onExpansionChanged: (v) => setState(() => _expandedCats[cat.id] = v),
         tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-        shape: RoundedRectangleBorder(),
-        collapsedShape: RoundedRectangleBorder(),
-        collapsedBackgroundColor: Colors.transparent,
-
         title: Row(
           children: [
             Container(
@@ -434,28 +356,66 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
             ),
           ],
         ),
-        children: [
-          _tableHeader(),
-          if (filteredTxs.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: AppText(
-                'No transactions for this category in selected range.',
-                color: Theme.of(
-                  context,
-                ).colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-            )
-          else
-            ...filteredTxs.map((t) => _txRow(cat.id, t)),
-          _categoryTotalRow(total),
-        ],
+        children: subcategories
+            .map((sub) => _buildSubcategorySection(sub))
+            .toList(),
       ),
     );
   }
 
+  Widget _buildSubcategorySection(SubCategoryModel sub) {
+    final txs = (_txBySubCat[sub.id] ?? []).where((t) {
+      if (_search.isEmpty) return true;
+      final q = _search.toLowerCase();
+      return sub.name.toLowerCase().contains(q) ||
+          t.title.toLowerCase().contains(q);
+    }).toList();
+
+    final total = _subCatTotals[sub.id] ?? 0;
+    if (total <= 0 && txs.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 12, 12, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: AppText(
+                  sub.name,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              AppText(
+                _formatCurrency(total),
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: orangeColor,
+              ),
+            ],
+          ),
+        ),
+        _tableHeader(),
+        if (txs.isEmpty)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(36, 8, 12, 12),
+            child: AppText(
+              'No transactions found in this subcategory.',
+              fontSize: 12,
+            ),
+          )
+        else
+          ...txs.map((t) => _txRow(t)),
+        const Divider(indent: 24, endIndent: 12),
+      ],
+    );
+  }
+
   Widget _tableHeader() => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+    padding: const EdgeInsets.fromLTRB(24, 8, 12, 8),
     child: Row(
       spacing: 3,
       children: const [
@@ -463,14 +423,14 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
           flex: 4,
           child: FittedText(
             'Merchant',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
           ),
         ),
         Expanded(
           flex: 2,
           child: FittedText(
             'Date',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
         ),
@@ -478,7 +438,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
           flex: 2,
           child: FittedText(
             'Amount',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
         ),
@@ -487,57 +447,40 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     ),
   );
 
-  Widget _categoryTotalRow(double total) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    child: Row(
-      children: [
-        const Expanded(child: SizedBox()),
-        Expanded(
-          flex: 2,
-          child: AppText(
-            "",
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            textAlign: TextAlign.left,
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: AppText(
-            _formatCurrency(total),
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            textAlign: TextAlign.left,
-            color: orangeColor,
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _txRow(String catId, Tx tx) {
+  Widget _txRow(TransactionModel tx) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(24, 4, 12, 4),
       child: Row(
         children: [
-          Expanded(flex: 4, child: FittedText(tx.merchant)),
-          Expanded(flex: 2, child: FittedText(_formatShortDate(tx.date))),
-          Expanded(flex: 2, child: FittedText(_formatCurrency(tx.amount))),
+          Expanded(
+            flex: 4,
+            child: FittedText(tx.title, style: const TextStyle(fontSize: 12)),
+          ),
+          Expanded(
+            flex: 2,
+            child: FittedText(
+              _formatShortDate(tx.dateTime),
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: FittedText(
+              _formatCurrency(tx.amount.abs()),
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
           SizedBox(
             width: 30,
             height: 30,
             child: PopupMenuButton<String>(
-              icon: Icon(Icons.more_vert, size: 18),
+              icon: const Icon(Icons.more_vert, size: 16),
               padding: EdgeInsetsGeometry.zero,
               itemBuilder: (context) {
                 return [
                   const PopupMenuItem<String>(
                     value: "remove",
                     child: Text("Remove"),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: "add",
-                    child: Text("Add Receipt"),
                   ),
                   const PopupMenuItem<String>(
                     value: "cancel",
@@ -548,13 +491,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
               onSelected: (value) {
                 switch (value) {
                   case "remove":
-                    _removeTx(catId, tx);
-                    break;
-                  case "add":
-                    setState(() => tx.hasReceipt = true);
-                    break;
-                  case "cancel":
-                    // Do nothing
+                    _removeTx(tx.id);
                     break;
                 }
               },
@@ -583,36 +520,4 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     ];
     return '${months[d.month - 1]} ${d.day}';
   }
-}
-
-class CategoryData {
-  final String id;
-  final String name;
-  final List<Tx> transactions;
-  bool expanded;
-
-  CategoryData({
-    required this.id,
-    required this.name,
-    required this.transactions,
-    this.expanded = false,
-  });
-
-  bool get isEmpty => id.isEmpty;
-  static CategoryData empty() =>
-      CategoryData(id: '', name: '', transactions: []);
-}
-
-class Tx {
-  final String merchant;
-  final DateTime date;
-  final double amount;
-  bool hasReceipt;
-
-  Tx({
-    required this.merchant,
-    required this.date,
-    required this.amount,
-    this.hasReceipt = false,
-  });
 }

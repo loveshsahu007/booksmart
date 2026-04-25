@@ -675,9 +675,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
           ),
         );
       }
-      totalIncRow.cells[colCount - 1].value = fmtMoney(
-        exportData.totalIncome,
-      );
+      totalIncRow.cells[colCount - 1].value = fmtMoney(exportData.totalIncome);
       totalIncRow.cells[colCount - 1].style = pdf_gen.PdfGridCellStyle(
         font: boldFont,
         format: pdf_gen.PdfStringFormat(
@@ -891,14 +889,16 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
   void _exportExcel(FinancialReportController controller) async {
     try {
-      final start = _startDate ?? DateTime.now().subtract(const Duration(days: 89));
+      final start =
+          _startDate ?? DateTime.now().subtract(const Duration(days: 89));
       final end = _endDate ?? DateTime.now();
       if (end.isBefore(start)) {
         showSnackBar('End date must be on or after start date.', isError: true);
         return;
       }
 
-      final totalMonths = (end.year - start.year) * 12 + end.month - start.month + 1;
+      final totalMonths =
+          (end.year - start.year) * 12 + end.month - start.month + 1;
       final useYearly = totalMonths > 12;
       final periodKeys = <String>[];
       final periodLabels = <String>[];
@@ -997,7 +997,12 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       sheet.setColumnWidth(totalColIdx, 16);
 
       for (int c = 0; c < totalCols; c++) {
-        setCell(c, 0, excel_lib.TextCellValue('Profit & Loss Statement'), headerStyle);
+        setCell(
+          c,
+          0,
+          excel_lib.TextCellValue('Profit & Loss Statement'),
+          headerStyle,
+        );
         setCell(
           c,
           1,
@@ -1009,20 +1014,36 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       }
       sheet.merge(
         excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: totalColIdx, rowIndex: 0),
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: totalColIdx,
+          rowIndex: 0,
+        ),
       );
       sheet.merge(
         excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 1),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: totalColIdx, rowIndex: 1),
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: totalColIdx,
+          rowIndex: 1,
+        ),
       );
 
       int row = 3;
       void writeColumnHeader() {
         setCell(0, row, excel_lib.TextCellValue('Description'), headerStyle);
         for (int i = 0; i < periodLabels.length; i++) {
-          setCell(i + 1, row, excel_lib.TextCellValue(periodLabels[i]), headerStyle);
+          setCell(
+            i + 1,
+            row,
+            excel_lib.TextCellValue(periodLabels[i]),
+            headerStyle,
+          );
         }
-        setCell(totalColIdx, row, excel_lib.TextCellValue('TOTAL'), headerStyle);
+        setCell(
+          totalColIdx,
+          row,
+          excel_lib.TextCellValue('TOTAL'),
+          headerStyle,
+        );
         row++;
       }
 
@@ -1034,9 +1055,13 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         row++;
       }
 
-      void writeCategoryRows(Map<String, double> breakdown, Map<String, Map<String, double>> periodicMap) {
+      void writeCategoryRows(
+        Map<String, double> breakdown,
+        Map<String, Map<String, double>> periodicMap,
+      ) {
         for (final category in breakdown.keys) {
-          if (category.trim().isEmpty || category.toLowerCase() == 'uncategorized') {
+          if (category.trim().isEmpty ||
+              category.toLowerCase() == 'uncategorized') {
             continue;
           }
           setCell(0, row, excel_lib.TextCellValue(category), labelStyle);
@@ -1046,12 +1071,21 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
             rowTotal += v;
             setCell(i + 1, row, excel_lib.DoubleCellValue(v), currencyStyle);
           }
-          setCell(totalColIdx, row, excel_lib.DoubleCellValue(rowTotal), currencyStyle);
+          setCell(
+            totalColIdx,
+            row,
+            excel_lib.DoubleCellValue(rowTotal),
+            currencyStyle,
+          );
           row++;
         }
       }
 
-      void writeTotalRow(String label, Map<String, Map<String, double>> periodicMap, double grandTotal) {
+      void writeTotalRow(
+        String label,
+        Map<String, Map<String, double>> periodicMap,
+        double grandTotal,
+      ) {
         setCell(0, row, excel_lib.TextCellValue(label), totalLabelStyle);
         for (int i = 0; i < periodKeys.length; i++) {
           double pTotal = 0;
@@ -1062,27 +1096,59 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
               }
             });
           } else {
-            pTotal = (periodicMap[periodKeys[i]] ?? {}).values.fold(0.0, (a, b) => a + b);
+            pTotal = (periodicMap[periodKeys[i]] ?? {}).values.fold(
+              0.0,
+              (a, b) => a + b,
+            );
           }
-          setCell(i + 1, row, excel_lib.DoubleCellValue(pTotal), currencyBoldStyle);
+          setCell(
+            i + 1,
+            row,
+            excel_lib.DoubleCellValue(pTotal),
+            currencyBoldStyle,
+          );
         }
-        setCell(totalColIdx, row, excel_lib.DoubleCellValue(grandTotal), currencyBoldStyle);
+        setCell(
+          totalColIdx,
+          row,
+          excel_lib.DoubleCellValue(grandTotal),
+          currencyBoldStyle,
+        );
         row++;
       }
 
       writeSectionTitle('INCOME');
       writeColumnHeader();
-      writeCategoryRows(exportData.incomeBreakdown, exportData.periodicIncomeBreakdown);
-      writeTotalRow('Total Income', exportData.periodicIncomeBreakdown, exportData.totalIncome);
+      writeCategoryRows(
+        exportData.incomeBreakdown,
+        exportData.periodicIncomeBreakdown,
+      );
+      writeTotalRow(
+        'Total Income',
+        exportData.periodicIncomeBreakdown,
+        exportData.totalIncome,
+      );
 
       row++;
       writeSectionTitle('EXPENSES');
       writeColumnHeader();
-      writeCategoryRows(exportData.expenseBreakdown, exportData.periodicExpenseBreakdown);
-      writeTotalRow('Total Expenses', exportData.periodicExpenseBreakdown, exportData.totalExpenses);
+      writeCategoryRows(
+        exportData.expenseBreakdown,
+        exportData.periodicExpenseBreakdown,
+      );
+      writeTotalRow(
+        'Total Expenses',
+        exportData.periodicExpenseBreakdown,
+        exportData.totalExpenses,
+      );
 
       row++;
-      setCell(0, row, excel_lib.TextCellValue('NET PROFIT / LOSS'), sectionStyle);
+      setCell(
+        0,
+        row,
+        excel_lib.TextCellValue('NET PROFIT / LOSS'),
+        sectionStyle,
+      );
       for (int i = 0; i < periodKeys.length; i++) {
         double pNet = 0;
         if (useYearly) {
@@ -1094,7 +1160,12 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         }
         setCell(i + 1, row, excel_lib.DoubleCellValue(pNet), currencyBoldStyle);
       }
-      setCell(totalColIdx, row, excel_lib.DoubleCellValue(exportData.netIncome), currencyBoldStyle);
+      setCell(
+        totalColIdx,
+        row,
+        excel_lib.DoubleCellValue(exportData.netIncome),
+        currencyBoldStyle,
+      );
 
       final bytes = excel.save();
       if (bytes == null) {
@@ -1103,7 +1174,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       await downloadFile(
         '${orgName.replaceAll(' ', '_')}_Periodic_PL.xlsx',
         bytes,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
     } catch (e, st) {
       dev.log('Excel Export Error: $e\n$st');
@@ -1214,7 +1286,10 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     return false;
   }
 
-  Future<_PnlExportData> _buildPnlExportData(DateTime start, DateTime end) async {
+  Future<_PnlExportData> _buildPnlExportData(
+    DateTime start,
+    DateTime end,
+  ) async {
     final orgId = getCurrentOrganization?.id;
     if (orgId == null) {
       return const _PnlExportData(
@@ -1247,7 +1322,11 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     }
 
     final subCategoryIds = txMaps
-        .map((row) => parseInt(row['sub_category_id']) ?? parseInt(row['subcategory_id']))
+        .map(
+          (row) =>
+              parseInt(row['sub_category_id']) ??
+              parseInt(row['subcategory_id']),
+        )
         .whereType<int>()
         .toSet()
         .toList();
@@ -1287,7 +1366,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       periodicExpenseBreakdown[monthKey] ??= <String, double>{};
       periodicNetIncome[monthKey] ??= 0;
 
-      final bool isAL = title.contains('[asset') ||
+      final bool isAL =
+          title.contains('[asset') ||
           title.contains('[liab') ||
           title.contains('equity') ||
           title.contains('[cf:');
@@ -1297,7 +1377,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
       if (title.startsWith('[revenue]')) {
         isIncome = true;
-      } else if (title.startsWith('[cogs]') || title.contains('cost of goods')) {
+      } else if (title.startsWith('[cogs]') ||
+          title.contains('cost of goods')) {
         isExpense = true;
       } else if (title.startsWith('[opex]')) {
         isExpense = true;
@@ -1305,7 +1386,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         // Excluded from P&L
       } else {
         final knownExpense = _isKnownExportExpense(title);
-        final isTransfer = title.contains('credit card payment') ||
+        final isTransfer =
+            title.contains('credit card payment') ||
             title.contains('transfer to') ||
             title.contains('autopay');
         if (knownExpense) {
@@ -1332,19 +1414,25 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         incomeBreakdown[label] = (incomeBreakdown[label] ?? 0) + absAmt;
         periodicIncomeBreakdown[monthKey]![label] =
             (periodicIncomeBreakdown[monthKey]![label] ?? 0) + absAmt;
-        periodicNetIncome[monthKey] = (periodicNetIncome[monthKey] ?? 0) + absAmt;
+        periodicNetIncome[monthKey] =
+            (periodicNetIncome[monthKey] ?? 0) + absAmt;
       } else if (isExpense) {
         expenseBreakdown[label] = (expenseBreakdown[label] ?? 0) + absAmt;
         periodicExpenseBreakdown[monthKey]![label] =
             (periodicExpenseBreakdown[monthKey]![label] ?? 0) + absAmt;
-        periodicNetIncome[monthKey] = (periodicNetIncome[monthKey] ?? 0) - absAmt;
+        periodicNetIncome[monthKey] =
+            (periodicNetIncome[monthKey] ?? 0) - absAmt;
       }
     }
 
-    final totalIncome =
-        incomeBreakdown.values.fold<double>(0.0, (a, b) => a + b);
-    final totalExpenses =
-        expenseBreakdown.values.fold<double>(0.0, (a, b) => a + b);
+    final totalIncome = incomeBreakdown.values.fold<double>(
+      0.0,
+      (a, b) => a + b,
+    );
+    final totalExpenses = expenseBreakdown.values.fold<double>(
+      0.0,
+      (a, b) => a + b,
+    );
     final netIncome = totalIncome - totalExpenses;
 
     return _PnlExportData(
@@ -1360,7 +1448,10 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
   }
 
   Future<PnlPdfData> _buildPnlPdfData(PdfExportRequest request) async {
-    final exportData = await _buildPnlExportData(request.startDate, request.endDate);
+    final exportData = await _buildPnlExportData(
+      request.startDate,
+      request.endDate,
+    );
     final labels = PdfExportService().buildBucketLabels(
       request.startDate,
       request.endDate,
@@ -1418,7 +1509,11 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       }
     }
     expenseRows.add(
-      PnlPdfRowData(label: 'Total Expenses', values: expenseTotal, isBold: true),
+      PnlPdfRowData(
+        label: 'Total Expenses',
+        values: expenseTotal,
+        isBold: true,
+      ),
     );
 
     final netProfit = List<double>.filled(labels.length, 0);
@@ -1480,8 +1575,10 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
         final double grossProfit = controller.grossProfit.value;
         final double prevGrossProfit = controller.prevPeriodGrossProfit.value;
-        final double grossProfitChange =
-            _percentChange(grossProfit, prevGrossProfit);
+        final double grossProfitChange = _percentChange(
+          grossProfit,
+          prevGrossProfit,
+        );
 
         final double margin = controller.grossMarginPct.value.clamp(0, 100);
         final double prevMargin = controller.prevPeriodGrossMarginPct.value
@@ -1601,7 +1698,9 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                   startDate: request.startDate,
                                   endDate: request.endDate,
                                 );
-                                final liveData = await _buildPnlPdfData(request);
+                                final liveData = await _buildPnlPdfData(
+                                  request,
+                                );
                                 await PdfExportService()
                                     .exportProfitLossPresentationPdf(
                                       request,
