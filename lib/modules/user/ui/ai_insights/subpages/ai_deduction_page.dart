@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/helpers/currency_formatter.dart';
 import 'package:booksmart/models/category.dart';
+import 'package:booksmart/models/deduction_rule_model.dart';
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
@@ -39,6 +40,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
   final Map<int, List<TransactionModel>> _txBySubCat = {};
   final Map<int, double> _subCatTotals = {};
   final Map<int, double> _parentCatTotals = {};
+  int? _userStateId;
 
   @override
   void initState() {
@@ -80,6 +82,17 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
           .map((e) => TransactionModel.fromJson(e))
           .toList();
 
+      if (_catCtrl.states.isEmpty) {
+        await _catCtrl.fetchStates();
+      }
+      await _catCtrl.fetchDeductionRules();
+
+      final org = getCurrentOrganization;
+      final orgState = org?.primaryState ?? org?.state;
+      _userStateId = _catCtrl.states
+          .firstWhereOrNull((s) => s.name == orgState || s.code == orgState)
+          ?.id;
+
       _processTransactions(fetched);
     } catch (e) {
       dev.log("Error loading AI Deduction data: $e");
@@ -108,16 +121,50 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
 
   Map<String, double> _computePieData() {
     final Map<String, double> map = {};
-    for (var cat in _catCtrl.categories) {
-      final total = _parentCatTotals[cat.id] ?? 0;
+    for (var entry in _subCatTotals.entries) {
+      final subId = entry.key;
+      final total = entry.value;
+      final subName = _catCtrl.getSubCategoryName(subId);
       if (total > 0) {
         if (_search.isEmpty ||
-            cat.name.toLowerCase().contains(_search.toLowerCase())) {
-          map[cat.name] = total;
+            subName.toLowerCase().contains(_search.toLowerCase())) {
+          map[subName] = total;
         }
       }
     }
     return map;
+  }
+
+  double _getDeduction(double amount, int subCatId, {required bool isFederal}) {
+    final stateId = isFederal ? null : _userStateId;
+    final rule = _catCtrl.deductionRules.firstWhereOrNull(
+      (r) => r.subCategoryId == subCatId && r.stateId == stateId,
+    );
+    if (rule == null) return 0.0;
+    if (rule.ruleType == RuleType.percentage) {
+      return amount * (rule.value / 100);
+    } else {
+      return rule.value;
+    }
+  }
+
+  String _getDeductionDisplay(
+    double amount,
+    int subCatId, {
+    required bool isFederal,
+  }) {
+    final stateId = isFederal ? null : _userStateId;
+    final rule = _catCtrl.deductionRules.firstWhereOrNull(
+      (r) => r.subCategoryId == subCatId && r.stateId == stateId,
+    );
+    if (rule == null) return _formatCurrency(0);
+
+    final calculated = _getDeduction(amount, subCatId, isFederal: isFederal);
+    if (rule.ruleType == RuleType.percentage) {
+      return "${_formatCurrency(calculated)} (${rule.value.toStringAsFixed(0)}%)";
+    } else {
+      return "${_formatCurrency(calculated)} (${_formatCurrency(rule.value)})";
+    }
   }
 
   Color _colorFor(int id, ThemeData theme) {
@@ -179,10 +226,10 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     final colorList = ordered.isEmpty
         ? [colorScheme.primary]
         : ordered.map((e) {
-            final cat = _catCtrl.categories.firstWhereOrNull(
+            final sub = _catCtrl.subCategories.firstWhereOrNull(
               (c) => c.name == e.key,
             );
-            return _colorFor(cat?.id ?? 0, theme);
+            return _colorFor(sub?.id ?? 0, theme);
           }).toList();
 
     return Scaffold(
@@ -260,9 +307,18 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    child: _isLoading
-                        ? const SizedBox()
-                        : _buildAccordionList(),
+                    child: _isLoading ? const SizedBox() : _buildDeductionTable(),
+                  ),
+                  Divider(
+                    height: 1,
+                    color: colorScheme.onSurface.withValues(alpha: 0.08),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    child: _isLoading ? const SizedBox() : _buildAccordionList(),
                   ),
                 ],
               ),
@@ -270,6 +326,109 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDeductionTable() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final List<int> activeSubCatIds =
+        _subCatTotals.keys
+            .where((id) {
+              if (_search.isEmpty) return true;
+              return _catCtrl
+                  .getSubCategoryName(id)
+                  .toLowerCase()
+                  .contains(_search.toLowerCase());
+            })
+            .toList();
+
+    if (activeSubCatIds.isEmpty) return const SizedBox();
+
+    double grandTotalAmount = 0;
+    double grandTotalState = 0;
+    double grandTotalFederal = 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 8.0),
+          child: AppText('Deductions Breakdown', fontWeight: FontWeight.bold),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: colorScheme.outlineVariant),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Table(
+            columnWidths: const {
+              0: FlexColumnWidth(3),
+              1: FlexColumnWidth(2),
+              2: FlexColumnWidth(2),
+              3: FlexColumnWidth(2),
+            },
+            children: [
+              // Header
+              TableRow(
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceVariant,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    topRight: Radius.circular(8),
+                  ),
+                ),
+                children: const [
+                  _TableCell('Sub-Category', isHeader: true),
+                  _TableCell('Total Amount', isHeader: true),
+                  _TableCell('State Deduction', isHeader: true),
+                  _TableCell('Federal Deduction', isHeader: true),
+                ],
+              ),
+              // Data Rows
+              ...activeSubCatIds.map((subId) {
+                final amount = _subCatTotals[subId] ?? 0;
+                final stateDed = _getDeduction(amount, subId, isFederal: false);
+                final fedDed = _getDeduction(amount, subId, isFederal: true);
+
+                grandTotalAmount += amount;
+                grandTotalState += stateDed;
+                grandTotalFederal += fedDed;
+
+                return TableRow(
+                  children: [
+                    _TableCell(_catCtrl.getSubCategoryName(subId)),
+                    _TableCell(_formatCurrency(amount)),
+                    _TableCell(_getDeductionDisplay(amount, subId, isFederal: false)),
+                    _TableCell(_getDeductionDisplay(amount, subId, isFederal: true)),
+                  ],
+                );
+              }),
+              // Total Row
+              TableRow(
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceVariant.withValues(alpha: 0.5),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(8),
+                    bottomRight: Radius.circular(8),
+                  ),
+                ),
+                children: [
+                  const _TableCell('Total', isHeader: true),
+                  _TableCell(_formatCurrency(grandTotalAmount), isHeader: true),
+                  _TableCell(_formatCurrency(grandTotalState), isHeader: true),
+                  _TableCell(
+                    _formatCurrency(grandTotalFederal),
+                    isHeader: true,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
     );
   }
 
@@ -519,5 +678,24 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
       'Dec',
     ];
     return '${months[d.month - 1]} ${d.day}';
+  }
+}
+
+class _TableCell extends StatelessWidget {
+  final String text;
+  final bool isHeader;
+  const _TableCell(this.text, {this.isHeader = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
+      child: AppText(
+        text,
+        fontSize: isHeader ? 12 : 11,
+        fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+        textAlign: TextAlign.center,
+      ),
+    );
   }
 }
