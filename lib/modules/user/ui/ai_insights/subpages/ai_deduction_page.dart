@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/helpers/currency_formatter.dart';
-import 'package:booksmart/models/category.dart';
 import 'package:booksmart/models/deduction_rule_model.dart';
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
@@ -9,7 +8,6 @@ import 'package:booksmart/modules/user/controllers/organization_controller.dart'
 import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/utils/supabase.dart';
-import 'package:booksmart/widgets/confirmation_dialog.dart';
 import 'package:booksmart/widgets/date_range_picker.dart';
 import 'package:get/get.dart';
 import 'package:pie_chart/pie_chart.dart';
@@ -188,18 +186,18 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     });
   }
 
-  Future<void> _removeTx(int txId) async {
-    await showConfirmationDialog(
-      title: 'Remove Transaction',
-      description:
-          'Are you sure you want to remove this transaction from this subcategory?',
-      onYes: () async {
-        Get.back(); // Close dialog
-        await _txCtrl.deleteTransaction(txId);
-        _loadData();
-      },
-    );
-  }
+  // Future<void> _removeTx(int txId) async {
+  //   await showConfirmationDialog(
+  //     title: 'Remove Transaction',
+  //     description:
+  //         'Are you sure you want to remove this transaction from this subcategory?',
+  //     onYes: () async {
+  //       Get.back(); // Close dialog
+  //       await _txCtrl.deleteTransaction(txId);
+  //       _loadData();
+  //     },
+  //   );
+  // }
 
   @override
   void dispose() {
@@ -307,19 +305,23 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                       horizontal: 16,
                       vertical: 8,
                     ),
-                    child: _isLoading ? const SizedBox() : _buildDeductionTable(),
+                    child: _isLoading
+                        ? const SizedBox()
+                        : _buildDeductionTable(),
                   ),
                   Divider(
                     height: 1,
                     color: colorScheme.onSurface.withValues(alpha: 0.08),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: _isLoading ? const SizedBox() : _buildAccordionList(),
-                  ),
+                  // Padding(
+                  //   padding: const EdgeInsets.symmetric(
+                  //     horizontal: 16,
+                  //     vertical: 8,
+                  //   ),
+                  //   child: _isLoading
+                  //       ? const SizedBox()
+                  //       : _buildAccordionList(),
+                  // ),
                 ],
               ),
             ),
@@ -333,16 +335,13 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final List<int> activeSubCatIds =
-        _subCatTotals.keys
-            .where((id) {
-              if (_search.isEmpty) return true;
-              return _catCtrl
-                  .getSubCategoryName(id)
-                  .toLowerCase()
-                  .contains(_search.toLowerCase());
-            })
-            .toList();
+    final List<int> activeSubCatIds = _subCatTotals.keys.where((id) {
+      if (_search.isEmpty) return true;
+      return _catCtrl
+          .getSubCategoryName(id)
+          .toLowerCase()
+          .contains(_search.toLowerCase());
+    }).toList();
 
     if (activeSubCatIds.isEmpty) return const SizedBox();
 
@@ -357,328 +356,408 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
           padding: EdgeInsets.only(bottom: 8.0),
           child: AppText('Deductions Breakdown', fontWeight: FontWeight.bold),
         ),
+
+        /// HEADER
+        Container(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceVariant,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: const Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: _TableCell('Sub-Category', isHeader: true),
+              ),
+              Expanded(
+                flex: 2,
+                child: _TableCell('Total Amount', isHeader: true),
+              ),
+              Expanded(
+                flex: 2,
+                child: _TableCell('State Deduction', isHeader: true),
+              ),
+              Expanded(
+                flex: 2,
+                child: _TableCell('Federal Deduction', isHeader: true),
+              ),
+            ],
+          ),
+        ),
+
+        /// BODY (Expandable Rows)
         Container(
           decoration: BoxDecoration(
             border: Border.all(color: colorScheme.outlineVariant),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Table(
-            columnWidths: const {
-              0: FlexColumnWidth(3),
-              1: FlexColumnWidth(2),
-              2: FlexColumnWidth(2),
-              3: FlexColumnWidth(2),
-            },
+          child: Column(
             children: [
-              // Header
-              TableRow(
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceVariant,
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    topRight: Radius.circular(8),
-                  ),
-                ),
-                children: const [
-                  _TableCell('Sub-Category', isHeader: true),
-                  _TableCell('Total Amount', isHeader: true),
-                  _TableCell('State Deduction', isHeader: true),
-                  _TableCell('Federal Deduction', isHeader: true),
-                ],
-              ),
-              // Data Rows
               ...activeSubCatIds.map((subId) {
                 final amount = _subCatTotals[subId] ?? 0;
                 final stateDed = _getDeduction(amount, subId, isFederal: false);
                 final fedDed = _getDeduction(amount, subId, isFederal: true);
 
+                final transactions = _txBySubCat[subId] ?? [];
+
                 grandTotalAmount += amount;
                 grandTotalState += stateDed;
                 grandTotalFederal += fedDed;
 
-                return TableRow(
-                  children: [
-                    _TableCell(_catCtrl.getSubCategoryName(subId)),
-                    _TableCell(_formatCurrency(amount)),
-                    _TableCell(_getDeductionDisplay(amount, subId, isFederal: false)),
-                    _TableCell(_getDeductionDisplay(amount, subId, isFederal: true)),
-                  ],
+                return Theme(
+                  data: Theme.of(
+                    context,
+                  ).copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    tilePadding: const EdgeInsets.symmetric(horizontal: 12),
+                    childrenPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Text(_catCtrl.getSubCategoryName(subId)),
+                        ),
+                        Expanded(flex: 2, child: Text(_formatCurrency(amount))),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            _getDeductionDisplay(
+                              amount,
+                              subId,
+                              isFederal: false,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          flex: 2,
+                          child: Text(
+                            _getDeductionDisplay(
+                              amount,
+                              subId,
+                              isFederal: true,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    /// 🔥 EXPANDED TRANSACTIONS
+                    children: [
+                      if (transactions.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Text('No transactions'),
+                        )
+                      else
+                        Column(
+                          children: transactions.map((tx) {
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(tx.title),
+                              // subtitle: Text(_formatShortDate(tx.date)),
+                              trailing: Text(_formatCurrency(tx.amount)),
+                            );
+                          }).toList(),
+                        ),
+                    ],
+                  ),
                 );
               }),
-              // Total Row
-              TableRow(
+
+              /// TOTAL ROW
+              Container(
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceVariant.withValues(alpha: 0.5),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(8),
-                    bottomRight: Radius.circular(8),
+                  borderRadius: const BorderRadius.vertical(
+                    bottom: Radius.circular(8),
                   ),
                 ),
-                children: [
-                  const _TableCell('Total', isHeader: true),
-                  _TableCell(_formatCurrency(grandTotalAmount), isHeader: true),
-                  _TableCell(_formatCurrency(grandTotalState), isHeader: true),
-                  _TableCell(
-                    _formatCurrency(grandTotalFederal),
-                    isHeader: true,
-                  ),
-                ],
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 12,
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      flex: 3,
+                      child: Text(
+                        'Total',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(_formatCurrency(grandTotalAmount)),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(_formatCurrency(grandTotalState)),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: Text(_formatCurrency(grandTotalFederal)),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
+
         const SizedBox(height: 16),
       ],
     );
   }
 
-  Widget _buildAccordionList() {
-    final visibleParents = _catCtrl.categories.where((c) {
-      final total = _parentCatTotals[c.id] ?? 0;
-      if (total <= 0) return false;
-      if (_search.isEmpty) return true;
-      final q = _search.toLowerCase();
-      if (c.name.toLowerCase().contains(q)) return true;
+  // Widget _buildAccordionList() {
+  //   final visibleParents = _catCtrl.categories.where((c) {
+  //     final total = _parentCatTotals[c.id] ?? 0;
+  //     if (total <= 0) return false;
+  //     if (_search.isEmpty) return true;
+  //     final q = _search.toLowerCase();
+  //     if (c.name.toLowerCase().contains(q)) return true;
 
-      final subs = _catCtrl.getSubCategoriesByCategory(c.id);
-      for (var sub in subs) {
-        if (sub.name.toLowerCase().contains(q)) return true;
-        final txs = _txBySubCat[sub.id] ?? [];
-        if (txs.any((t) => t.title.toLowerCase().contains(q))) return true;
-      }
-      return false;
-    }).toList();
+  //     final subs = _catCtrl.getSubCategoriesByCategory(c.id);
+  //     for (var sub in subs) {
+  //       if (sub.name.toLowerCase().contains(q)) return true;
+  //       final txs = _txBySubCat[sub.id] ?? [];
+  //       if (txs.any((t) => t.title.toLowerCase().contains(q))) return true;
+  //     }
+  //     return false;
+  //   }).toList();
 
-    if (visibleParents.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 40),
-          child: AppText(
-            'No transactions found from\n${_formatShortDate(_activeRange.start)} to ${_formatShortDate(_activeRange.end)}',
-            // color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-            textAlign: TextAlign.center,
-            fontSize: 14,
-          ),
-        ),
-      );
-    }
+  //   if (visibleParents.isEmpty) {
+  //     return Center(
+  //       child: Padding(
+  //         padding: const EdgeInsets.symmetric(vertical: 40),
+  //         child: AppText(
+  //           'No transactions found from\n${_formatShortDate(_activeRange.start)} to ${_formatShortDate(_activeRange.end)}',
+  //           // color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+  //           textAlign: TextAlign.center,
+  //           fontSize: 14,
+  //         ),
+  //       ),
+  //     );
+  //   }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: visibleParents.length,
-      itemBuilder: (context, idx) {
-        final cat = visibleParents[idx];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _buildCategoryTile(cat),
-        );
-      },
-    );
-  }
+  //   return ListView.builder(
+  //     shrinkWrap: true,
+  //     physics: const NeverScrollableScrollPhysics(),
+  //     itemCount: visibleParents.length,
+  //     itemBuilder: (context, idx) {
+  //       final cat = visibleParents[idx];
+  //       return Padding(
+  //         padding: const EdgeInsets.only(bottom: 12),
+  //         child: _buildCategoryTile(cat),
+  //       );
+  //     },
+  //   );
+  // }
 
-  Widget _buildCategoryTile(CategoryModel cat) {
-    final theme = Theme.of(context);
-    final color = _colorFor(cat.id, theme);
-    final total = _parentCatTotals[cat.id] ?? 0;
+  // Widget _buildCategoryTile(CategoryModel cat) {
+  //   final theme = Theme.of(context);
+  //   final color = _colorFor(cat.id, theme);
+  //   final total = _parentCatTotals[cat.id] ?? 0;
 
-    final subcategories = _catCtrl.getSubCategoriesByCategory(cat.id);
+  //   final subcategories = _catCtrl.getSubCategoriesByCategory(cat.id);
 
-    return Card(
-      color: theme.colorScheme.surfaceVariant,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: ExpansionTile(
-        key: PageStorageKey(cat.id),
-        initiallyExpanded: _expandedCats[cat.id] ?? false,
-        onExpansionChanged: (v) => setState(() => _expandedCats[cat.id] = v),
-        tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-        title: Row(
-          children: [
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: AppText(
-                cat.name,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            AppText(
-              _formatCurrency(total),
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ],
-        ),
-        children: subcategories
-            .map((sub) => _buildSubcategorySection(sub))
-            .toList(),
-      ),
-    );
-  }
+  //   return Card(
+  //     color: theme.colorScheme.surfaceVariant,
+  //     margin: EdgeInsets.zero,
+  //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+  //     child: ExpansionTile(
+  //       key: PageStorageKey(cat.id),
+  //       initiallyExpanded: _expandedCats[cat.id] ?? false,
+  //       onExpansionChanged: (v) => setState(() => _expandedCats[cat.id] = v),
+  //       tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+  //       title: Row(
+  //         children: [
+  //           Container(
+  //             width: 12,
+  //             height: 12,
+  //             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  //           ),
+  //           const SizedBox(width: 10),
+  //           Expanded(
+  //             child: AppText(
+  //               cat.name,
+  //               fontSize: 14,
+  //               fontWeight: FontWeight.w600,
+  //             ),
+  //           ),
+  //           AppText(
+  //             _formatCurrency(total),
+  //             fontSize: 12,
+  //             fontWeight: FontWeight.bold,
+  //           ),
+  //         ],
+  //       ),
+  //       children: subcategories
+  //           .map((sub) => _buildSubcategorySection(sub))
+  //           .toList(),
+  //     ),
+  //   );
+  // }
 
-  Widget _buildSubcategorySection(SubCategoryModel sub) {
-    final txs = (_txBySubCat[sub.id] ?? []).where((t) {
-      if (_search.isEmpty) return true;
-      final q = _search.toLowerCase();
-      return sub.name.toLowerCase().contains(q) ||
-          t.title.toLowerCase().contains(q);
-    }).toList();
+  // Widget _buildSubcategorySection(SubCategoryModel sub) {
+  //   final txs = (_txBySubCat[sub.id] ?? []).where((t) {
+  //     if (_search.isEmpty) return true;
+  //     final q = _search.toLowerCase();
+  //     return sub.name.toLowerCase().contains(q) ||
+  //         t.title.toLowerCase().contains(q);
+  //   }).toList();
 
-    final total = _subCatTotals[sub.id] ?? 0;
-    if (total <= 0 && txs.isEmpty) return const SizedBox();
+  //   final total = _subCatTotals[sub.id] ?? 0;
+  //   if (total <= 0 && txs.isEmpty) return const SizedBox();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(24, 12, 12, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: AppText(
-                  sub.name,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              AppText(
-                _formatCurrency(total),
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: orangeColor,
-              ),
-            ],
-          ),
-        ),
-        _tableHeader(),
-        if (txs.isEmpty)
-          const Padding(
-            padding: EdgeInsets.fromLTRB(36, 8, 12, 12),
-            child: AppText(
-              'No transactions found in this subcategory.',
-              fontSize: 12,
-            ),
-          )
-        else
-          ...txs.map((t) => _txRow(t)),
-        const Divider(indent: 24, endIndent: 12),
-      ],
-    );
-  }
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       Padding(
+  //         padding: const EdgeInsets.fromLTRB(24, 12, 12, 8),
+  //         child: Row(
+  //           children: [
+  //             Expanded(
+  //               child: AppText(
+  //                 sub.name,
+  //                 fontSize: 13,
+  //                 fontWeight: FontWeight.w600,
+  //                 color: Theme.of(context).colorScheme.primary,
+  //               ),
+  //             ),
+  //             AppText(
+  //               _formatCurrency(total),
+  //               fontSize: 12,
+  //               fontWeight: FontWeight.bold,
+  //               color: orangeColor,
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //       _tableHeader(),
+  //       if (txs.isEmpty)
+  //         const Padding(
+  //           padding: EdgeInsets.fromLTRB(36, 8, 12, 12),
+  //           child: AppText(
+  //             'No transactions found in this subcategory.',
+  //             fontSize: 12,
+  //           ),
+  //         )
+  //       else
+  //         ...txs.map((t) => _txRow(t)),
+  //       const Divider(indent: 24, endIndent: 12),
+  //     ],
+  //   );
+  // }
 
-  Widget _tableHeader() => Padding(
-    padding: const EdgeInsets.fromLTRB(24, 8, 12, 8),
-    child: Row(
-      spacing: 3,
-      children: const [
-        Expanded(
-          flex: 4,
-          child: FittedText(
-            'Merchant',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: FittedText(
-            'Date',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: FittedText(
-            'Amount',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-        ),
-        SizedBox(width: 30, height: 30),
-      ],
-    ),
-  );
+  // Widget _tableHeader() => Padding(
+  //   padding: const EdgeInsets.fromLTRB(24, 8, 12, 8),
+  //   child: Row(
+  //     spacing: 3,
+  //     children: const [
+  //       Expanded(
+  //         flex: 4,
+  //         child: FittedText(
+  //           'Merchant',
+  //           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+  //         ),
+  //       ),
+  //       Expanded(
+  //         flex: 2,
+  //         child: FittedText(
+  //           'Date',
+  //           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+  //           textAlign: TextAlign.center,
+  //         ),
+  //       ),
+  //       Expanded(
+  //         flex: 2,
+  //         child: FittedText(
+  //           'Amount',
+  //           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+  //           textAlign: TextAlign.center,
+  //         ),
+  //       ),
+  //       SizedBox(width: 30, height: 30),
+  //     ],
+  //   ),
+  // );
 
-  Widget _txRow(TransactionModel tx) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 4, 12, 4),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 4,
-            child: FittedText(tx.title, style: const TextStyle(fontSize: 12)),
-          ),
-          Expanded(
-            flex: 2,
-            child: FittedText(
-              _formatShortDate(tx.dateTime),
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: FittedText(
-              _formatCurrency(tx.amount.abs()),
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
-          SizedBox(
-            width: 30,
-            height: 30,
-            child: PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 16),
-              padding: EdgeInsetsGeometry.zero,
-              itemBuilder: (context) {
-                return [
-                  const PopupMenuItem<String>(
-                    value: "remove",
-                    child: Text("Remove"),
-                  ),
-                  const PopupMenuItem<String>(
-                    value: "cancel",
-                    child: Text("Cancel"),
-                  ),
-                ];
-              },
-              onSelected: (value) {
-                switch (value) {
-                  case "remove":
-                    _removeTx(tx.id);
-                    break;
-                }
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Widget _txRow(TransactionModel tx) {
+  //   return Padding(
+  //     padding: const EdgeInsets.fromLTRB(24, 4, 12, 4),
+  //     child: Row(
+  //       children: [
+  //         Expanded(
+  //           flex: 4,
+  //           child: FittedText(tx.title, style: const TextStyle(fontSize: 12)),
+  //         ),
+  //         Expanded(
+  //           flex: 2,
+  //           child: FittedText(
+  //             _formatShortDate(tx.dateTime),
+  //             style: const TextStyle(fontSize: 12),
+  //           ),
+  //         ),
+  //         Expanded(
+  //           flex: 2,
+  //           child: FittedText(
+  //             _formatCurrency(tx.amount.abs()),
+  //             style: const TextStyle(fontSize: 12),
+  //           ),
+  //         ),
+  //         SizedBox(
+  //           width: 30,
+  //           height: 30,
+  //           child: PopupMenuButton<String>(
+  //             icon: const Icon(Icons.more_vert, size: 16),
+  //             padding: EdgeInsetsGeometry.zero,
+  //             itemBuilder: (context) {
+  //               return [
+  //                 const PopupMenuItem<String>(
+  //                   value: "remove",
+  //                   child: Text("Remove"),
+  //                 ),
+  //                 const PopupMenuItem<String>(
+  //                   value: "cancel",
+  //                   child: Text("Cancel"),
+  //                 ),
+  //               ];
+  //             },
+  //             onSelected: (value) {
+  //               switch (value) {
+  //                 case "remove":
+  //                   _removeTx(tx.id);
+  //                   break;
+  //               }
+  //             },
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   String _formatCurrency(double n) => CurrencyUtils.format(n);
-  String _formatShortDate(DateTime d) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[d.month - 1]} ${d.day}';
-  }
+  // String _formatShortDate(DateTime d) {
+  //   const months = [
+  //     'Jan',
+  //     'Feb',
+  //     'Mar',
+  //     'Apr',
+  //     'May',
+  //     'Jun',
+  //     'Jul',
+  //     'Aug',
+  //     'Sep',
+  //     'Oct',
+  //     'Nov',
+  //     'Dec',
+  //   ];
+  //   return '${months[d.month - 1]} ${d.day}';
+  // }
 }
 
 class _TableCell extends StatelessWidget {

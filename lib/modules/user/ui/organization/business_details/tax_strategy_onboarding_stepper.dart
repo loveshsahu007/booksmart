@@ -13,23 +13,59 @@ import 'package:get/get.dart';
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'business_details_widgets.dart';
 
-void goToTaxStrategyOnboarding({int? transactionId, int? organizationId}) {
+// void goToTaxStrategyOnboarding({int? transactionId, int? organizationId}) {
+//   if (kIsWeb) {
+//     customDialog(
+//       child: TaxStrategyOnboardingStepper(
+//         transactionId: transactionId,
+//         organizationId: organizationId,
+//       ),
+//       title: 'Tax Strategy Onboarding',
+//       barrierDismissible: false,
+//     );
+//   } else {
+//     Get.to(
+//       () => TaxStrategyOnboardingStepper(
+//         transactionId: transactionId,
+//         organizationId: organizationId,
+//       ),
+//     );
+//   }
+// }
+
+void goToTaxStrategyOnboarding({
+  int? transactionId,
+  int? organizationId,
+  bool shouldCloseBefore = false,
+}) {
   if (kIsWeb) {
+    if (shouldCloseBefore) {
+      Get.back();
+    }
     customDialog(
       child: TaxStrategyOnboardingStepper(
         transactionId: transactionId,
         organizationId: organizationId,
       ),
-      title: 'Tax Strategy Onboarding',
+      title: "Tax Strategy Onboarding",
       barrierDismissible: false,
     );
   } else {
-    Get.to(
-      () => TaxStrategyOnboardingStepper(
-        transactionId: transactionId,
-        organizationId: organizationId,
-      ),
-    );
+    if (shouldCloseBefore) {
+      Get.off(
+        () => TaxStrategyOnboardingStepper(
+          transactionId: transactionId,
+          organizationId: organizationId,
+        ),
+      );
+    } else {
+      Get.to(
+        () => TaxStrategyOnboardingStepper(
+          transactionId: transactionId,
+          organizationId: organizationId,
+        ),
+      );
+    }
   }
 }
 
@@ -119,8 +155,9 @@ class _TaxStrategyOnboardingStepperState
 
   void _preFillData() {
     if (widget.organizationId != null) {
-      final org = organizationControllerInstance.organizations
-          .firstWhereOrNull((e) => e.id == widget.organizationId);
+      final org = organizationControllerInstance.organizations.firstWhereOrNull(
+        (e) => e.id == widget.organizationId,
+      );
       if (org != null) {
         // Step 1
         _filingStatus = org.filingStatus;
@@ -156,8 +193,9 @@ class _TaxStrategyOnboardingStepperState
         _auditAppetite = org.auditAppetite;
       }
     } else if (widget.transactionId != null) {
-      final tx = transactionControllerInstance.transactions
-          .firstWhereOrNull((e) => e.id == widget.transactionId);
+      final tx = transactionControllerInstance.transactions.firstWhereOrNull(
+        (e) => e.id == widget.transactionId,
+      );
       if (tx != null) {
         // Step 1
         _filingStatus = tx.filingStatus;
@@ -209,20 +247,26 @@ class _TaxStrategyOnboardingStepperState
 
     try {
       final Map<String, dynamic> data = {};
-      
+
       switch (_currentStep) {
         case 0:
           data.addAll({
             'filing_status': _filingStatus,
-            'primary_state': _stateController.text.trim().isEmpty ? null : _stateController.text.trim(),
+            'primary_state': _stateController.text.trim().isEmpty
+                ? null
+                : _stateController.text.trim(),
             'residency_status': _residencyStatus,
             'multi_state_activity': _multiStateActivity,
           });
           break;
         case 1:
           data.addAll({
-            'primary_income_types': _primaryIncomeTypes.isEmpty ? null : _primaryIncomeTypes,
-            'industry_niche': _industryController.text.trim().isEmpty ? null : _industryController.text.trim(),
+            'primary_income_types': _primaryIncomeTypes.isEmpty
+                ? null
+                : _primaryIncomeTypes,
+            'industry_niche': _industryController.text.trim().isEmpty
+                ? null
+                : _industryController.text.trim(),
             'passive_income': _passiveIncome.isEmpty ? null : _passiveIncome,
           });
           break;
@@ -249,7 +293,9 @@ class _TaxStrategyOnboardingStepperState
           break;
         case 5:
           data.addAll({
-            'real_estate_interests': _realEstateInterests.isEmpty ? null : _realEstateInterests,
+            'real_estate_interests': _realEstateInterests.isEmpty
+                ? null
+                : _realEstateInterests,
             'hosts_business_meetings': _hostsBusinessMeetings,
           });
           break;
@@ -257,13 +303,17 @@ class _TaxStrategyOnboardingStepperState
           data.addAll({
             'health_insurance': _healthInsurance,
             'health_savings': _healthSavings.isEmpty ? null : _healthSavings,
-            'family_education': _familyEducation.isEmpty ? null : _familyEducation,
+            'family_education': _familyEducation.isEmpty
+                ? null
+                : _familyEducation,
           });
           break;
         case 7:
           data.addAll({
             'tax_goal': _taxGoal,
-            'retirement_current': _retirementCurrent.isEmpty ? null : _retirementCurrent,
+            'retirement_current': _retirementCurrent.isEmpty
+                ? null
+                : _retirementCurrent,
             'audit_appetite': _auditAppetite,
           });
           break;
@@ -302,7 +352,7 @@ class _TaxStrategyOnboardingStepperState
 
   void _finish() {
     showSnackBar('Tax profile saved! Your AI strategy is being tailored. 🎯');
-    
+
     Future.delayed(const Duration(milliseconds: 500), () {
       if (kIsWeb) {
         Get.back();
@@ -327,9 +377,9 @@ class _TaxStrategyOnboardingStepperState
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      //  backgroundColor: colorScheme.surface,
       appBar: kIsWeb
           ? null
           : AppBar(
@@ -376,11 +426,11 @@ class _TaxStrategyOnboardingStepperState
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Get.back(),
-                    icon: const Icon(Icons.close),
-                  ),
+                  // const Spacer(),
+                  // IconButton(
+                  //   onPressed: () => Get.back(),
+                  //   icon: const Icon(Icons.close),
+                  // ),
                 ],
               ),
             ),
@@ -419,11 +469,7 @@ class _TaxStrategyOnboardingStepperState
       children: [
         TaxProgressBar(current: step),
         const SizedBox(height: 20),
-        TaxSectionTitle(
-          icon: icon,
-          title: title,
-          subtitle: subtitle,
-        ),
+        TaxSectionTitle(icon: icon, title: title, subtitle: subtitle),
         const SizedBox(height: 24),
         ...children,
         const SizedBox(height: 32),
@@ -445,7 +491,8 @@ class _TaxStrategyOnboardingStepperState
       step: 1,
       icon: Icons.gavel_rounded,
       title: 'Legal & Tax Identity',
-      subtitle: 'Help us understand your legal standing to optimize your strategy.',
+      subtitle:
+          'Help us understand your legal standing to optimize your strategy.',
       children: [
         AppText('Filing Status', fontSize: 14, fontWeight: FontWeight.w600),
         const SizedBox(height: 8),
@@ -475,7 +522,11 @@ class _TaxStrategyOnboardingStepperState
           onChanged: (v) => setState(() => _residencyStatus = v),
         ),
         const SizedBox(height: 16),
-        AppText('Multi-State Activity', fontSize: 14, fontWeight: FontWeight.w600),
+        AppText(
+          'Multi-State Activity',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         const SizedBox(height: 4),
         AppText(
           'Did you work or own property in more than one state?',
@@ -498,9 +549,17 @@ class _TaxStrategyOnboardingStepperState
       title: 'Income Streams & Entity Structure',
       subtitle: 'Tell us how you earn to unlock entity-level strategies.',
       children: [
-        AppText('Primary Income Type', fontSize: 14, fontWeight: FontWeight.w600),
+        AppText(
+          'Primary Income Type',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         const SizedBox(height: 4),
-        AppText('Select all that apply', fontSize: 12, color: colorScheme.onSurfaceVariant),
+        AppText(
+          'Select all that apply',
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(height: 8),
         CustomMultiDropDownWidget<String>(
           dropDownKey: _incomeKey,
@@ -520,7 +579,11 @@ class _TaxStrategyOnboardingStepperState
         const SizedBox(height: 16),
         AppText('Passive Income', fontSize: 14, fontWeight: FontWeight.w600),
         const SizedBox(height: 4),
-        AppText('Select all that apply', fontSize: 12, color: colorScheme.onSurfaceVariant),
+        AppText(
+          'Select all that apply',
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(height: 8),
         CustomMultiDropDownWidget<String>(
           dropDownKey: _passiveKey,
@@ -538,11 +601,16 @@ class _TaxStrategyOnboardingStepperState
       step: 3,
       icon: Icons.business_center_rounded,
       title: 'Operational Footprint',
-      subtitle: 'Audit-proof your business by documenting your team & accounting setup.',
+      subtitle:
+          'Audit-proof your business by documenting your team & accounting setup.',
       children: [
         AppText('Team & Payroll', fontSize: 14, fontWeight: FontWeight.w600),
         const SizedBox(height: 4),
-        AppText('Select all that apply', fontSize: 12, color: colorScheme.onSurfaceVariant),
+        AppText(
+          'Select all that apply',
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(height: 8),
         CustomMultiDropDownWidget<String>(
           dropDownKey: _teamKey,
@@ -575,7 +643,8 @@ class _TaxStrategyOnboardingStepperState
           onChanged: (v) => setState(() => _majorEquipment = v),
         ),
         const TaxInsightChip(
-          text: 'AI Insight: This triggers Section 179 or Bonus Depreciation strategies.',
+          text:
+              'AI Insight: This triggers Section 179 or Bonus Depreciation strategies.',
         ),
       ],
     );
@@ -586,7 +655,8 @@ class _TaxStrategyOnboardingStepperState
       step: 4,
       icon: Icons.directions_car_rounded,
       title: 'Vehicle & Logistics',
-      subtitle: "Vehicle deductions can be significant — let's capture every dollar.",
+      subtitle:
+          "Vehicle deductions can be significant — let's capture every dollar.",
       children: [
         AppText('Vehicle Ownership', fontSize: 14, fontWeight: FontWeight.w600),
         const SizedBox(height: 8),
@@ -598,7 +668,11 @@ class _TaxStrategyOnboardingStepperState
           onChanged: (v) => setState(() => _vehicleOwnership = v),
         ),
         const SizedBox(height: 16),
-        AppText('Primary Usage Method', fontSize: 14, fontWeight: FontWeight.w600),
+        AppText(
+          'Primary Usage Method',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         const SizedBox(height: 8),
         CustomDropDownWidget<String>(
           dropDownKey: _usageKey,
@@ -621,7 +695,8 @@ class _TaxStrategyOnboardingStepperState
           onChanged: (v) => setState(() => _vehicleOver6kLbs = v),
         ),
         const TaxInsightChip(
-          text: 'AI Insight: This triggers the "Hummer Tax Loophole" — heavy vehicle depreciation under Section 179.',
+          text:
+              'AI Insight: This triggers the "Hummer Tax Loophole" — heavy vehicle depreciation under Section 179.',
         ),
       ],
     );
@@ -644,7 +719,11 @@ class _TaxStrategyOnboardingStepperState
           onChanged: (v) => setState(() => _homeOfficeType = v),
         ),
         const SizedBox(height: 16),
-        AppText('Home Ownership Status', fontSize: 14, fontWeight: FontWeight.w600),
+        AppText(
+          'Home Ownership Status',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         const SizedBox(height: 8),
         CustomDropDownWidget<String>(
           dropDownKey: _homeKey,
@@ -654,9 +733,17 @@ class _TaxStrategyOnboardingStepperState
           onChanged: (v) => setState(() => _homeStatus = v),
         ),
         const SizedBox(height: 16),
-        AppText('Tech & Digital Usage', fontSize: 14, fontWeight: FontWeight.w600),
+        AppText(
+          'Tech & Digital Usage',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         const SizedBox(height: 4),
-        AppText('Select all that apply', fontSize: 12, color: colorScheme.onSurfaceVariant),
+        AppText(
+          'Select all that apply',
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(height: 8),
         CustomMultiDropDownWidget<String>(
           dropDownKey: _techKey,
@@ -674,11 +761,20 @@ class _TaxStrategyOnboardingStepperState
       step: 6,
       icon: Icons.house_rounded,
       title: 'Real Estate Strategy',
-      subtitle: 'Real estate holds some of the most powerful tax strategies available.',
+      subtitle:
+          'Real estate holds some of the most powerful tax strategies available.',
       children: [
-        AppText('Real Estate Interests', fontSize: 14, fontWeight: FontWeight.w600),
+        AppText(
+          'Real Estate Interests',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         const SizedBox(height: 4),
-        AppText('Select all that apply', fontSize: 12, color: colorScheme.onSurfaceVariant),
+        AppText(
+          'Select all that apply',
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(height: 8),
         CustomMultiDropDownWidget<String>(
           dropDownKey: _realEstateKey,
@@ -701,7 +797,8 @@ class _TaxStrategyOnboardingStepperState
           onChanged: (v) => setState(() => _hostsBusinessMeetings = v),
         ),
         const TaxInsightChip(
-          text: 'AI Insight: This identifies eligibility for the Augusta Rule — up to 14 days of tax-free rental income from your home.',
+          text:
+              'AI Insight: This identifies eligibility for the Augusta Rule — up to 14 days of tax-free rental income from your home.',
         ),
       ],
     );
@@ -712,9 +809,14 @@ class _TaxStrategyOnboardingStepperState
       step: 7,
       icon: Icons.favorite_rounded,
       title: 'Household & Benefits',
-      subtitle: 'Health and family expenses often hide significant tax opportunities.',
+      subtitle:
+          'Health and family expenses often hide significant tax opportunities.',
       children: [
-        AppText('Health Insurance Type', fontSize: 14, fontWeight: FontWeight.w600),
+        AppText(
+          'Health Insurance Type',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         const SizedBox(height: 8),
         CustomDropDownWidget<String>(
           dropDownKey: _insuranceKey,
@@ -726,7 +828,11 @@ class _TaxStrategyOnboardingStepperState
         const SizedBox(height: 16),
         AppText('Health Savings', fontSize: 14, fontWeight: FontWeight.w600),
         const SizedBox(height: 4),
-        AppText('Select all that apply', fontSize: 12, color: colorScheme.onSurfaceVariant),
+        AppText(
+          'Select all that apply',
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(height: 8),
         CustomMultiDropDownWidget<String>(
           dropDownKey: _savingsKey,
@@ -736,9 +842,17 @@ class _TaxStrategyOnboardingStepperState
           onChanged: (v) => setState(() => _healthSavings = v),
         ),
         const SizedBox(height: 16),
-        AppText('Education & Family', fontSize: 14, fontWeight: FontWeight.w600),
+        AppText(
+          'Education & Family',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         const SizedBox(height: 4),
-        AppText('Select all that apply', fontSize: 12, color: colorScheme.onSurfaceVariant),
+        AppText(
+          'Select all that apply',
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(height: 8),
         CustomMultiDropDownWidget<String>(
           dropDownKey: _educationKey,
@@ -756,7 +870,8 @@ class _TaxStrategyOnboardingStepperState
       step: 8,
       icon: Icons.auto_awesome_rounded,
       title: 'AI Strategy Alignment',
-      subtitle: 'Final step — align your goals so our AI can build your personalized roadmap.',
+      subtitle:
+          'Final step — align your goals so our AI can build your personalized roadmap.',
       nextLabel: 'Save & Finish 🎯',
       showSkip: false, // REMOVE SKIP from the last screen
       children: [
@@ -770,9 +885,17 @@ class _TaxStrategyOnboardingStepperState
           onChanged: (v) => setState(() => _taxGoal = v),
         ),
         const SizedBox(height: 16),
-        AppText('Retirement Readiness', fontSize: 14, fontWeight: FontWeight.w600),
+        AppText(
+          'Retirement Readiness',
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
         const SizedBox(height: 4),
-        AppText('Select all that apply', fontSize: 12, color: colorScheme.onSurfaceVariant),
+        AppText(
+          'Select all that apply',
+          fontSize: 12,
+          color: colorScheme.onSurfaceVariant,
+        ),
         const SizedBox(height: 8),
         CustomMultiDropDownWidget<String>(
           dropDownKey: _retirementKey,
@@ -805,17 +928,28 @@ class _TaxStrategyOnboardingStepperState
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colorScheme.primary.withValues(alpha: 0.3)),
+            border: Border.all(
+              color: colorScheme.primary.withValues(alpha: 0.3),
+            ),
           ),
           child: Row(
             children: [
-              Icon(Icons.celebration_rounded, color: colorScheme.primary, size: 28),
+              Icon(
+                Icons.celebration_rounded,
+                color: colorScheme.primary,
+                size: 28,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppText('Almost there!', fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.primary),
+                    AppText(
+                      'Almost there!',
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.primary,
+                    ),
                     const SizedBox(height: 2),
                     AppText(
                       'Once you finish, our AI will generate your personalized US tax strategy.',
