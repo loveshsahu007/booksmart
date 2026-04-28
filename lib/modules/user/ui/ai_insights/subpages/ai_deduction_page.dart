@@ -22,9 +22,6 @@ class AIDeductionPage extends StatefulWidget {
 
 class _AIDeductionPageState extends State<AIDeductionPage> {
   late CategoryAdminController _catCtrl;
-  late TransactionController _txCtrl;
-
-  final Map<int, bool> _expandedCats = {};
   final TextEditingController _searchCtrl = TextEditingController();
   Timer? _debounce;
   String _search = '';
@@ -53,10 +50,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
 
     final tag = getCurrentOrganization!.id.toString();
     if (Get.isRegistered<TransactionController>(tag: tag)) {
-      _txCtrl = Get.find<TransactionController>(tag: tag);
-    } else {
-      _txCtrl = Get.put(TransactionController(), tag: tag);
-    }
+    } else {}
 
     _loadData();
     _searchCtrl.addListener(_onSearchChanged);
@@ -166,17 +160,9 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
   }
 
   Color _colorFor(int id, ThemeData theme) {
-    final palette = [
-      const Color(0xFF19C37D),
-      const Color(0xFF0077CC),
-      const Color(0xFFF2C94C),
-      const Color(0xFF6C5CE7),
-      const Color(0xFF3B82F6),
-      const Color(0xFFFF7A7A),
-      theme.colorScheme.primary,
-    ];
-    final idx = id.hashCode.abs() % palette.length;
-    return palette[idx];
+    if (id == 0) return theme.colorScheme.primary;
+    final hue = (id * 137.508) % 360;
+    return HSLColor.fromAHSL(1.0, hue, 0.65, 0.55).toColor();
   }
 
   void _onSearchChanged() {
@@ -223,12 +209,13 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
 
     final colorList = ordered.isEmpty
         ? [colorScheme.primary]
-        : ordered.map((e) {
-            final sub = _catCtrl.subCategories.firstWhereOrNull(
-              (c) => c.name == e.key,
-            );
-            return _colorFor(sub?.id ?? 0, theme);
-          }).toList();
+        : List.generate(ordered.length, (index) {
+            // Using the golden angle to distribute colors evenly based on their
+            // sorted index. This guarantees no two slices get the same color,
+            // even if their IDs are missing or duplicate.
+            final hue = (index * 137.508) % 360;
+            return HSLColor.fromAHSL(1.0, hue, 0.65, 0.55).toColor();
+          });
 
     return Scaffold(
       body: Column(
@@ -331,6 +318,25 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     );
   }
 
+  String _getDateRangeText() {
+    final now = DateTime.now();
+    final start = _activeRange.start;
+    final end = _activeRange.end;
+
+    final isEndToday =
+        end.year == now.year && end.month == now.month && end.day == now.day;
+
+    if (isEndToday) {
+      final startDay = DateTime(start.year, start.month, start.day);
+      final endDay = DateTime(end.year, end.month, end.day);
+      final difference = endDay.difference(startDay).inDays;
+      return 'Last ${difference == 0 ? 1 : difference} Days';
+    } else {
+      String pad(int n) => n.toString().padLeft(2, '0');
+      return '${pad(start.month)}/${pad(start.day)}/${start.year} - ${pad(end.month)}/${pad(end.day)}/${end.year}';
+    }
+  }
+
   Widget _buildDeductionTable() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -352,9 +358,18 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(bottom: 8.0),
-          child: AppText('Deductions Breakdown', fontWeight: FontWeight.bold),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const AppText(
+                'Deductions Breakdown',
+                fontWeight: FontWeight.bold,
+              ),
+              AppText(_getDateRangeText(), fontWeight: FontWeight.bold),
+            ],
+          ),
         ),
 
         /// HEADER
@@ -379,7 +394,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                 child: _TableCell('State Deduction', isHeader: true),
               ),
               Expanded(
-                flex: 2,
+                flex: 5,
                 child: _TableCell('Federal Deduction', isHeader: true),
               ),
             ],
@@ -456,7 +471,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                               dense: true,
                               contentPadding: EdgeInsets.zero,
                               title: Text(tx.title),
-                              // subtitle: Text(_formatShortDate(tx.date)),
+
                               trailing: Text(_formatCurrency(tx.amount)),
                             );
                           }).toList(),
@@ -511,253 +526,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     );
   }
 
-  // Widget _buildAccordionList() {
-  //   final visibleParents = _catCtrl.categories.where((c) {
-  //     final total = _parentCatTotals[c.id] ?? 0;
-  //     if (total <= 0) return false;
-  //     if (_search.isEmpty) return true;
-  //     final q = _search.toLowerCase();
-  //     if (c.name.toLowerCase().contains(q)) return true;
-
-  //     final subs = _catCtrl.getSubCategoriesByCategory(c.id);
-  //     for (var sub in subs) {
-  //       if (sub.name.toLowerCase().contains(q)) return true;
-  //       final txs = _txBySubCat[sub.id] ?? [];
-  //       if (txs.any((t) => t.title.toLowerCase().contains(q))) return true;
-  //     }
-  //     return false;
-  //   }).toList();
-
-  //   if (visibleParents.isEmpty) {
-  //     return Center(
-  //       child: Padding(
-  //         padding: const EdgeInsets.symmetric(vertical: 40),
-  //         child: AppText(
-  //           'No transactions found from\n${_formatShortDate(_activeRange.start)} to ${_formatShortDate(_activeRange.end)}',
-  //           // color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-  //           textAlign: TextAlign.center,
-  //           fontSize: 14,
-  //         ),
-  //       ),
-  //     );
-  //   }
-
-  //   return ListView.builder(
-  //     shrinkWrap: true,
-  //     physics: const NeverScrollableScrollPhysics(),
-  //     itemCount: visibleParents.length,
-  //     itemBuilder: (context, idx) {
-  //       final cat = visibleParents[idx];
-  //       return Padding(
-  //         padding: const EdgeInsets.only(bottom: 12),
-  //         child: _buildCategoryTile(cat),
-  //       );
-  //     },
-  //   );
-  // }
-
-  // Widget _buildCategoryTile(CategoryModel cat) {
-  //   final theme = Theme.of(context);
-  //   final color = _colorFor(cat.id, theme);
-  //   final total = _parentCatTotals[cat.id] ?? 0;
-
-  //   final subcategories = _catCtrl.getSubCategoriesByCategory(cat.id);
-
-  //   return Card(
-  //     color: theme.colorScheme.surfaceVariant,
-  //     margin: EdgeInsets.zero,
-  //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-  //     child: ExpansionTile(
-  //       key: PageStorageKey(cat.id),
-  //       initiallyExpanded: _expandedCats[cat.id] ?? false,
-  //       onExpansionChanged: (v) => setState(() => _expandedCats[cat.id] = v),
-  //       tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-  //       title: Row(
-  //         children: [
-  //           Container(
-  //             width: 12,
-  //             height: 12,
-  //             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-  //           ),
-  //           const SizedBox(width: 10),
-  //           Expanded(
-  //             child: AppText(
-  //               cat.name,
-  //               fontSize: 14,
-  //               fontWeight: FontWeight.w600,
-  //             ),
-  //           ),
-  //           AppText(
-  //             _formatCurrency(total),
-  //             fontSize: 12,
-  //             fontWeight: FontWeight.bold,
-  //           ),
-  //         ],
-  //       ),
-  //       children: subcategories
-  //           .map((sub) => _buildSubcategorySection(sub))
-  //           .toList(),
-  //     ),
-  //   );
-  // }
-
-  // Widget _buildSubcategorySection(SubCategoryModel sub) {
-  //   final txs = (_txBySubCat[sub.id] ?? []).where((t) {
-  //     if (_search.isEmpty) return true;
-  //     final q = _search.toLowerCase();
-  //     return sub.name.toLowerCase().contains(q) ||
-  //         t.title.toLowerCase().contains(q);
-  //   }).toList();
-
-  //   final total = _subCatTotals[sub.id] ?? 0;
-  //   if (total <= 0 && txs.isEmpty) return const SizedBox();
-
-  //   return Column(
-  //     crossAxisAlignment: CrossAxisAlignment.start,
-  //     children: [
-  //       Padding(
-  //         padding: const EdgeInsets.fromLTRB(24, 12, 12, 8),
-  //         child: Row(
-  //           children: [
-  //             Expanded(
-  //               child: AppText(
-  //                 sub.name,
-  //                 fontSize: 13,
-  //                 fontWeight: FontWeight.w600,
-  //                 color: Theme.of(context).colorScheme.primary,
-  //               ),
-  //             ),
-  //             AppText(
-  //               _formatCurrency(total),
-  //               fontSize: 12,
-  //               fontWeight: FontWeight.bold,
-  //               color: orangeColor,
-  //             ),
-  //           ],
-  //         ),
-  //       ),
-  //       _tableHeader(),
-  //       if (txs.isEmpty)
-  //         const Padding(
-  //           padding: EdgeInsets.fromLTRB(36, 8, 12, 12),
-  //           child: AppText(
-  //             'No transactions found in this subcategory.',
-  //             fontSize: 12,
-  //           ),
-  //         )
-  //       else
-  //         ...txs.map((t) => _txRow(t)),
-  //       const Divider(indent: 24, endIndent: 12),
-  //     ],
-  //   );
-  // }
-
-  // Widget _tableHeader() => Padding(
-  //   padding: const EdgeInsets.fromLTRB(24, 8, 12, 8),
-  //   child: Row(
-  //     spacing: 3,
-  //     children: const [
-  //       Expanded(
-  //         flex: 4,
-  //         child: FittedText(
-  //           'Merchant',
-  //           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-  //         ),
-  //       ),
-  //       Expanded(
-  //         flex: 2,
-  //         child: FittedText(
-  //           'Date',
-  //           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-  //           textAlign: TextAlign.center,
-  //         ),
-  //       ),
-  //       Expanded(
-  //         flex: 2,
-  //         child: FittedText(
-  //           'Amount',
-  //           style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-  //           textAlign: TextAlign.center,
-  //         ),
-  //       ),
-  //       SizedBox(width: 30, height: 30),
-  //     ],
-  //   ),
-  // );
-
-  // Widget _txRow(TransactionModel tx) {
-  //   return Padding(
-  //     padding: const EdgeInsets.fromLTRB(24, 4, 12, 4),
-  //     child: Row(
-  //       children: [
-  //         Expanded(
-  //           flex: 4,
-  //           child: FittedText(tx.title, style: const TextStyle(fontSize: 12)),
-  //         ),
-  //         Expanded(
-  //           flex: 2,
-  //           child: FittedText(
-  //             _formatShortDate(tx.dateTime),
-  //             style: const TextStyle(fontSize: 12),
-  //           ),
-  //         ),
-  //         Expanded(
-  //           flex: 2,
-  //           child: FittedText(
-  //             _formatCurrency(tx.amount.abs()),
-  //             style: const TextStyle(fontSize: 12),
-  //           ),
-  //         ),
-  //         SizedBox(
-  //           width: 30,
-  //           height: 30,
-  //           child: PopupMenuButton<String>(
-  //             icon: const Icon(Icons.more_vert, size: 16),
-  //             padding: EdgeInsetsGeometry.zero,
-  //             itemBuilder: (context) {
-  //               return [
-  //                 const PopupMenuItem<String>(
-  //                   value: "remove",
-  //                   child: Text("Remove"),
-  //                 ),
-  //                 const PopupMenuItem<String>(
-  //                   value: "cancel",
-  //                   child: Text("Cancel"),
-  //                 ),
-  //               ];
-  //             },
-  //             onSelected: (value) {
-  //               switch (value) {
-  //                 case "remove":
-  //                   _removeTx(tx.id);
-  //                   break;
-  //               }
-  //             },
-  //           ),
-  //         ),
-  //       ],
-  //     ),
-  //   );
-  // }
-
   String _formatCurrency(double n) => CurrencyUtils.format(n);
-  // String _formatShortDate(DateTime d) {
-  //   const months = [
-  //     'Jan',
-  //     'Feb',
-  //     'Mar',
-  //     'Apr',
-  //     'May',
-  //     'Jun',
-  //     'Jul',
-  //     'Aug',
-  //     'Sep',
-  //     'Oct',
-  //     'Nov',
-  //     'Dec',
-  //   ];
-  //   return '${months[d.month - 1]} ${d.day}';
-  // }
 }
 
 class _TableCell extends StatelessWidget {
