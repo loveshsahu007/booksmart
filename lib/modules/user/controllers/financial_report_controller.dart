@@ -3,7 +3,6 @@ import 'package:booksmart/modules/user/controllers/organization_controller.dart'
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/utils/supabase.dart';
-import 'package:booksmart/widgets/snackbar.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart' as intl;
 
@@ -299,7 +298,8 @@ class FinancialReportController extends GetxController {
       DateTime pStart;
       DateTime pEnd;
       if (!effectiveStart.isAfter(effectiveEnd)) {
-        final inclusiveDays = effectiveEnd.difference(effectiveStart).inDays + 1;
+        final inclusiveDays =
+            effectiveEnd.difference(effectiveStart).inDays + 1;
         pEnd = effectiveStart.subtract(const Duration(days: 1));
         pStart = pEnd.subtract(Duration(days: inclusiveDays - 1));
       } else {
@@ -626,7 +626,8 @@ class FinancialReportController extends GetxController {
           title.contains('equity') ||
           title.contains('capital') ||
           title.contains('[equity]');
-      final bool isAssetLike = title.contains('[asset') || title.contains('asset');
+      final bool isAssetLike =
+          title.contains('[asset') || title.contains('asset');
       final bool isCurrentForOther =
           title.contains('cash') ||
           title.contains('bank') ||
@@ -909,7 +910,8 @@ class FinancialReportController extends GetxController {
     }
 
     currentAssetsBreakdown.value = {
-      if (taggedCurrentAssetsTotal > 0) "Current Assets": taggedCurrentAssetsTotal,
+      if (taggedCurrentAssetsTotal > 0)
+        "Current Assets": taggedCurrentAssetsTotal,
       "Cash": cashTotal,
       "Accounts Receivable": arTotal,
       if (inventoryTotal > 0) "Inventory": inventoryTotal,
@@ -942,13 +944,13 @@ class FinancialReportController extends GetxController {
     final currEquity = totalAssets.value - totalLiabilities.value;
     assetsChange.value = prevPeriodAssets.value != 0
         ? ((totalAssets.value - prevPeriodAssets.value) /
-                prevPeriodAssets.value) *
-            100
+                  prevPeriodAssets.value) *
+              100
         : (totalAssets.value > 0 ? 100 : 0);
     liabilitiesChange.value = prevPeriodLiabilities.value != 0
         ? ((totalLiabilities.value - prevPeriodLiabilities.value) /
-                prevPeriodLiabilities.value) *
-            100
+                  prevPeriodLiabilities.value) *
+              100
         : (totalLiabilities.value > 0 ? 100 : 0);
     equityChange.value = prevEquity != 0
         ? ((currEquity - prevEquity) / prevEquity) * 100
@@ -969,8 +971,11 @@ class FinancialReportController extends GetxController {
     financingCashFlow.value = loanAct + ownCont + dist + finOther;
     beginningCashBalance.value = openingCash;
     netChangeInCash.value =
-        operatingCashFlow.value + investingCashFlow.value + financingCashFlow.value;
-    endingCashBalance.value = beginningCashBalance.value + netChangeInCash.value;
+        operatingCashFlow.value +
+        investingCashFlow.value +
+        financingCashFlow.value;
+    endingCashBalance.value =
+        beginningCashBalance.value + netChangeInCash.value;
 
     incomeBreakdown.assignAll(incBreakdown);
     expenseBreakdown.assignAll(expBreakdown);

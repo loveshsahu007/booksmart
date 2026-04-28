@@ -20,7 +20,7 @@ import '../../../../widgets/custom_drop_down.dart';
 import 'receipt_scanning_output_screen.dart';
 import '../../../../services/storage_service.dart';
 import '../../../../supabase/buckets.dart';
-import '../organization/business_details/tax_screen_1_legal_identity.dart';
+import '../organization/business_details/tax_strategy_onboarding_stepper.dart';
 
 void goToAddTransactionScreen({
   TransactionModel? transaction,
@@ -227,7 +227,7 @@ class _AddTransactionScreenManualState
       await transactionC.addTransactionAndReturnId(model).then((newId) {
         if (newId != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            goToTaxScreen1();
+            goToTaxStrategyOnboarding(transactionId: newId);
           });
         }
       });
@@ -236,7 +236,7 @@ class _AddTransactionScreenManualState
       final existingId = widget.transaction!.id;
       await transactionC.updateTransaction(data: model, id: existingId);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        goToTaxScreen1();
+        goToTaxStrategyOnboarding(transactionId: existingId);
       });
     }
   }

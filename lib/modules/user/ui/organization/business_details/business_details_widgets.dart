@@ -207,45 +207,65 @@ class TaxNavButtons extends StatelessWidget {
   final VoidCallback onSkip;
   final VoidCallback onNext;
   final String nextLabel;
+  final bool showSkip;
+  final bool isLoading;
+
   const TaxNavButtons({
     super.key,
     required this.onSkip,
     required this.onNext,
     this.nextLabel = 'Save & Next',
+    this.showSkip = true,
+    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: onSkip,
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+        if (showSkip) ...[
+          Expanded(
+            child: OutlinedButton(
+              onPressed: isLoading ? null : onSkip,
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: BorderSide(color: Get.theme.colorScheme.outline),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
+              child: const AppText('Skip', fontWeight: FontWeight.w500),
             ),
-            child: const AppText('Skip', fontWeight: FontWeight.w500),
           ),
-        ),
-        const SizedBox(width: 12),
+          const SizedBox(width: 12),
+        ],
         Expanded(
           flex: 2,
           child: ElevatedButton(
-            onPressed: onNext,
+            onPressed: isLoading ? null : onNext,
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 14),
+              backgroundColor: Get.theme.colorScheme.primary,
+              foregroundColor: Get.theme.colorScheme.onPrimary,
+              elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            child: AppText(
-              nextLabel,
-              color: Get.theme.colorScheme.onPrimary,
-              fontWeight: FontWeight.w600,
-            ),
+            child: isLoading
+                ? SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Get.theme.colorScheme.onPrimary,
+                    ),
+                  )
+                : AppText(
+                    nextLabel,
+                    color: Get.theme.colorScheme.onPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
           ),
         ),
       ],

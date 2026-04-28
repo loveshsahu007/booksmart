@@ -109,10 +109,10 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
     super.initState();
     final now = DateTime.now();
     _endDate = widget.initialEndDate ?? DateTime(now.year, now.month, now.day);
-    _startDate = widget.initialStartDate ??
-        (widget.useSingleDate
-            ? _endDate
-            : DateTime(_endDate.year, _endDate.month - 2, 1));
+    _startDate = widget.useSingleDate
+        ? _endDate
+        : (widget.initialStartDate ??
+              DateTime(_endDate.year, _endDate.month - 2, 1));
     _validate();
   }
 
@@ -143,7 +143,9 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
     if (picked == null) return;
     setState(() {
       _endDate = DateTime(picked.year, picked.month, picked.day);
-      if (_endDate.isBefore(_startDate)) {
+      if (widget.useSingleDate) {
+        _startDate = _endDate;
+      } else if (_endDate.isBefore(_startDate)) {
         _startDate = _endDate;
       }
       _validate();
@@ -151,6 +153,10 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
   }
 
   void _validate() {
+    if (widget.useSingleDate) {
+      _validationError = null;
+      return;
+    }
     _validationError = _service.validateRange(_startDate, _endDate, _viewType);
   }
 
@@ -180,10 +186,13 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
 
     setState(() => _isExporting = true);
     try {
-      final DateTime startForExport =
-          _startDate;
+      final DateTime startForExport = widget.useSingleDate
+          ? _endDate
+          : _startDate;
       final DateTime endForExport = _endDate;
-      final PdfViewType viewTypeForExport = _viewType;
+      final PdfViewType viewTypeForExport = widget.useSingleDate
+          ? PdfViewType.monthly
+          : _viewType;
       final request = PdfExportRequest(
         startDate: startForExport,
         endDate: endForExport,
@@ -224,7 +233,9 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            widget.isExcel ? 'Excel export failed: $e' : 'PDF export failed: $e',
+            widget.isExcel
+                ? 'Excel export failed: $e'
+                : 'PDF export failed: $e',
           ),
         ),
       );
@@ -235,7 +246,6 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final labels = _service.buildBucketLabels(_startDate, _endDate, _viewType);
     final hasError = _validationError != null;
 
@@ -339,9 +349,13 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   ElevatedButton(
-                    onPressed: _isExporting ? null : () => Navigator.of(context).pop(),
+                    onPressed: _isExporting
+                        ? null
+                        : () => Navigator.of(context).pop(),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
+                      backgroundColor: const Color(
+                        0xFF1E3A8A,
+                      ).withValues(alpha: 0.35),
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: const Color(
                         0xFF1E3A8A,
@@ -351,7 +365,10 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                     ),
                     child: const Text('Close'),
                   ),
@@ -359,7 +376,9 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
                   ElevatedButton(
                     onPressed: _isExporting ? null : _runExport,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
+                      backgroundColor: const Color(
+                        0xFF1E3A8A,
+                      ).withValues(alpha: 0.35),
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: const Color(
                         0xFF1E3A8A,
@@ -369,7 +388,10 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
                     ),
                     child: _isExporting
                         ? const SizedBox(
@@ -377,7 +399,9 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(widget.isExcel ? 'Download Excel' : 'Download PDF'),
+                        : Text(
+                            widget.isExcel ? 'Download Excel' : 'Download PDF',
+                          ),
                   ),
                 ],
               ),
