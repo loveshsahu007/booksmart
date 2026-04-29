@@ -223,7 +223,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                         items: controller.states.map((e) => e.name).toList(),
                         dropDownKey: stateDropdownKey,
                         selectedItem: controller.getStateName(
-                          widget.organization?.state,
+                          widget.organization?.stateId,
                         ),
                       ),
                     ),
@@ -340,7 +340,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
       einTin: einController.text.trim(),
       orgType: orgType,
       industry: industry,
-      state: stateId,
+      stateId: stateId,
       street: streetController.text.trim(),
       city: cityController.text.trim(),
       zip: zipController.text.trim(),

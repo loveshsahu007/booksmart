@@ -65,16 +65,20 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
       final org = getCurrentOrganization;
       if (org == null) return;
 
-      _userStateId = org.state;
+      _userStateId = org.stateId;
+
+      var rpcParams = {
+        'p_org_id': org.id,
+        'p_state_id': _userStateId,
+        'p_start_date': _activeRange.start.toIso8601String(),
+        'p_end_date': _activeRange.end.toIso8601String(),
+      };
+
+      dev.log(rpcParams.toString());
 
       final res = await supabase.rpc(
         'get_subcategory_totals_with_deductions',
-        params: {
-          'p_org_id': org.id,
-          'p_state_id': _userStateId,
-          'p_start_date': _activeRange.start.toIso8601String().split('T')[0],
-          'p_end_date': _activeRange.end.toIso8601String().split('T')[0],
-        },
+        params: rpcParams,
       );
 
       _rpcResults = res as List<dynamic>;
@@ -102,8 +106,8 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
           .select()
           .eq('org_id', getCurrentOrganization!.id)
           .eq('sub_category_id', subCatId)
-          .gte('date_time', _activeRange.start.toIso8601String().split('T')[0])
-          .lte('date_time', _activeRange.end.toIso8601String().split('T')[0]);
+          .gte('date_time', _activeRange.start.toIso8601String())
+          .lte('date_time', _activeRange.end.toIso8601String());
 
       final List<TransactionModel> txs = (res as List)
           .map((e) => TransactionModel.fromJson(e))
@@ -314,12 +318,13 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
             color: colorScheme.surfaceVariant,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
           ),
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
           child: const Row(
             children: [
               Expanded(
                 flex: 3,
-                child: _TableCell('Sub-Category', isHeader: true),
+                // it is subcategory but we are showing it as category here
+                child: _TableCell('Category', isHeader: true),
               ),
               Expanded(
                 flex: 2,
@@ -330,9 +335,10 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                 child: _TableCell('State Deduction', isHeader: true),
               ),
               Expanded(
-                flex: 5,
+                flex: 2,
                 child: _TableCell('Federal Deduction', isHeader: true),
               ),
+              SizedBox(width: 35),
             ],
           ),
         ),
@@ -422,7 +428,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                 ),
                 child: Row(
                   children: [
-                    const Expanded(
+                    Expanded(
                       flex: 3,
                       child: Text(
                         'Total',
@@ -441,6 +447,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                       flex: 2,
                       child: Text(_formatCurrency(grandTotalFederal)),
                     ),
+                    SizedBox(width: 35),
                   ],
                 ),
               ),
@@ -463,14 +470,13 @@ class _TableCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12.0),
-      child: AppText(
-        text,
+    return FittedText(
+      text,
+      style: TextStyle(
         fontSize: isHeader ? 12 : 11,
         fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
-        textAlign: TextAlign.center,
       ),
+      textAlign: TextAlign.left,
     );
   }
 }

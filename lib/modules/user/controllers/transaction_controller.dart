@@ -118,11 +118,8 @@ class TransactionController extends GetxController {
 
       // Date filter
       if (startDate != null && endDate != null) {
-        query = query.gte(
-          'date_time',
-          startDate.toIso8601String().split('T')[0],
-        );
-        query = query.lte('date_time', endDate.toIso8601String().split('T')[0]);
+        query = query.gte('date_time', startDate.toIso8601String());
+        query = query.lte('date_time', endDate.toIso8601String());
       }
 
       // Pagination and Sorting
@@ -335,7 +332,4 @@ class TransactionController extends GetxController {
       update();
     }
   }
-
-
 }
-
