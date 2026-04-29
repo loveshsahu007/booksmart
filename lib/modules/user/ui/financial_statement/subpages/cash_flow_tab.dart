@@ -1094,7 +1094,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
       final streetLine = (org.street ?? '').trim();
       final cityStateZipLine = [
         (org.city ?? '').trim(),
-        (org.state ?? '').trim(),
+        (org.primaryState ?? '').trim(),
         (org.zip ?? '').trim(),
       ].where((e) => e.isNotEmpty).join(', ');
 
@@ -1700,7 +1700,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                   (getCurrentOrganization?.street ?? '').trim(),
                                   [
                                     (getCurrentOrganization?.city ?? '').trim(),
-                                    (getCurrentOrganization?.state ?? '').trim(),
+                                    (getCurrentOrganization?.primaryState ?? '').trim(),
                                     (getCurrentOrganization?.zip ?? '').trim(),
                                   ].where((e) => e.isNotEmpty).join(', '),
                                 ].where((e) => e.isNotEmpty).join('\n'),
@@ -1748,7 +1748,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                   (getCurrentOrganization?.street ?? '').trim(),
                                   [
                                     (getCurrentOrganization?.city ?? '').trim(),
-                                    (getCurrentOrganization?.state ?? '').trim(),
+                                    (getCurrentOrganization?.primaryState ?? '').trim(),
                                     (getCurrentOrganization?.zip ?? '').trim(),
                                   ].where((e) => e.isNotEmpty).join(', '),
                                 ].where((e) => e.isNotEmpty).join('\n'),
@@ -1924,9 +1924,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                           children: [
                                             AppText(
                                               "${DateFormat('MMM dd, yyyy').format(_startDate!)} – ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: textSecondary,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w400,
+                                              color: isDark ? Colors.white38 : Colors.black45,
                                             ),
                                             Container(
                                               width: 1,
@@ -1938,7 +1938,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                               controller.trendGranularityLabel,
                                               fontSize: 11,
                                               fontWeight: FontWeight.w600,
-                                              color: textSecondary,
+                                              color: isDark ? Colors.white38 : Colors.black45,
                                             ),
                                           ],
                                         )
@@ -1946,15 +1946,16 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                         if (_startDate != null && _endDate != null)
                                           AppText(
                                             "${DateFormat('MMM dd, yyyy').format(_startDate!)} – ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
-                                            fontSize: 12,
-                                            color: textSecondary,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w400,
+                                            color: isDark ? Colors.white38 : Colors.black45,
                                           ),
                                         if (controller.trendGranularityLabel.isNotEmpty)
                                           AppText(
                                             controller.trendGranularityLabel,
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
-                                            color: textSecondary,
+                                            color: isDark ? Colors.white38 : Colors.black45,
                                           ),
                                       ],
                                     ],

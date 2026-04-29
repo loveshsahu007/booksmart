@@ -13,6 +13,7 @@ import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:booksmart/modules/user/ui/tax_filling/upload_tax_doc_dialog.dart';
 import 'package:booksmart/widgets/recent_documents_widget.dart';
+import 'package:booksmart/widgets/kpi_info_tooltip.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as pdf_gen;
 import 'dart:convert';
 import 'dart:developer' as dev;
@@ -2826,7 +2827,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                 (getCurrentOrganization?.street ?? '').trim(),
                                 [
                                   (getCurrentOrganization?.city ?? '').trim(),
-                                  (getCurrentOrganization?.state ?? '').trim(),
+                                  (getCurrentOrganization?.primaryState ?? '').trim(),
                                   (getCurrentOrganization?.zip ?? '').trim(),
                                 ].where((e) => e.isNotEmpty).join(', '),
                               ].where((e) => e.isNotEmpty).join('\n'),
@@ -2866,7 +2867,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                 (getCurrentOrganization?.street ?? '').trim(),
                                 [
                                   (getCurrentOrganization?.city ?? '').trim(),
-                                  (getCurrentOrganization?.state ?? '').trim(),
+                                  (getCurrentOrganization?.primaryState ?? '').trim(),
                                   (getCurrentOrganization?.zip ?? '').trim(),
                                 ].where((e) => e.isNotEmpty).join(', '),
                               ].where((e) => e.isNotEmpty).join('\n'),
@@ -3152,6 +3153,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isPositive = change >= 0;
+    final tooltipText = kpiTooltipTextForTitle(title);
     // Soft red color instead of harsh bright red
     final Color softRed = const Color(0xFFE57373);
     final Color changeColor = isPositive ? const Color(0xFF19C37D) : softRed;
@@ -3185,63 +3187,79 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Stack(
         children: [
-          AppText(
-            title,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: isDark ? Colors.white70 : Colors.black54,
-          ),
-          const SizedBox(height: 12),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: AppText(
-              value,
-              fontSize: 28,
-              fontWeight: FontWeight.w900,
-              color: valueColor,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            alignment: WrapAlignment.center,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 8,
-            runSpacing: 4,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isPositive
-                      ? changeColor.withValues(alpha: 0.15)
-                      : softRed.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(changeIcon, size: 12, color: changeColor),
-                    const SizedBox(width: 4),
-                    AppText(
-                      "${change.abs().toStringAsFixed(1)}%",
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      color: changeColor,
-                      disableFormat: true,
-                    ),
-                  ],
+              AppText(
+                title,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+              const SizedBox(height: 12),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: AppText(
+                  value,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: valueColor,
                 ),
               ),
-              AppText(
-                "vs previous $timeframe",
-                fontSize: 11,
-                color: isDark ? Colors.white30 : Colors.black45,
-                disableFormat: true,
+              const SizedBox(height: 16),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isPositive
+                          ? changeColor.withValues(alpha: 0.15)
+                          : softRed.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(changeIcon, size: 12, color: changeColor),
+                        const SizedBox(width: 4),
+                        AppText(
+                          "${change.abs().toStringAsFixed(1)}%",
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                          color: changeColor,
+                          disableFormat: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                  AppText(
+                    "vs previous $timeframe",
+                    fontSize: 11,
+                    color: isDark ? Colors.white30 : Colors.black45,
+                    disableFormat: true,
+                  ),
+                ],
               ),
             ],
           ),
+          if (tooltipText != null)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: KpiInfoTooltipIcon(
+                message: tooltipText,
+                semanticLabel: "More information about $title",
+              ),
+            ),
         ],
       ),
     );
@@ -3313,9 +3331,9 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                             children: [
                               AppText(
                                 "${DateFormat('MMM dd, yyyy').format(_startDate!)} – ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: isDark ? Colors.white70 : Colors.black54,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w400,
+                                color: isDark ? Colors.white38 : Colors.black45,
                               ),
                               Container(
                                 width: 1,
@@ -3329,7 +3347,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                 controller.trendGranularityLabel,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
-                                color: isDark ? Colors.white70 : Colors.black54,
+                                color: isDark ? Colors.white38 : Colors.black45,
                               ),
                             ],
                           )
@@ -3337,16 +3355,16 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                           if (_startDate != null && _endDate != null)
                             AppText(
                               "${DateFormat('MMM dd, yyyy').format(_startDate!)} – ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? Colors.white70 : Colors.black54,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w400,
+                              color: isDark ? Colors.white38 : Colors.black45,
                             ),
                           if (controller.trendGranularityLabel.isNotEmpty)
                             AppText(
                               controller.trendGranularityLabel,
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white70 : Colors.black54,
+                              color: isDark ? Colors.white38 : Colors.black45,
                             ),
                         ],
                       ],
@@ -4761,7 +4779,12 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
   bool _shouldShowXAxisLabel(int index, int total, int step) {
     if (total <= 1) return true;
-    return index == 0 || index == total - 1 || index % step == 0;
+    if (index == 0) return true;
+    if (index == total - 1) {
+      final remainder = (total - 1) % step;
+      return remainder > (step / 2);
+    }
+    return index % step == 0;
   }
 
   double _growthYAxisInterval(double minY, double maxY) {

@@ -236,7 +236,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       final streetLine = org?.street.trim() ?? '';
       final cityStateZipLine = [
         org?.city.trim() ?? '',
-        org?.state.trim() ?? '',
+        org?.primaryState?.trim() ?? '',
         org?.zip.trim() ?? '',
       ].where((e) => e.isNotEmpty).join(', ');
       final asOfLine = 'As of ${DateFormat('MMMM dd,').format(asOfDate)}';
@@ -2245,7 +2245,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       final streetLine = org?.street.trim() ?? '';
       final cityStateZipLine = [
         org?.city.trim() ?? '',
-        org?.state.trim() ?? '',
+        org?.primaryState?.trim() ?? '',
         org?.zip.trim() ?? '',
       ].where((e) => e.isNotEmpty).join(', ');
       final exportService = PdfExportService();

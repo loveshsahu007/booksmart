@@ -75,26 +75,42 @@ class _KpiInfoTooltipIconState extends State<KpiInfoTooltipIcon> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDark
+        ? const Color(0xFF0F1E37)
+        : const Color(0xFFF8FAFC);
+    final foregroundColor = isDark ? Colors.white : const Color(0xFF0F172A);
 
     return Semantics(
       label: widget.semanticLabel,
       button: true,
       child: Tooltip(
         key: _tooltipKey,
-        message: widget.message,
+        richMessage: _buildTooltipSpan(widget.message, foregroundColor),
         waitDuration: const Duration(milliseconds: 220),
         showDuration: const Duration(seconds: 5),
         preferBelow: false,
         margin: const EdgeInsets.symmetric(horizontal: 12),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF111827) : Colors.black87,
-          borderRadius: BorderRadius.circular(8),
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.12)
+                : const Color(0xFFCBD5E1),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
-        textStyle: const TextStyle(
-          color: Colors.white,
+        textStyle: TextStyle(
+          color: foregroundColor,
           fontSize: 12,
-          height: 1.25,
+          height: 1.3,
         ),
         child: FocusableActionDetector(
           mouseCursor: SystemMouseCursors.click,
@@ -114,6 +130,42 @@ class _KpiInfoTooltipIconState extends State<KpiInfoTooltipIcon> {
           ),
         ),
       ),
+    );
+  }
+
+  InlineSpan _buildTooltipSpan(String message, Color textColor) {
+    final lines = message
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (lines.isEmpty) {
+      return TextSpan(text: '', style: TextStyle(color: textColor));
+    }
+
+    final title = lines.first;
+    final detailLines = lines.skip(1).toList();
+
+    return TextSpan(
+      style: TextStyle(color: textColor, fontSize: 12, height: 1.3),
+      children: [
+        TextSpan(
+          text: '$title\n',
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        ...detailLines.map(
+          (line) => TextSpan(
+            text: '• $line\n',
+            style: TextStyle(
+              color: textColor.withValues(alpha: 0.95),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
