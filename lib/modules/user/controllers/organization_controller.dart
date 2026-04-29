@@ -1,5 +1,6 @@
 import 'dart:developer';
 import 'package:booksmart/models/organization_model.dart';
+import 'package:booksmart/models/state_model.dart';
 import 'package:booksmart/modules/user/providers/organization_provider.dart';
 import 'package:booksmart/services/crud_service.dart';
 import 'package:booksmart/supabase/tables.dart';
@@ -30,6 +31,7 @@ class OrganizationController extends GetxController {
 
   RxBool isLoading = false.obs;
   RxList<OrganizationModel> organizations = <OrganizationModel>[].obs;
+  RxList<StateModel> states = <StateModel>[].obs;
 
   OrganizationController(List<OrganizationModel> organizationList) {
     initlizeOrganizations(organizationList);
@@ -39,6 +41,7 @@ class OrganizationController extends GetxController {
     List<OrganizationModel> list, {
     bool shouldUpdate = true,
   }) {
+    fetchStates();
     organizations.value = list;
 
     if (currentOrganization == null && organizations.isNotEmpty) {
@@ -159,5 +162,21 @@ class OrganizationController extends GetxController {
       log(s.toString());
       showSnackBar(e.toString(), isError: true);
     }
+  }
+
+  Future<void> fetchStates() async {
+    try {
+      final res = await supabase.from(SupabaseTable.states).select().eq('is_active', true).order('name');
+      states.value = (res as List).map((e) => StateModel.fromJson(e)).toList();
+      update();
+    } catch (e) {
+      log("❌ fetchStates ERROR: $e");
+    }
+  }
+
+  String getStateName(dynamic stateId) {
+    if (stateId == null) return 'N/A';
+    final state = states.firstWhereOrNull((e) => e.id.toString() == stateId.toString());
+    return state?.name ?? stateId.toString();
   }
 }

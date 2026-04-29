@@ -1,6 +1,6 @@
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/constant/data.dart';
-import 'package:booksmart/modules/user/controllers/transaction_controller.dart';
+
 import 'package:booksmart/widgets/custom_dialog.dart';
 import 'package:booksmart/widgets/custom_drop_down.dart';
 import 'package:booksmart/widgets/multiple_selection_dropdown_widget.dart';
@@ -13,28 +13,7 @@ import 'package:get/get.dart';
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'business_details_widgets.dart';
 
-// void goToTaxStrategyOnboarding({int? transactionId, int? organizationId}) {
-//   if (kIsWeb) {
-//     customDialog(
-//       child: TaxStrategyOnboardingStepper(
-//         transactionId: transactionId,
-//         organizationId: organizationId,
-//       ),
-//       title: 'Tax Strategy Onboarding',
-//       barrierDismissible: false,
-//     );
-//   } else {
-//     Get.to(
-//       () => TaxStrategyOnboardingStepper(
-//         transactionId: transactionId,
-//         organizationId: organizationId,
-//       ),
-//     );
-//   }
-// }
-
 void goToTaxStrategyOnboarding({
-  int? transactionId,
   int? organizationId,
   bool shouldCloseBefore = false,
 }) {
@@ -44,7 +23,6 @@ void goToTaxStrategyOnboarding({
     }
     customDialog(
       child: TaxStrategyOnboardingStepper(
-        transactionId: transactionId,
         organizationId: organizationId,
       ),
       title: "Tax Strategy Onboarding",
@@ -54,14 +32,12 @@ void goToTaxStrategyOnboarding({
     if (shouldCloseBefore) {
       Get.off(
         () => TaxStrategyOnboardingStepper(
-          transactionId: transactionId,
           organizationId: organizationId,
         ),
       );
     } else {
       Get.to(
         () => TaxStrategyOnboardingStepper(
-          transactionId: transactionId,
           organizationId: organizationId,
         ),
       );
@@ -70,11 +46,9 @@ void goToTaxStrategyOnboarding({
 }
 
 class TaxStrategyOnboardingStepper extends StatefulWidget {
-  final int? transactionId;
   final int? organizationId;
   const TaxStrategyOnboardingStepper({
     super.key,
-    this.transactionId,
     this.organizationId,
   });
 
@@ -192,44 +166,6 @@ class _TaxStrategyOnboardingStepperState
         _retirementCurrent = org.retirementCurrent ?? [];
         _auditAppetite = org.auditAppetite;
       }
-    } else if (widget.transactionId != null) {
-      final tx = transactionControllerInstance.transactions.firstWhereOrNull(
-        (e) => e.id == widget.transactionId,
-      );
-      if (tx != null) {
-        // Step 1
-        _filingStatus = tx.filingStatus;
-        _stateController.text = tx.primaryState ?? '';
-        _residencyStatus = tx.residencyStatus;
-        _multiStateActivity = tx.multiStateActivity;
-        // Step 2
-        _primaryIncomeTypes = tx.primaryIncomeTypes ?? [];
-        _industryController.text = tx.industryNiche ?? '';
-        _passiveIncome = tx.passiveIncome ?? [];
-        // Step 3
-        _teamStructure = tx.teamStructure ?? [];
-        _accountingMethod = tx.accountingMethod;
-        _majorEquipment = tx.majorEquipment;
-        // Step 4
-        _vehicleOwnership = tx.vehicleOwnership;
-        _vehicleUsage = tx.vehicleUsage;
-        _vehicleOver6kLbs = tx.vehicleOver6kLbs;
-        // Step 5
-        _homeOfficeType = tx.homeOfficeType;
-        _homeStatus = tx.homeStatus;
-        _techUsage = tx.techUsage ?? [];
-        // Step 6
-        _realEstateInterests = tx.realEstateInterests ?? [];
-        _hostsBusinessMeetings = tx.hostsBusinessMeetings;
-        // Step 7
-        _healthInsurance = tx.healthInsurance;
-        _healthSavings = tx.healthSavings ?? [];
-        _familyEducation = tx.familyEducation ?? [];
-        // Step 8
-        _taxGoal = tx.taxGoal;
-        _retirementCurrent = tx.retirementCurrent ?? [];
-        _auditAppetite = tx.auditAppetite;
-      }
     }
   }
 
@@ -319,12 +255,7 @@ class _TaxStrategyOnboardingStepperState
           break;
       }
 
-      if (widget.transactionId != null) {
-        await transactionControllerInstance.updateTaxProfile(
-          transactionId: widget.transactionId!,
-          data: data,
-        );
-      } else if (widget.organizationId != null) {
+      if (widget.organizationId != null) {
         await organizationControllerInstance.updateTaxProfile(
           organizationId: widget.organizationId!,
           data: data,
@@ -351,15 +282,15 @@ class _TaxStrategyOnboardingStepperState
   }
 
   void _finish() {
-    showSnackBar('Tax profile saved! Your AI strategy is being tailored. 🎯');
+    // Navigate back first to close the dialog/screen
+    if (kIsWeb) {
+      Get.back();
+    } else {
+      Get.until((route) => route.isFirst);
+    }
 
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (kIsWeb) {
-        Get.back();
-      } else {
-        Get.until((route) => route.isFirst);
-      }
-    });
+    // Show success message after navigation
+    showSnackBar('Tax profile saved! Your AI strategy is being tailored. 🎯');
   }
 
   void _nextWithoutSaving() {
