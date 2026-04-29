@@ -1329,6 +1329,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
                       color: changeColor,
+                      disableFormat: true,
                     ),
                   ],
                 ),

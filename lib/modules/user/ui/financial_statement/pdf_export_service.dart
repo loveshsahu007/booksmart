@@ -256,15 +256,10 @@ class PdfExportService {
     required List<String> labels,
     required _StatementDummy statement,
   }) {
-    final titleFont = pdf_gen.PdfStandardFont(
-      pdf_gen.PdfFontFamily.helvetica,
-      16,
-      style: pdf_gen.PdfFontStyle.bold,
-    );
+    final titleFont = pdf_gen.PdfStandardFont(pdf_gen.PdfFontFamily.helvetica, 16);
     final headerFont = pdf_gen.PdfStandardFont(
       pdf_gen.PdfFontFamily.helvetica,
       9,
-      style: pdf_gen.PdfFontStyle.bold,
     );
     final bodyFont = pdf_gen.PdfStandardFont(pdf_gen.PdfFontFamily.helvetica, 8);
     final bodyBold = pdf_gen.PdfStandardFont(
@@ -273,14 +268,15 @@ class PdfExportService {
       style: pdf_gen.PdfFontStyle.bold,
     );
 
-    final headerBlue = pdf_gen.PdfColor(112, 145, 176);
-    final totalBand = pdf_gen.PdfColor(244, 247, 252);
+    // Match the Excel reference palette as closely as PDF allows.
+    final headerBlue = pdf_gen.PdfColor(133, 150, 176); // #8596B0
+    final totalBand = pdf_gen.PdfColor(234, 237, 244); // #EAEDF4
+    final netBand = pdf_gen.PdfColor(133, 150, 176); // same as section band
     final companyName = request.companyName.trim().isEmpty
         ? 'Organization'
         : request.companyName.trim();
     final datePrepared = DateFormat('MM/dd/yyyy').format(DateTime.now());
-    final periodText =
-        '${DateFormat('MMM dd, yyyy').format(request.startDate)} - ${DateFormat('MMM dd, yyyy').format(request.endDate)}';
+    final periodText = _asOfTextByViewType(request);
     final companyMeta = request.companyAddress.trim().isEmpty
         ? 'Address not available'
         : request.companyAddress.trim();
@@ -337,7 +333,7 @@ class PdfExportService {
       format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
     );
     graphics.drawLine(
-      pdf_gen.PdfPen(pdf_gen.PdfColor(220, 226, 234), width: 0.7),
+      pdf_gen.PdfPen(pdf_gen.PdfColor(190, 196, 204), width: 0.7),
       Offset(34, 72),
       Offset(size.width - 34, 72),
     );
@@ -352,6 +348,7 @@ class PdfExportService {
       bodyBold: bodyBold,
       sectionColor: headerBlue,
       totalHighlight: totalBand,
+      netHighlight: netBand,
       statement: statement,
     );
   }
@@ -473,33 +470,28 @@ class PdfExportService {
     required pdf_gen.PdfFont bodyBold,
     required pdf_gen.PdfColor sectionColor,
     required pdf_gen.PdfColor totalHighlight,
+    required pdf_gen.PdfColor netHighlight,
     required _StatementDummy statement,
   }) {
     final grid = pdf_gen.PdfGrid();
-    final colCount = labels.length + 2;
+    final colCount = labels.length + 1; // Description + one value column per period
     grid.columns.add(count: colCount);
     final totalWidth = page.getClientSize().width - 68;
-    final descriptionWidth = totalWidth * (labels.length <= 2 ? 0.50 : 0.46);
+    final descriptionWidth = totalWidth * 0.50;
     grid.columns[0].width = descriptionWidth;
-    // Keep date columns and total column evenly spaced for consistent visual gaps.
-    final valueColumnsTotalWidth = totalWidth - descriptionWidth;
-    final eachValueColumnWidth = valueColumnsTotalWidth / (labels.length + 1);
-    final dataColumnWidth = eachValueColumnWidth;
-    final totalAmountWidth = eachValueColumnWidth;
+    final dataColumnWidth = (totalWidth - descriptionWidth) / labels.length;
     for (var i = 1; i <= labels.length; i++) {
       grid.columns[i].width = dataColumnWidth;
     }
-    grid.columns[colCount - 1].width = totalAmountWidth;
 
     final header = grid.headers.add(1)[0];
     header.cells[0].value = '  ${statement.sections.first.title}';
     for (var i = 0; i < labels.length; i++) {
       header.cells[i + 1].value = labels[i];
     }
-    header.cells[colCount - 1].value = 'Total Amount';
     header.style = pdf_gen.PdfGridRowStyle(
       font: headerFont,
-      textBrush: pdf_gen.PdfBrushes.white,
+      textBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(17, 17, 17)),
       backgroundBrush: pdf_gen.PdfSolidBrush(sectionColor),
     );
     for (var i = 0; i < colCount; i++) {
@@ -511,7 +503,7 @@ class PdfExportService {
           top: pdf_gen.PdfPens.transparent,
         ),
         format: i == 0
-            ? null
+            ? pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.left)
             : pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.center),
       );
     }
@@ -527,7 +519,7 @@ class PdfExportService {
         secRow.cells[0].columnSpan = colCount;
         secRow.style = pdf_gen.PdfGridRowStyle(
           font: headerFont,
-          textBrush: pdf_gen.PdfBrushes.white,
+          textBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(17, 17, 17)),
           backgroundBrush: pdf_gen.PdfSolidBrush(sectionColor),
         );
         secRow.cells[0].style = pdf_gen.PdfGridCellStyle(
@@ -540,14 +532,12 @@ class PdfExportService {
         );
       }
 
-      for (final row in section.rows.where((r) => !r.values.every((v) => v == 0))) {
+      for (final row in section.rows) {
         final dataRow = grid.rows.add();
-        // Keep hierarchy similar to balance sheet template: category rows slightly indented.
+        // Keep hierarchy similar to Excel template: detail rows more indented.
         dataRow.cells[0].value = row.isBold ? row.label : '      ${row.label}';
-        var rowTotal = 0.0;
         for (var i = 0; i < labels.length; i++) {
           final value = row.values[i];
-          rowTotal += value;
           dataRow.cells[i + 1].value = _money(value);
           dataRow.cells[i + 1].style = pdf_gen.PdfGridCellStyle(
             format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
@@ -559,16 +549,6 @@ class PdfExportService {
             ),
           );
         }
-        dataRow.cells[colCount - 1].value = _money(rowTotal);
-        dataRow.cells[colCount - 1].style = pdf_gen.PdfGridCellStyle(
-          format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
-          borders: pdf_gen.PdfBorders(
-            bottom: pdf_gen.PdfPens.transparent,
-            left: pdf_gen.PdfPens.transparent,
-            right: pdf_gen.PdfPens.transparent,
-            top: pdf_gen.PdfPens.transparent,
-          ),
-        );
         dataRow.cells[0].style = pdf_gen.PdfGridCellStyle(
           borders: pdf_gen.PdfBorders(
             bottom: pdf_gen.PdfPens.transparent,
@@ -588,35 +568,23 @@ class PdfExportService {
     }
 
     final netRow = grid.rows.add();
-    netRow.cells[0].value = 'Net Profit';
-    var netTotal = 0.0;
+    netRow.cells[0].value = 'Net Income';
     for (var i = 0; i < labels.length; i++) {
       final value = statement.netProfit[i];
-      netTotal += value;
       netRow.cells[i + 1].value = _money(value);
       netRow.cells[i + 1].style = pdf_gen.PdfGridCellStyle(
         format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
         borders: pdf_gen.PdfBorders(
-          bottom: pdf_gen.PdfPen(sectionColor, width: 1.0),
+          bottom: pdf_gen.PdfPen(netHighlight, width: 1.0),
           left: pdf_gen.PdfPens.transparent,
           right: pdf_gen.PdfPens.transparent,
           top: pdf_gen.PdfPens.transparent,
         ),
       );
     }
-    netRow.cells[colCount - 1].value = _money(netTotal);
-    netRow.cells[colCount - 1].style = pdf_gen.PdfGridCellStyle(
-      format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
-      borders: pdf_gen.PdfBorders(
-        bottom: pdf_gen.PdfPen(sectionColor, width: 1.0),
-        left: pdf_gen.PdfPens.transparent,
-        right: pdf_gen.PdfPens.transparent,
-        top: pdf_gen.PdfPens.transparent,
-      ),
-    );
     netRow.cells[0].style = pdf_gen.PdfGridCellStyle(
       borders: pdf_gen.PdfBorders(
-        bottom: pdf_gen.PdfPen(sectionColor, width: 1.0),
+        bottom: pdf_gen.PdfPen(netHighlight, width: 1.0),
         left: pdf_gen.PdfPens.transparent,
         right: pdf_gen.PdfPens.transparent,
         top: pdf_gen.PdfPens.transparent,
@@ -624,8 +592,8 @@ class PdfExportService {
     );
     netRow.style = pdf_gen.PdfGridRowStyle(
       font: bodyBold,
-      textBrush: pdf_gen.PdfSolidBrush(sectionColor),
-      backgroundBrush: pdf_gen.PdfSolidBrush(totalHighlight),
+      textBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(17, 17, 17)),
+      backgroundBrush: pdf_gen.PdfSolidBrush(netHighlight),
     );
 
     final result = grid.draw(
@@ -1200,9 +1168,28 @@ class PdfExportService {
 
   int _yearSpanInclusive(DateTime start, DateTime end) => end.year - start.year + 1;
 
+  String _asOfTextByViewType(PdfExportRequest request) {
+    switch (request.viewType) {
+      case PdfViewType.monthly:
+        return 'As of ${DateFormat('MMMM yyyy').format(request.endDate)}';
+      case PdfViewType.quarterly:
+        final q = ((request.endDate.month - 1) ~/ 3) + 1;
+        return 'As of Q$q ${request.endDate.year}';
+      case PdfViewType.yearly:
+        return 'As of ${DateFormat('MMMM dd,').format(DateTime(request.endDate.year, 12, 31))}';
+    }
+  }
+
   String _money(double value) {
-    final fmt = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
-    return fmt.format(value);
+    if (value.abs() < 0.000001) return '\$ -';
+    final core = NumberFormat('#,##0.00').format(value.abs());
+    return value < 0 ? '\$($core)' : '\$$core';
+  }
+
+  String _moneyAmountOnly(double value) {
+    if (value.abs() < 0.000001) return '-';
+    final core = NumberFormat('#,##0.00').format(value.abs());
+    return value < 0 ? '($core)' : core;
   }
 }
 
