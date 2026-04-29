@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:booksmart/constant/exports.dart';
 import 'package:booksmart/helpers/currency_formatter.dart';
-import 'package:booksmart/models/deduction_rule_model.dart';
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/modules/admin/controllers/category_controler.dart';
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
@@ -27,14 +26,14 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
   String _search = '';
 
   DateTimeRange _activeRange = DateTimeRange(
+    // start: DateTime(DateTime.now().year, 1, 1),
     start: DateTime.now().subtract(const Duration(days: 365)),
     end: DateTime.now(),
   );
 
   bool _isLoading = false;
+  List<dynamic> _rpcResults = [];
   final Map<int, List<TransactionModel>> _txBySubCat = {};
-  final Map<int, double> _subCatTotals = {};
-  final Map<int, double> _parentCatTotals = {};
   int? _userStateId;
 
   @override
@@ -63,29 +62,30 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
         await _catCtrl.fetchAll();
       }
 
-      final res = await supabase
-          .from(SupabaseTable.transaction)
-          .select()
-          .eq('org_id', getCurrentOrganization!.id)
-          .gte('date_time', _activeRange.start.toIso8601String().split('T')[0])
-          .lte('date_time', _activeRange.end.toIso8601String().split('T')[0]);
+      final org = getCurrentOrganization;
+      if (org == null) return;
 
-      final List<TransactionModel> fetched = (res as List)
-          .map((e) => TransactionModel.fromJson(e))
-          .toList();
+      _userStateId = org.state;
+
+      final res = await supabase.rpc(
+        'get_subcategory_totals_with_deductions',
+        params: {
+          'p_org_id': org.id,
+          'p_state_id': _userStateId,
+          'p_start_date': _activeRange.start.toIso8601String().split('T')[0],
+          'p_end_date': _activeRange.end.toIso8601String().split('T')[0],
+        },
+      );
+
+      _rpcResults = res as List<dynamic>;
+      // debugPrint("Org_id+${org.id}");
+      // debugPrint("State_id+$_userStateId");
+      // debugPrint(_rpcResults.length.toString());
+      _txBySubCat.clear(); // Clear cached transactions when range changes
 
       if (_catCtrl.states.isEmpty) {
         await _catCtrl.fetchStates();
       }
-      await _catCtrl.fetchDeductionRules();
-
-      final org = getCurrentOrganization;
-      final orgState = org?.primaryState ?? org?.state;
-      _userStateId = _catCtrl.states
-          .firstWhereOrNull((s) => s.name == orgState || s.code == orgState)
-          ?.id;
-
-      _processTransactions(fetched);
     } catch (e) {
       dev.log("Error loading AI Deduction data: $e");
     } finally {
@@ -93,29 +93,35 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     }
   }
 
-  void _processTransactions(List<TransactionModel> txs) {
-    _txBySubCat.clear();
-    _subCatTotals.clear();
-    _parentCatTotals.clear();
+  Future<void> _fetchSubCategoryTransactions(int subCatId) async {
+    if (_txBySubCat.containsKey(subCatId)) return; // Already fetched
 
-    for (var tx in txs) {
-      if (tx.category == null || tx.subcategory == null) continue;
+    try {
+      final res = await supabase
+          .from(SupabaseTable.transaction)
+          .select()
+          .eq('org_id', getCurrentOrganization!.id)
+          .eq('sub_category_id', subCatId)
+          .gte('date_time', _activeRange.start.toIso8601String().split('T')[0])
+          .lte('date_time', _activeRange.end.toIso8601String().split('T')[0]);
 
-      _txBySubCat.putIfAbsent(tx.subcategory!, () => []).add(tx);
+      final List<TransactionModel> txs = (res as List)
+          .map((e) => TransactionModel.fromJson(e))
+          .toList();
 
-      final amt = tx.amount.abs();
-      _subCatTotals[tx.subcategory!] =
-          (_subCatTotals[tx.subcategory!] ?? 0) + amt;
-      _parentCatTotals[tx.category!] =
-          (_parentCatTotals[tx.category!] ?? 0) + amt;
+      setState(() {
+        _txBySubCat[subCatId] = txs;
+      });
+    } catch (e) {
+      dev.log("Error fetching transactions for subcategory $subCatId: $e");
     }
   }
 
   Map<String, double> _computePieData() {
     final Map<String, double> map = {};
-    for (var entry in _subCatTotals.entries) {
-      final subId = entry.key;
-      final total = entry.value;
+    for (var row in _rpcResults) {
+      final subId = row['sub_category_id'] as int;
+      final total = (row['total_amount'] ?? 0.0) as double;
       final subName = _catCtrl.getSubCategoryName(subId);
       if (total > 0) {
         if (_search.isEmpty ||
@@ -127,63 +133,12 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     return map;
   }
 
-  double _getDeduction(double amount, int subCatId, {required bool isFederal}) {
-    final stateId = isFederal ? null : _userStateId;
-    final rule = _catCtrl.deductionRules.firstWhereOrNull(
-      (r) => r.subCategoryId == subCatId && r.stateId == stateId,
-    );
-    if (rule == null) return 0.0;
-    if (rule.ruleType == RuleType.percentage) {
-      return amount * (rule.value / 100);
-    } else {
-      return rule.value;
-    }
-  }
-
-  String _getDeductionDisplay(
-    double amount,
-    int subCatId, {
-    required bool isFederal,
-  }) {
-    final stateId = isFederal ? null : _userStateId;
-    final rule = _catCtrl.deductionRules.firstWhereOrNull(
-      (r) => r.subCategoryId == subCatId && r.stateId == stateId,
-    );
-    if (rule == null) return _formatCurrency(0);
-
-    final calculated = _getDeduction(amount, subCatId, isFederal: isFederal);
-    if (rule.ruleType == RuleType.percentage) {
-      return "${_formatCurrency(calculated)} (${rule.value.toStringAsFixed(0)}%)";
-    } else {
-      return "${_formatCurrency(calculated)} (${_formatCurrency(rule.value)})";
-    }
-  }
-
-  Color _colorFor(int id, ThemeData theme) {
-    if (id == 0) return theme.colorScheme.primary;
-    final hue = (id * 137.508) % 360;
-    return HSLColor.fromAHSL(1.0, hue, 0.65, 0.55).toColor();
-  }
-
   void _onSearchChanged() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 250), () {
       setState(() => _search = _searchCtrl.text);
     });
   }
-
-  // Future<void> _removeTx(int txId) async {
-  //   await showConfirmationDialog(
-  //     title: 'Remove Transaction',
-  //     description:
-  //         'Are you sure you want to remove this transaction from this subcategory?',
-  //     onYes: () async {
-  //       Get.back(); // Close dialog
-  //       await _txCtrl.deleteTransaction(txId);
-  //       _loadData();
-  //     },
-  //   );
-  // }
 
   @override
   void dispose() {
@@ -300,15 +255,6 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                     height: 1,
                     color: colorScheme.onSurface.withValues(alpha: 0.08),
                   ),
-                  // Padding(
-                  //   padding: const EdgeInsets.symmetric(
-                  //     horizontal: 16,
-                  //     vertical: 8,
-                  //   ),
-                  //   child: _isLoading
-                  //       ? const SizedBox()
-                  //       : _buildAccordionList(),
-                  // ),
                 ],
               ),
             ),
@@ -319,37 +265,27 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
   }
 
   String _getDateRangeText() {
-    final now = DateTime.now();
     final start = _activeRange.start;
     final end = _activeRange.end;
 
-    final isEndToday =
-        end.year == now.year && end.month == now.month && end.day == now.day;
-
-    if (isEndToday) {
-      final startDay = DateTime(start.year, start.month, start.day);
-      final endDay = DateTime(end.year, end.month, end.day);
-      final difference = endDay.difference(startDay).inDays;
-      return 'Last ${difference == 0 ? 1 : difference} Days';
-    } else {
-      String pad(int n) => n.toString().padLeft(2, '0');
-      return '${pad(start.month)}/${pad(start.day)}/${start.year} - ${pad(end.month)}/${pad(end.day)}/${end.year}';
-    }
+    String pad(int n) => n.toString().padLeft(2, '0');
+    return '${pad(start.month)}/${pad(start.day)}/${start.year} - ${pad(end.month)}/${pad(end.day)}/${end.year}';
   }
 
   Widget _buildDeductionTable() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final List<int> activeSubCatIds = _subCatTotals.keys.where((id) {
+    final List<dynamic> filteredRows = _rpcResults.where((row) {
       if (_search.isEmpty) return true;
+      final subId = row['sub_category_id'] as int;
       return _catCtrl
-          .getSubCategoryName(id)
+          .getSubCategoryName(subId)
           .toLowerCase()
           .contains(_search.toLowerCase());
     }).toList();
 
-    if (activeSubCatIds.isEmpty) return const SizedBox();
+    if (filteredRows.isEmpty) return const SizedBox();
 
     double grandTotalAmount = 0;
     double grandTotalState = 0;
@@ -409,10 +345,11 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
           ),
           child: Column(
             children: [
-              ...activeSubCatIds.map((subId) {
-                final amount = _subCatTotals[subId] ?? 0;
-                final stateDed = _getDeduction(amount, subId, isFederal: false);
-                final fedDed = _getDeduction(amount, subId, isFederal: true);
+              ...filteredRows.map((row) {
+                final subId = row['sub_category_id'] as int;
+                final amount = (row['total_amount'] ?? 0.0) as double;
+                final stateDed = (row['state_deduction'] ?? 0.0) as double;
+                final fedDed = (row['federal_deduction'] ?? 0.0) as double;
 
                 final transactions = _txBySubCat[subId] ?? [];
 
@@ -427,6 +364,11 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                   child: ExpansionTile(
                     tilePadding: const EdgeInsets.symmetric(horizontal: 12),
                     childrenPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    onExpansionChanged: (expanded) {
+                      if (expanded) {
+                        _fetchSubCategoryTransactions(subId);
+                      }
+                    },
                     title: Row(
                       children: [
                         Expanded(
@@ -436,24 +378,9 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
                         Expanded(flex: 2, child: Text(_formatCurrency(amount))),
                         Expanded(
                           flex: 2,
-                          child: Text(
-                            _getDeductionDisplay(
-                              amount,
-                              subId,
-                              isFederal: false,
-                            ),
-                          ),
+                          child: Text(_formatCurrency(stateDed)),
                         ),
-                        Expanded(
-                          flex: 2,
-                          child: Text(
-                            _getDeductionDisplay(
-                              amount,
-                              subId,
-                              isFederal: true,
-                            ),
-                          ),
-                        ),
+                        Expanded(flex: 2, child: Text(_formatCurrency(fedDed))),
                       ],
                     ),
 

@@ -7,7 +7,6 @@ import 'package:booksmart/widgets/snackbar.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
-
 import '../../../../widgets/custom_drop_down.dart';
 import 'business_details/tax_strategy_onboarding_stepper.dart';
 
@@ -111,13 +110,14 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
     'Writers',
   ];
 
-  final List<String> _states = DropdownData.stateOptions
-      .map((e) => e['label'] as String)
-      .toList();
+  // final List<String> _states = DropdownData.stateOptions
+  //     .map((e) => e['label'] as String)
+  //     .toList();
 
   @override
   void initState() {
     super.initState();
+    controller.fetchStates();
     if (widget.organization != null) {
       nameController.text = widget.organization!.name;
       websiteController.text = widget.organization!.website ?? '';
@@ -217,11 +217,15 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
                     ),
                     0.02.verticalSpace,
 
-                    _buildFilterDropdown(
-                      label: "State / Territory *",
-                      items: _states,
-                      dropDownKey: stateDropdownKey,
-                      selectedItem: widget.organization?.state,
+                    Obx(
+                      () => _buildFilterDropdown(
+                        label: "State / Territory *",
+                        items: controller.states.map((e) => e.name).toList(),
+                        dropDownKey: stateDropdownKey,
+                        selectedItem: controller.getStateName(
+                          widget.organization?.state,
+                        ),
+                      ),
                     ),
                     0.02.verticalSpace,
                     AppText("Street Address", fontWeight: FontWeight.w600),
@@ -319,9 +323,12 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
 
     final orgType = orgDropdownKey.currentState?.getSelectedItem;
     final industry = industryDropdownKey.currentState?.getSelectedItem;
-    final state = stateDropdownKey.currentState?.getSelectedItem;
+    final stateName = stateDropdownKey.currentState?.getSelectedItem;
+    final stateId = controller.states
+        .firstWhereOrNull((e) => e.name == stateName)
+        ?.id;
 
-    if (orgType == null || industry == null || state == null) {
+    if (orgType == null || industry == null || stateId == null) {
       showSnackBar("Please select all required dropdowns", isError: true);
       return;
     }
@@ -333,7 +340,7 @@ class _AddOrganizationScreenState extends State<AddOrganizationScreen> {
       einTin: einController.text.trim(),
       orgType: orgType,
       industry: industry,
-      state: state,
+      state: stateId,
       street: streetController.text.trim(),
       city: cityController.text.trim(),
       zip: zipController.text.trim(),

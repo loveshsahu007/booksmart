@@ -5,7 +5,7 @@ class OrganizationModel {
   final String einTin;
   final String orgType;
   final String industry;
-  final String state;
+  final int? state;
   final String street;
   final String city;
   final String zip;
@@ -89,7 +89,9 @@ class OrganizationModel {
       einTin: json['ein_tin'],
       orgType: json['org_type'],
       industry: json['industry'],
-      state: json['state'],
+      state: json['state'] is int
+          ? json['state']
+          : int.tryParse(json['state']?.toString() ?? ''),
       street: json['street'],
       city: json['city'],
       zip: json['zip'],
