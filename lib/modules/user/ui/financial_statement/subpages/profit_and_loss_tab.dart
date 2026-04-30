@@ -130,7 +130,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     DateTime? tempStart;
     DateTime? tempEnd;
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (context) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -2681,11 +2681,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
   }
 
   double _percentChange(double current, double previous) {
-    if (previous == 0) {
-      if (current > 0) return 100;
-      if (current < 0) return -100;
-      return 0;
-    }
+    if (previous.abs() < 0.000001) return 0;
     return ((current - previous) / previous.abs()) * 100;
   }
 

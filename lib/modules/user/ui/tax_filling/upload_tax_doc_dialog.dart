@@ -29,7 +29,7 @@ void showUploadTaxDocumentDialog({String? type}) {
         ),
       );
     },
-    barrierDismissible: false,
+    barrierDismissible: true,
     barrierLabel: 'showUploadTaxDocumentDialog_${type ?? 'general'}',
   );
 }
@@ -44,6 +44,14 @@ class UploadTaxDocWidget extends StatefulWidget {
 }
 
 class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
+  String get _dialogTitle {
+    final t = widget.type?.toLowerCase();
+    if (t == 'bs') return 'Upload Balance Sheet Document';
+    if (t == 'cf') return 'Upload Cash Flow Document';
+    if (t == 'pl' || t == 'pnl') return 'Upload Profit & Loss Document';
+    return 'Upload Tax Document';
+  }
+
   final List<String> categories = [
     'Income',
     'Expenses',
@@ -104,8 +112,8 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // ── Title ───────────────────────────────────────────────────
-              const AppText(
-                'Upload Tax Document',
+              AppText(
+                _dialogTitle,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),

@@ -1402,7 +1402,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
     DateTime? tempStart;
     DateTime? tempEnd;
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (context) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -2169,11 +2169,14 @@ class _CashFlowTabState extends State<CashFlowTab> {
     bool comparisonUnavailable = false,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bool isPositive = change >= 0;
+    final bool isFlat = change.abs() < 0.000001;
+    final bool isPositive = change > 0;
     final bool isGoodTrend = invertTrendColors ? !isPositive : isPositive;
     const Color softRed = Color(0xFFE57373);
     const Color cashGreen = Color(0xFF19C37D);
-    final Color changeColor = isGoodTrend ? cashGreen : softRed;
+    final Color changeColor = isFlat
+        ? (isDark ? Colors.white54 : Colors.black45)
+        : (isGoodTrend ? cashGreen : softRed);
     final IconData changeIcon = isPositive ? Icons.arrow_upward : Icons.arrow_downward;
     
     final bool isNegativeValue = value.contains('-') || (isCurrency && value.startsWith('-\$'));
@@ -2239,7 +2242,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (!comparisonUnavailable) ...[
+                        if (!comparisonUnavailable && !isFlat) ...[
                           Icon(changeIcon, size: 12, color: changeColor),
                           const SizedBox(width: 4),
                         ],
@@ -2376,34 +2379,42 @@ class _CashFlowTabState extends State<CashFlowTab> {
             }
 
             Future<void> save() async {
-              final amount = double.tryParse(amountCtrl.text.trim());
-              if (categoryCtrl.text.trim().isEmpty || amount == null) {
+              try {
+                final amount = double.tryParse(amountCtrl.text.trim());
+                if (categoryCtrl.text.trim().isEmpty || amount == null) {
+                  setDialogState(() {
+                    suggestionMessage = 'Category and valid amount are required.';
+                    suggestionIsError = true;
+                  });
+                  return;
+                }
+
+                final entry = CashFlowManualEntryModel(
+                  section: selectedSection,
+                  category: categoryCtrl.text.trim(),
+                  amount: amount,
+                  date: selectedDate,
+                  notes: notesCtrl.text.trim(),
+                  isNonCash: isNonCash,
+                );
+                await _manualEntryService.saveManualEntry(
+                  userId: user.id!,
+                  orgId: org.id!,
+                  entry: entry,
+                );
+                await controller.fetchAndAggregateData(
+                  startDate: _startDate,
+                  endDate: _endDate,
+                );
+                if (mounted) Navigator.of(context).pop();
+                showSnackBar('Manual cash flow entry added.');
+              } catch (e) {
                 setDialogState(() {
-                  suggestionMessage = 'Category and valid amount are required.';
+                  suggestionMessage = 'Unable to save adjustment. Please try again.';
                   suggestionIsError = true;
                 });
-                return;
+                showSnackBar('Unable to save manual cash flow entry.', isError: true);
               }
-
-              final entry = CashFlowManualEntryModel(
-                section: selectedSection,
-                category: categoryCtrl.text.trim(),
-                amount: amount,
-                date: selectedDate,
-                notes: notesCtrl.text.trim(),
-                isNonCash: isNonCash,
-              );
-              await _manualEntryService.saveManualEntry(
-                userId: user.id!,
-                orgId: org.id!,
-                entry: entry,
-              );
-              await controller.fetchAndAggregateData(
-                startDate: _startDate,
-                endDate: _endDate,
-              );
-              if (mounted) Navigator.of(context).pop();
-              showSnackBar('Manual cash flow entry added.');
             }
 
             return AlertDialog(

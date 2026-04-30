@@ -820,8 +820,8 @@ class FinancialReportController extends GetxController {
         } else if (title.contains('equity') ||
             title.contains('capital') ||
             title.contains('[equity]')) {
-          pEq[mKey]!['Owners Equity'] =
-              (pEq[mKey]!['Owners Equity'] ?? 0) + tx.amount.abs();
+          pEq[mKey]!["Owner's Equity"] =
+              (pEq[mKey]!["Owner's Equity"] ?? 0) + tx.amount.abs();
         }
       }
 
@@ -832,7 +832,8 @@ class FinancialReportController extends GetxController {
         opAdj += absAmt;
       }
 
-      if (tx.deductible) taxDeductions += absAmt;
+      // Deductions should only come from expense-side transactions.
+      if (tx.deductible && isExpense) taxDeductions += absAmt;
     }
 
     Map<String, double> balanceTotals(List<TransactionModel> txs) {
@@ -909,30 +910,6 @@ class FinancialReportController extends GetxController {
       };
     }
 
-    currentAssetsBreakdown.value = {
-      if (taggedCurrentAssetsTotal > 0)
-        "Current Assets": taggedCurrentAssetsTotal,
-      "Cash": cashTotal,
-      "Accounts Receivable": arTotal,
-      if (inventoryTotal > 0) "Inventory": inventoryTotal,
-    };
-    fixedAssetsBreakdown.value = {"Fixed Assets": fixedAssetsTotal};
-    otherAssetsBreakdown.value = {"Other Assets": otherAssetsTotal};
-    currentLiabilitiesBreakdown.value = {"Current Liabilities": curLiabTotal};
-    longTermLiabilitiesBreakdown.value = {
-      "Long-Term Liabilities": longTermLiabTotal,
-    };
-    ownerEquityBreakdown.value = {"Owners Equity": equityTotalItems};
-
-    totalAssets.value =
-        cashTotal +
-        arTotal +
-        inventoryTotal +
-        fixedAssetsTotal +
-        otherAssetsTotal;
-    totalLiabilities.value = curLiabTotal + longTermLiabTotal;
-    totalTaxDeductions.value = taxDeductions;
-
     final prevBalance = balanceTotals(prevTransactions);
     prevPeriodAssets.value = prevBalance['assets'] ?? 0.0;
     prevPeriodLiabilities.value = prevBalance['liabilities'] ?? 0.0;
@@ -976,6 +953,38 @@ class FinancialReportController extends GetxController {
         financingCashFlow.value;
     endingCashBalance.value =
         beginningCashBalance.value + netChangeInCash.value;
+
+    final computedCashForBs =
+        cashTotal.abs() > 0.0001 ? cashTotal : endingCashBalance.value;
+    final retainedEarnings = netIncome.value;
+    final totalEquityForBreakdown = equityTotalItems + retainedEarnings;
+
+    currentAssetsBreakdown.value = {
+      if (taggedCurrentAssetsTotal > 0)
+        "Current Assets": taggedCurrentAssetsTotal,
+      "Cash": computedCashForBs,
+      "Accounts Receivable": arTotal,
+      if (inventoryTotal > 0) "Inventory": inventoryTotal,
+    };
+    fixedAssetsBreakdown.value = {"Fixed Assets": fixedAssetsTotal};
+    otherAssetsBreakdown.value = {"Other Assets": otherAssetsTotal};
+    currentLiabilitiesBreakdown.value = {"Current Liabilities": curLiabTotal};
+    longTermLiabilitiesBreakdown.value = {
+      "Long-Term Liabilities": longTermLiabTotal,
+    };
+    ownerEquityBreakdown.value = {
+      if (equityTotalItems.abs() > 0.0001) "Owner's Equity": equityTotalItems,
+      "Retained Earnings": retainedEarnings,
+    };
+
+    totalAssets.value =
+        computedCashForBs +
+        arTotal +
+        inventoryTotal +
+        fixedAssetsTotal +
+        otherAssetsTotal;
+    totalLiabilities.value = curLiabTotal + longTermLiabTotal;
+    totalTaxDeductions.value = taxDeductions;
 
     incomeBreakdown.assignAll(incBreakdown);
     expenseBreakdown.assignAll(expBreakdown);
@@ -1340,7 +1349,7 @@ class FinancialReportController extends GetxController {
 
     currentLiabilitiesBreakdown.value = {"Current Liabilities": 45000.0};
     longTermLiabilitiesBreakdown.value = {"Long Term Liabilities": 800000.0};
-    ownerEquityBreakdown.value = {"Owners Equity": 500000.0};
+    ownerEquityBreakdown.value = {"Owner's Equity": 500000.0};
     netIncome.value = 114800.0;
     final mockChart = [
       {

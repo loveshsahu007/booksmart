@@ -140,7 +140,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     DateTime? tempStart;
     DateTime? tempEnd;
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (context) {
         final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1739,9 +1739,16 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                     SizedBox(
                       width: screenWidth - 36,
                       child: _premiumKPICard(
-                        title: "Total Assets",
-                        value: _formatCurrency(totalAssets),
-                        change: assetsChange,
+                        title: "Working Capital",
+                        value: _formatCurrency(
+                          controller.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b) -
+                              controller.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b),
+                        ),
+                        change: _percentChange(
+                          controller.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b) -
+                              controller.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b),
+                          controller.prevPeriodCurrentAssets.value - controller.prevPeriodCurrentLiabilities.value,
+                        ),
                         isCurrency: true,
                         timeframe: _getTimeframeLabel(),
                         borderColor: Colors.yellow.withValues(alpha: 0.6),
@@ -1792,9 +1799,16 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                       const SizedBox(width: 12),
                       Expanded(
                         child: _premiumKPICard(
-                          title: "Total Assets",
-                          value: _formatCurrency(totalAssets),
-                          change: assetsChange,
+                          title: "Working Capital",
+                          value: _formatCurrency(
+                            controller.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b) -
+                                controller.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b),
+                          ),
+                          change: _percentChange(
+                            controller.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b) -
+                                controller.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b),
+                            controller.prevPeriodCurrentAssets.value - controller.prevPeriodCurrentLiabilities.value,
+                          ),
                           isCurrency: true,
                           timeframe: _getTimeframeLabel(),
                           borderColor: Colors.yellow.withValues(alpha: 0.6),
@@ -2020,7 +2034,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       ..sort((a, b) => b.value.abs().compareTo(a.value.abs()));
     
     final displayItems = sortedItems.take(5).toList();
-    final bool hasData = allItems.isNotEmpty;
+    final bool hasData = sortedItems.isNotEmpty;
 
     final List<Color> palette = [
       const Color(0xFF10B981), // Emerald/Green
