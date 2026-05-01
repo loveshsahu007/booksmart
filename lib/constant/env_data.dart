@@ -13,3 +13,6 @@ String get getStripeLivePublishKey =>
     dotenv.env['STRIPE_LIVE_PUBLISH_KEY'] ?? "---";
 String get getStripeLiveSecretKey =>
     dotenv.env['STRIPE_LIVE_SECRET_KEY'] ?? "---";
+
+String get getOpenRouterAiTaxKey =>
+    dotenv.env['OPENROUTER_AI_TAX_KEY'] ?? "---";

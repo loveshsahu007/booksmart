@@ -172,4 +172,38 @@ class OrganizationModel {
     if (data is List) return data.map((e) => e.toString()).toList();
     return null;
   }
+
+  Map<String, dynamic> getJsonForAI() {
+    return {
+      'name': name,
+      'website': website,
+      'ein_tin': einTin,
+      'org_type': orgType,
+      'industry': industry,
+      'filing_status': filingStatus,
+      'primary_state': primaryState,
+      'residency_status': residencyStatus,
+      'multi_state_activity': multiStateActivity,
+      'primary_income_types': primaryIncomeTypes,
+      'industry_niche': industryNiche,
+      'passive_income': passiveIncome,
+      'team_structure': teamStructure,
+      'accounting_method': accountingMethod,
+      'major_equipment': majorEquipment,
+      'vehicle_ownership': vehicleOwnership,
+      'vehicle_usage': vehicleUsage,
+      'vehicle_over_6k_lbs': vehicleOver6kLbs,
+      'home_office_type': homeOfficeType,
+      'home_status': homeStatus,
+      'tech_usage': techUsage,
+      'real_estate_interests': realEstateInterests,
+      'hosts_business_meetings': hostsBusinessMeetings,
+      'health_insurance': healthInsurance,
+      'health_savings': healthSavings,
+      'family_education': familyEducation,
+      'tax_goal': taxGoal,
+      'retirement_current': retirementCurrent,
+      'audit_appetite': auditAppetite,
+    };
+  }
 }
