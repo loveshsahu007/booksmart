@@ -967,7 +967,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       final asOfStyle = excel_lib.CellStyle(
         fontSize: 12,
         fontFamily: excel_lib.getFontFamily(excel_lib.FontFamily.Calibri),
-        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
         verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final sectionStyle = excel_lib.CellStyle(
@@ -1055,18 +1055,11 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         excel_lib.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 1),
         excel_lib.CellIndex.indexByColumnRow(columnIndex: labels.length, rowIndex: 1),
       );
-      final asOfText = switch (request.viewType) {
-        PdfViewType.monthly =>
-          DateFormat('MMMM yyyy').format(request.endDate),
-        PdfViewType.quarterly =>
-          'Q${((request.endDate.month - 1) ~/ 3) + 1} ${request.endDate.year}',
-        PdfViewType.yearly =>
-          DateFormat('MMMM dd,').format(DateTime(request.endDate.year, 12, 31)),
-      };
-      setCell(1, 3, excel_lib.TextCellValue('As of $asOfText'), asOfStyle);
+      final asOfText = DateFormat('MMMM dd, yyyy').format(request.endDate);
+      setCell(1, 2, excel_lib.TextCellValue('As of $asOfText'), asOfStyle);
       sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 3),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: labels.length, rowIndex: 3),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 2),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: labels.length, rowIndex: 2),
       );
       int row = 5;
       void writeSection(
@@ -3185,14 +3178,17 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       ),
       child: Stack(
         children: [
-          Column(
+          Center(
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               AppText(
                 title,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: isDark ? Colors.white70 : Colors.black54,
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
               FittedBox(
@@ -3202,6 +3198,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
                   color: valueColor,
+                  textAlign: TextAlign.center,
                 ),
               ),
               const SizedBox(height: 16),
@@ -3241,11 +3238,13 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                     "vs previous $timeframe",
                     fontSize: 11,
                     color: isDark ? Colors.white30 : Colors.black45,
+                    textAlign: TextAlign.center,
                     disableFormat: true,
                   ),
                 ],
               ),
             ],
+          ),
           ),
           if (tooltipText != null)
             Positioned(

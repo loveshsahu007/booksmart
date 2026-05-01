@@ -1739,16 +1739,9 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                     SizedBox(
                       width: screenWidth - 36,
                       child: _premiumKPICard(
-                        title: "Working Capital",
-                        value: _formatCurrency(
-                          controller.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b) -
-                              controller.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b),
-                        ),
-                        change: _percentChange(
-                          controller.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b) -
-                              controller.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b),
-                          controller.prevPeriodCurrentAssets.value - controller.prevPeriodCurrentLiabilities.value,
-                        ),
+                        title: "Total Assets",
+                        value: _formatCurrency(totalAssets),
+                        change: assetsChange,
                         isCurrency: true,
                         timeframe: _getTimeframeLabel(),
                         borderColor: Colors.yellow.withValues(alpha: 0.6),
@@ -1799,16 +1792,9 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                       const SizedBox(width: 12),
                       Expanded(
                         child: _premiumKPICard(
-                          title: "Working Capital",
-                          value: _formatCurrency(
-                            controller.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b) -
-                                controller.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b),
-                          ),
-                          change: _percentChange(
-                            controller.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b) -
-                                controller.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b),
-                            controller.prevPeriodCurrentAssets.value - controller.prevPeriodCurrentLiabilities.value,
-                          ),
+                          title: "Total Assets",
+                          value: _formatCurrency(totalAssets),
+                          change: assetsChange,
                           isCurrency: true,
                           timeframe: _getTimeframeLabel(),
                           borderColor: Colors.yellow.withValues(alpha: 0.6),

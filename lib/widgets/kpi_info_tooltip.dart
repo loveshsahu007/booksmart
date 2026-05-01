@@ -85,7 +85,11 @@ class _KpiInfoTooltipIconState extends State<KpiInfoTooltipIcon> {
       button: true,
       child: Tooltip(
         key: _tooltipKey,
-        richMessage: _buildTooltipSpan(widget.message, foregroundColor),
+        richMessage: _buildTooltipSpan(
+          _extractTitleFromSemanticLabel(widget.semanticLabel),
+          widget.message,
+          foregroundColor,
+        ),
         waitDuration: const Duration(milliseconds: 220),
         showDuration: const Duration(seconds: 5),
         preferBelow: false,
@@ -122,10 +126,13 @@ class _KpiInfoTooltipIconState extends State<KpiInfoTooltipIcon> {
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: _showTooltip,
-            child: Icon(
-              Icons.info_outline_rounded,
-              size: 16,
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
+            child: Transform.translate(
+              offset: const Offset(0, -6),
+              child: Icon(
+                Icons.info_outline_rounded,
+                size: 16,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.85),
+              ),
             ),
           ),
         ),
@@ -133,18 +140,23 @@ class _KpiInfoTooltipIconState extends State<KpiInfoTooltipIcon> {
     );
   }
 
-  InlineSpan _buildTooltipSpan(String message, Color textColor) {
+  String _extractTitleFromSemanticLabel(String label) {
+    const prefix = 'More information about ';
+    if (label.startsWith(prefix)) {
+      final t = label.substring(prefix.length).trim();
+      if (t.isNotEmpty) return t;
+    }
+    return 'KPI Info';
+  }
+
+  InlineSpan _buildTooltipSpan(String title, String message, Color textColor) {
     final lines = message
         .split('\n')
         .map((e) => e.trim())
         .where((e) => e.isNotEmpty)
         .toList();
-    if (lines.isEmpty) {
-      return TextSpan(text: '', style: TextStyle(color: textColor));
-    }
-
-    final title = lines.first;
-    final detailLines = lines.skip(1).toList();
+    final intro = lines.isNotEmpty ? lines.first : '';
+    final detailLines = lines.length > 1 ? lines.skip(1).toList() : const <String>[];
 
     return TextSpan(
       style: TextStyle(color: textColor, fontSize: 12, height: 1.3),
@@ -153,18 +165,50 @@ class _KpiInfoTooltipIconState extends State<KpiInfoTooltipIcon> {
           text: '$title\n',
           style: TextStyle(
             color: textColor,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
           ),
         ),
-        ...detailLines.map(
-          (line) => TextSpan(
-            text: '• $line\n',
+        if (intro.isNotEmpty)
+          TextSpan(
+            text: '$intro\n',
             style: TextStyle(
-              color: textColor.withValues(alpha: 0.95),
-              fontWeight: FontWeight.w500,
+              color: textColor.withValues(alpha: 0.78),
+              fontWeight: FontWeight.w300,
             ),
           ),
-        ),
+        ...detailLines.expand((line) {
+          final idx = line.indexOf(':');
+          if (idx > 0) {
+            final lead = line.substring(0, idx).trim();
+            final rest = line.substring(idx + 1).trim();
+            return <InlineSpan>[
+              TextSpan(
+                text: '• $lead: ',
+                style: TextStyle(
+                  color: textColor.withValues(alpha: 0.9),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              TextSpan(
+                text: '$rest\n',
+                style: TextStyle(
+                  color: textColor.withValues(alpha: 0.72),
+                  fontWeight: FontWeight.w300,
+                ),
+              ),
+            ];
+          }
+          return <InlineSpan>[
+            TextSpan(
+              text: '• $line\n',
+              style: TextStyle(
+                color: textColor.withValues(alpha: 0.72),
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+          ];
+        }),
       ],
     );
   }

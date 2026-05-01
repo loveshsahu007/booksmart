@@ -990,6 +990,15 @@ class _CashFlowTabState extends State<CashFlowTab> {
         horizontalAlign: excel_lib.HorizontalAlign.Center,
         verticalAlign: excel_lib.VerticalAlign.Center,
       );
+      /// Section banner label (Operating / Investing / Financing) — left-aligned in column A.
+      final headerBlueLabelStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 9,
+        fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF7A94B3'),
+        horizontalAlign: excel_lib.HorizontalAlign.Left,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
       final sectionLabelStyle = excel_lib.CellStyle(
         bold: true,
         fontSize: 9,
@@ -1133,7 +1142,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
         titleStartCol,
         3,
         excel_lib.TextCellValue(
-          'As of ${DateFormat('MMMM dd, yyyy').format(DateTime(reportEnd.year, 12, 31))}',
+          'As of ${DateFormat('MMMM dd, yyyy').format(reportEnd)}',
         ),
         metaStyle,
       );
@@ -1153,7 +1162,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
 
       int row = 6;
       void writePeriodHeader(String title, {bool includePeriods = true}) {
-        setCell(labelCol, row, excel_lib.TextCellValue(title), headerBlueStyle);
+        setCell(labelCol, row, excel_lib.TextCellValue(title), headerBlueLabelStyle);
         for (int i = 0; i < keys.length; i++) {
           setCell(
             amountCol(i),
@@ -1174,6 +1183,8 @@ class _CashFlowTabState extends State<CashFlowTab> {
         row++;
       }
 
+      const cfSubIndent = '            ';
+
       void writeLineLabel(
         String label, {
         bool indent = false,
@@ -1184,7 +1195,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
         setCell(
           labelCol,
           row,
-          excel_lib.TextCellValue(indent ? '   $label' : label),
+          excel_lib.TextCellValue(indent ? '$cfSubIndent$label' : label),
           cashBand
               ? cashBandLabelStyle
               : (total
@@ -1225,12 +1236,6 @@ class _CashFlowTabState extends State<CashFlowTab> {
         bool cashBand = false,
         bool darkTotal = false,
       }) {
-        if (total || darkTotal || cashBand) {
-          // subtle divider above totals for professional statement hierarchy
-          for (int c = labelCol; c <= lastAmountCol; c++) {
-            setCell(c, row - 1, excel_lib.TextCellValue(' '), dividerStyle);
-          }
-        }
         writeLineLabel(
           label,
           indent: indent,
@@ -1242,7 +1247,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
           setCell(
             labelCol,
             row,
-            excel_lib.TextCellValue(indent ? '   $label' : label),
+            excel_lib.TextCellValue(indent ? '$cfSubIndent$label' : label),
             totalDarkLabelStyle,
           );
         }
@@ -1256,20 +1261,14 @@ class _CashFlowTabState extends State<CashFlowTab> {
         row++;
       }
 
-      void writeTextOnly(String label, {bool indent = false, bool bold = false}) {
-        writeLineLabel(label, indent: indent, bold: bold);
-        sheet.setRowHeight(row, 16);
-        row++;
-      }
-
       writePeriodHeader('Operating Activities', includePeriods: true);
       writeRow('Net income', netIncomeMap, indent: true);
-      writeTextOnly('Adjustments for Non-Cash Items', indent: true);
+      writeRow('Adjustments for Non-Cash Items', zeroMap(), indent: true);
       writeRow('Depreciation', depAmortMap, indent: true);
       writeRow('Amortization', zeroMap(), indent: true);
       writeRow('Goodwill/Intangible Impairment', zeroMap(), indent: true);
       writeRow('Deferred Income Tax', zeroMap(), indent: true);
-      writeTextOnly('Changes in Working Capital:', indent: true);
+      writeRow('Changes in Working Capital:', zeroMap(), indent: true);
       writeRow('Accounts Receivable', receivableMap, indent: true);
       writeRow('Inventory', inventoryMap, indent: true);
       writeRow('Accounts Payable', accountsPayableMap, indent: true);
@@ -1286,7 +1285,6 @@ class _CashFlowTabState extends State<CashFlowTab> {
         darkTotal: true,
       );
 
-      row++;
       writePeriodHeader('Investing Activities', includePeriods: false);
       writeRow('Proceeds from sales of long-term assets', proceedsSaleMap, indent: true);
       writeRow('Purchases of property, plant and equipment', ppePurchasesMap, indent: true);
@@ -1299,7 +1297,6 @@ class _CashFlowTabState extends State<CashFlowTab> {
         darkTotal: true,
       );
 
-      row++;
       writePeriodHeader('Financing Activities', includePeriods: false);
       writeRow('Issue of share capital', issueShareCapitalMap, indent: true);
       writeRow('Stock issuance', stockIssuanceMap, indent: true);
@@ -1315,7 +1312,6 @@ class _CashFlowTabState extends State<CashFlowTab> {
         darkTotal: true,
       );
 
-      row++;
       writeRow('Beginning Cash Balance', beginningCashMap, cashBand: true);
       writeRow('Change in Cash & Cash Equivalents', netChangeMap, cashBand: false);
       writeRow('Ending Cash Balance', endingCashMap, cashBand: true);

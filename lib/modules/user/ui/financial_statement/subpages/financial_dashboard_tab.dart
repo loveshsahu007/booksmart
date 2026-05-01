@@ -7,6 +7,7 @@ import 'package:booksmart/modules/user/controllers/financial_report_controller.d
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:booksmart/modules/user/utils/plaid_connect_utils.dart';
+import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 
 import '../financial_statement.dart';
 
@@ -18,9 +19,9 @@ class FinancialDashboardTab extends StatefulWidget {
 }
 
 class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
-  int _trendIndex = 2; // 3M default
-  static const List<String> _trendLabels = ['7d', '30d', '3M', '6M', '12M'];
-  static const List<int> _trendPoints = [7, 30, 90, 180, 365];
+  /// 0: 7d, 1: 30d, 2: 3mo, 3: 12mo, 4: Yearly, 5: Custom — mirrors Profit & Loss filters.
+  int _dashFilterIdx = 2;
+  int? _dashSelectedYear;
 
   static const Color _bg = Color(0xFF020E2C);
   static const Color _cardStart = Color(0xFF071F4A);
@@ -44,7 +45,6 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final monthly = controller.monthlyData;
           final income = controller.totalIncome.value;
           final expenses = controller.totalExpenses.value;
           final netIncome = controller.netIncome.value;
@@ -84,10 +84,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
             deductionPct: deductionPct,
           );
 
-          final trendSeries = _filterTrendSeries(
-            monthly,
-            _trendPoints[_trendIndex],
-          );
+          final chartData = _dashChartSeries(controller);
 
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 20),
@@ -101,10 +98,11 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                     Expanded(
                       flex: 70,
                       child: _chartCard(
-                        revenue: trendSeries['income']!,
-                        expense: trendSeries['expense']!,
-                        netCash: trendSeries['cashflow']!,
-                        profit: trendSeries['profit']!,
+                        revenue: chartData.income,
+                        expense: chartData.expense,
+                        netCash: chartData.cashflow,
+                        profit: chartData.profit,
+                        xLabels: chartData.xLabels,
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -127,6 +125,19 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Spacer(),
+                        Flexible(
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: _dashboardTimeFilter(controller),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     _topBand(
                       score: healthScore,
                       netIncome: netIncome,
@@ -166,10 +177,11 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                       SizedBox(height: 270, child: chartRow)
                     else ...[
                       SizedBox(height: 270, child: _chartCard(
-                        revenue: trendSeries['income']!,
-                        expense: trendSeries['expense']!,
-                        netCash: trendSeries['cashflow']!,
-                        profit: trendSeries['profit']!,
+                        revenue: chartData.income,
+                        expense: chartData.expense,
+                        netCash: chartData.cashflow,
+                        profit: chartData.profit,
+                        xLabels: chartData.xLabels,
                       )),
                       const SizedBox(height: 12),
                       SizedBox(height: 270, child: _insightsCard(
@@ -217,7 +229,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
   }) {
     final money = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
     return SizedBox(
-      height: 196,
+      height: 224,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -266,51 +278,55 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
             ? _yellow
             : _red;
     return _glassCard(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const AppText(
             'Business Health Score',
-            fontSize: 13,
-            color: _title,
-            fontWeight: FontWeight.w600,
+            fontSize: 14,
+            color: _text,
+            fontWeight: FontWeight.w700,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 2),
           SizedBox(
-            height: 92,
+            height: 142,
             width: double.infinity,
-            child: _getRadialGauge(score),
-          ),
-          const SizedBox(height: 1),
-          Align(
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                AppText(
-                  score.toInt().toString(),
-                  fontSize: 20,
-                  color: _text,
-                  fontWeight: FontWeight.w700,
-                  textAlign: TextAlign.center,
+                Positioned.fill(
+                  child: _getRadialGauge(score),
                 ),
-                AppText(
-                  status,
-                  fontSize: 12,
-                  color: statusColor,
-                  fontWeight: FontWeight.w600,
-                  textAlign: TextAlign.center,
-                ),
-                AppText(
-                  DateFormat('MMM dd, yyyy').format(DateTime.now()),
-                  fontSize: 10,
-                  color: _muted,
-                  textAlign: TextAlign.center,
+                Positioned(
+                  top: 70,
+                  child: AppText(
+                    score.toInt().toString(),
+                    fontSize: 22,
+                    color: _text,
+                    fontWeight: FontWeight.w800,
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 1),
+          AppText(
+            status,
+            fontSize: 12,
+            color: statusColor,
+            fontWeight: FontWeight.w700,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 2),
+          AppText(
+            DateFormat('MMM dd, yyyy').format(DateTime.now()),
+            fontSize: 9,
+            color: _muted,
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -328,6 +344,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     return _glassCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           AppText(
@@ -337,7 +354,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
             fontWeight: FontWeight.w600,
             textAlign: TextAlign.center,
           ),
-          const Spacer(),
+          const SizedBox(height: 12),
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.center,
@@ -349,34 +366,36 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
               textAlign: TextAlign.center,
             ),
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.center,
-            alignment: WrapAlignment.center,
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: deltaColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(16),
+          const SizedBox(height: 12),
+          Center(
+            child: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              alignment: WrapAlignment.center,
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: deltaColor.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: AppText(
+                    _formatDelta(deltaPct),
+                    fontSize: 10,
+                    color: deltaColor,
+                    fontWeight: FontWeight.w700,
+                    disableFormat: true,
+                  ),
                 ),
-                child: AppText(
-                  _formatDelta(deltaPct),
+                const AppText(
+                  'vs previous 3 months',
                   fontSize: 10,
-                  color: deltaColor,
-                  fontWeight: FontWeight.w600,
+                  color: _muted,
                   disableFormat: true,
                 ),
-              ),
-              const AppText(
-                'vs prev period',
-                fontSize: 11,
-                color: _muted,
-                disableFormat: true,
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -606,14 +625,19 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const AppText('Additional Tax\nDeductions Found', fontSize: 9, color: _muted),
+                      const AppText(
+                        'Additional Tax\nDeductions Found',
+                        fontSize: 9,
+                        color: _muted,
+                        textAlign: TextAlign.center,
+                      ),
                       const SizedBox(height: 2),
                       FittedBox(
                         fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
+                        alignment: Alignment.center,
                         child: AppText(
                           money0.format(taxDeduction),
                           fontSize: 18,
@@ -622,11 +646,16 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      const AppText('Potential Tax Savings', fontSize: 9, color: _muted),
+                      const AppText(
+                        'Potential Tax Savings',
+                        fontSize: 9,
+                        color: _muted,
+                        textAlign: TextAlign.center,
+                      ),
                       const SizedBox(height: 2),
                       FittedBox(
                         fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
+                        alignment: Alignment.center,
                         child: AppText(
                           money0.format(potentialSavings),
                           fontSize: 18,
@@ -644,9 +673,10 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
             '${unutilized.toStringAsFixed(0)}% of deductions not yet utilized',
             fontSize: 9,
             color: _muted,
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
-          _viewLink('View Deductions', () {}),
+          _viewLink('View AI Strategy', () => Get.toNamed(Routes.aiStrategy)),
         ],
       ),
     );
@@ -692,12 +722,24 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
           ),
           const SizedBox(width: 6),
           SizedBox(
-            width: 56,
-            child: AppText(
-              deltaText,
-              fontSize: 10,
-              color: color,
-              textAlign: TextAlign.right,
+            width: 64,
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: isFlat ? 0.12 : 0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: AppText(
+                  deltaText,
+                  fontSize: 9,
+                  color: color,
+                  fontWeight: FontWeight.w700,
+                  textAlign: TextAlign.center,
+                  disableFormat: true,
+                ),
+              ),
             ),
           ),
         ],
@@ -752,6 +794,223 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     }
   }
 
+  Future<void> _dashboardUpdateFilter(
+    int index,
+    FinancialReportController controller, {
+    int? year,
+  }) async {
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    DateTime? start;
+    DateTime end = today;
+
+    if (index == 0) {
+      start = today.subtract(const Duration(days: 6));
+    } else if (index == 1) {
+      start = today.subtract(const Duration(days: 29));
+    } else if (index == 2) {
+      start = today.subtract(const Duration(days: 89));
+    } else if (index == 3) {
+      start = today.subtract(const Duration(days: 364));
+    } else if (index == 4) {
+      final yr = year ?? _dashSelectedYear ?? now.year;
+      start = DateTime(yr, 1, 1);
+      end = yr == now.year ? today : DateTime(yr, 12, 31);
+    }
+
+    setState(() {
+      _dashFilterIdx = index;
+      if (year != null) _dashSelectedYear = year;
+    });
+
+    if (start != null) {
+      await controller.fetchAndAggregateData(startDate: start, endDate: end);
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _dashboardSelectCustom(FinancialReportController controller) async {
+    DateTime? tempStart;
+    DateTime? tempEnd;
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: const Color(0xFF0F1E37),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const AppText(
+                  'Select Date Range',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: _text,
+                ),
+                const SizedBox(height: 24),
+                SfDateRangePicker(
+                  view: DateRangePickerView.month,
+                  selectionMode: DateRangePickerSelectionMode.range,
+                  headerStyle: const DateRangePickerHeaderStyle(
+                    textStyle: TextStyle(color: _text, fontWeight: FontWeight.bold),
+                  ),
+                  monthCellStyle: DateRangePickerMonthCellStyle(
+                    textStyle: const TextStyle(color: _muted),
+                    todayTextStyle: TextStyle(color: orangeColor),
+                  ),
+                  rangeSelectionColor: orangeColor.withValues(alpha: 0.1),
+                  startRangeSelectionColor: orangeColor,
+                  endRangeSelectionColor: orangeColor,
+                  todayHighlightColor: orangeColor,
+                  onSelectionChanged: (DateRangePickerSelectionChangedArgs args) {
+                    if (args.value is PickerDateRange) {
+                      final range = args.value as PickerDateRange;
+                      tempStart = range.startDate;
+                      tempEnd = range.endDate ?? range.startDate;
+                    }
+                  },
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const AppText('Close', color: _muted),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: orangeColor,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      onPressed: () async {
+                        if (tempStart != null && tempEnd != null) {
+                          final ts = tempStart!;
+                          final te = tempEnd!;
+                          final s = DateTime(ts.year, ts.month, ts.day);
+                          final e = DateTime(te.year, te.month, te.day);
+                          setState(() {
+                            _dashFilterIdx = 5;
+                          });
+                          await controller.fetchAndAggregateData(startDate: s, endDate: e);
+                          if (context.mounted) Navigator.pop(context);
+                          if (mounted) setState(() {});
+                        }
+                      },
+                      child: const AppText('Select', color: Colors.black, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Same interaction model as Profit & Loss `_buildTimeFilter` / `_filterItem` (pill bar + soft selection).
+  Widget _dashboardPnlStyleFilterItem(String text, bool isSelected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1E293B) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: isSelected ? Border.all(color: Colors.white12) : null,
+        ),
+        child: AppText(
+          text,
+          fontSize: 11,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          color: isSelected ? Colors.white : const Color(0xFF8FA6C4),
+          disableFormat: true,
+        ),
+      ),
+    );
+  }
+
+  Widget _dashboardYearMenu(FinancialReportController controller) {
+    final int currentYear = DateTime.now().year;
+    final List<int> years = List.generate(5, (index) => currentYear - index);
+    final bool isSelected = _dashFilterIdx == 4;
+
+    return PopupMenuButton<int>(
+      offset: const Offset(0, 40),
+      color: const Color(0xFF1E293B),
+      onSelected: (y) => _dashboardUpdateFilter(4, controller, year: y),
+      itemBuilder: (context) => years
+          .map(
+            (y) => PopupMenuItem<int>(
+              value: y,
+              child: Text(
+                '$y',
+                style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'Outfit'),
+              ),
+            ),
+          )
+          .toList(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF1E293B) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: isSelected ? Border.all(color: Colors.white12) : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isSelected
+                  ? (_dashSelectedYear?.toString() ?? 'Yearly')
+                  : 'Yearly',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected ? Colors.white : const Color(0xFF8FA6C4),
+                fontFamily: 'Outfit',
+              ),
+            ),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 14,
+              color: isSelected ? Colors.white : const Color(0xFF8FA6C4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _dashboardTimeFilter(FinancialReportController controller) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.26),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Wrap(
+        spacing: 4,
+        runSpacing: 4,
+        alignment: WrapAlignment.end,
+        children: [
+          _dashboardPnlStyleFilterItem('7 Days', _dashFilterIdx == 0, () => _dashboardUpdateFilter(0, controller)),
+          _dashboardPnlStyleFilterItem('30 Days', _dashFilterIdx == 1, () => _dashboardUpdateFilter(1, controller)),
+          _dashboardPnlStyleFilterItem('3 Months', _dashFilterIdx == 2, () => _dashboardUpdateFilter(2, controller)),
+          _dashboardPnlStyleFilterItem('12 Months', _dashFilterIdx == 3, () => _dashboardUpdateFilter(3, controller)),
+          _dashboardYearMenu(controller),
+          _dashboardPnlStyleFilterItem('Custom', _dashFilterIdx == 5, () => _dashboardSelectCustom(controller)),
+        ],
+      ),
+    );
+  }
+
   static double? _pctChange(double current, double previous) {
     if (previous.abs() < 0.0001) {
       if (current.abs() < 0.0001) return 0;
@@ -790,106 +1049,264 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required List<double> expense,
     required List<double> netCash,
     required List<double> profit,
+    required List<String> xLabels,
   }) {
     final data = [revenue, expense, netCash, profit].expand((e) => e).toList();
     final minY = data.isEmpty ? -10.0 : data.reduce((a, b) => a < b ? a : b);
     final maxY = data.isEmpty ? 10.0 : data.reduce((a, b) => a > b ? a : b);
+    final span = (maxY - minY).abs();
+    final pad = span < 1e-6 ? 8.0 : span * 0.12;
+    final n = revenue.length;
+    final compactX = n > 8;
+
     return _glassCard(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const AppText('Financial Trend', fontSize: 13, color: _title, fontWeight: FontWeight.w600),
-              const Spacer(),
-              Wrap(
-                spacing: 6,
-                children: List.generate(_trendLabels.length, (i) {
-                  final active = i == _trendIndex;
-                  return InkWell(
-                    onTap: () => setState(() => _trendIndex = i),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: active ? const Color(0xFF1A3B72) : const Color(0xFF0A254F),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: active ? _yellow : _cardStroke),
-                      ),
-                      child: AppText(
-                        _trendLabels[i],
-                        fontSize: 10,
-                        color: active ? _text : _muted,
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ],
-          ),
+          const AppText('Financial Trend', fontSize: 13, color: _title, fontWeight: FontWeight.w600),
           const SizedBox(height: 8),
           Expanded(
-            child: LineChart(
-              LineChartData(
-                minY: minY - ((maxY - minY) * 0.12),
-                maxY: maxY + ((maxY - minY) * 0.12),
-                gridData: FlGridData(
-                  show: true,
-                  horizontalInterval: ((maxY - minY).abs() / 4).clamp(1, 100000000).toDouble(),
-                  drawVerticalLine: false,
-                  getDrawingHorizontalLine: (_) => const FlLine(color: Color(0xFF173761), strokeWidth: 1),
-                ),
-                borderData: FlBorderData(show: false),
-                titlesData: FlTitlesData(
-                  topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: ((maxY - minY).abs() / 3).clamp(1, 100000000).toDouble(),
-                      reservedSize: 34,
-                      getTitlesWidget: (value, _) => AppText(
-                        value >= 0 ? '\$${(value / 1000).toStringAsFixed(0)}K' : '-\$${((-value) / 1000).toStringAsFixed(0)}K',
-                        fontSize: 10,
-                        color: _muted,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                const leftAxis = 34.0;
+                final usableW = (constraints.maxWidth - leftAxis).clamp(1.0, double.infinity);
+                final groupW = _dashTrendGroupWidth(n);
+                final centers = _barGroupCenterXsSpaceAround(usableW, n, groupW);
+                final spotXN = centers.map((c) => c / usableW).toList();
+                final bottomReserved = compactX ? 34.0 : 22.0;
+
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    BarChart(
+                      BarChartData(
+                        alignment: BarChartAlignment.spaceAround,
+                        baselineY: 0,
+                        minY: minY - pad,
+                        maxY: maxY + pad,
+                        barTouchData: const BarTouchData(enabled: false),
+                        gridData: FlGridData(
+                          show: true,
+                          horizontalInterval: (span < 1e-6 ? 1.0 : span / 4).clamp(1, 100000000).toDouble(),
+                          drawVerticalLine: false,
+                          getDrawingHorizontalLine: (_) =>
+                              const FlLine(color: Color(0xFF173761), strokeWidth: 1),
+                        ),
+                        borderData: FlBorderData(show: false),
+                        titlesData: FlTitlesData(
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              interval: (span < 1e-6 ? 1.0 : span / 3).clamp(1, 100000000).toDouble(),
+                              reservedSize: leftAxis,
+                              getTitlesWidget: (value, _) => AppText(
+                                value >= 0
+                                    ? '\$${(value / 1000).toStringAsFixed(0)}K'
+                                    : '-\$${((-value) / 1000).toStringAsFixed(0)}K',
+                                fontSize: 10,
+                                color: _muted,
+                              ),
+                            ),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              interval: 1,
+                              reservedSize: bottomReserved,
+                              getTitlesWidget: (value, _) {
+                                final i = value.toInt();
+                                if (i < 0 || i >= xLabels.length) return const SizedBox.shrink();
+                                return Padding(
+                                  padding: EdgeInsets.only(top: compactX ? 4 : 0),
+                                  child: AppText(
+                                    xLabels[i],
+                                    fontSize: compactX ? 7 : 9,
+                                    color: _muted,
+                                    maxLines: 1,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        barGroups: List.generate(n, (i) {
+                          final rodW = (320 / n).clamp(4.0, 18.0);
+                          final inc = i < revenue.length ? revenue[i] : 0.0;
+                          final exp = i < expense.length ? expense[i] : 0.0;
+                          return BarChartGroupData(
+                            x: i,
+                            barsSpace: 6,
+                            barRods: [
+                              BarChartRodData(
+                                toY: inc,
+                                width: rodW,
+                                color: const Color(0xFF19C37D),
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                gradient: const LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [
+                                    Color(0x6619C37D),
+                                    Color(0xFF19C37D),
+                                  ],
+                                ),
+                              ),
+                              BarChartRodData(
+                                toY: exp,
+                                width: rodW,
+                                color: const Color(0xFF2B7FFF),
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                                gradient: const LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [
+                                    Color(0x662B7FFF),
+                                    Color(0xFF2B7FFF),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
                       ),
                     ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      interval: 1,
-                      reservedSize: 20,
-                      getTitlesWidget: (value, _) {
-                        const labels = ['Jan 26', 'Feb 2', 'Feb 9', 'Feb 16', 'Feb 23', 'Mar 2', 'Mar 9', 'Mar 16', 'Mar 23', 'Mar 30', 'Apr 6', 'Apr 13', 'Apr 20', 'Apr 27'];
-                        final i = value.toInt();
-                        if (i < 0 || i >= labels.length) return const SizedBox.shrink();
-                        return AppText(labels[i], fontSize: 9, color: _muted);
-                      },
+                    LineChart(
+                      LineChartData(
+                        minX: 0,
+                        maxX: 1,
+                        baselineY: 0,
+                        minY: minY - pad,
+                        maxY: maxY + pad,
+                        gridData: const FlGridData(show: false),
+                        borderData: FlBorderData(show: false),
+                        lineTouchData: LineTouchData(
+                          enabled: true,
+                          handleBuiltInTouches: true,
+                          getTouchedSpotIndicator: (barData, spotIndexes) {
+                            return spotIndexes
+                                .map(
+                                  (_) => const TouchedSpotIndicatorData(
+                                    FlLine(color: Colors.transparent, strokeWidth: 0),
+                                    FlDotData(show: false),
+                                  ),
+                                )
+                                .toList();
+                          },
+                          touchTooltipData: LineTouchTooltipData(
+                            maxContentWidth: 240,
+                            fitInsideHorizontally: true,
+                            fitInsideVertically: true,
+                            getTooltipColor: (_) => const Color(0xFF1E293B),
+                            getTooltipItems: (touchedSpots) {
+                              return touchedSpots.map((s) {
+                                // Two line series are touchable (net cash + profit). Render
+                                // a single combined tooltip from the first series only.
+                                if (s.barIndex != 0) return null;
+                                final idx = s.spotIndex;
+                                if (idx < 0 || idx >= n) return null;
+                                final rev = idx < revenue.length ? revenue[idx] : 0.0;
+                                final exp = idx < expense.length ? expense[idx] : 0.0;
+                                final cash = idx < netCash.length ? netCash[idx] : 0.0;
+                                final prof = idx < profit.length ? profit[idx] : 0.0;
+                                final dateText = idx < xLabels.length ? xLabels[idx] : '';
+                                final money = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+                                return LineTooltipItem(
+                                  '',
+                                  const TextStyle(height: 1.3),
+                                  children: [
+                                    TextSpan(
+                                      text: '$dateText\n',
+                                      style: const TextStyle(
+                                        color: Color(0xFFB8C7E0),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: 'Revenue: ${money.format(rev)}\n',
+                                      style: const TextStyle(
+                                        color: Color(0xFF19C37D),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: 'Expenses: ${money.format(exp)}\n',
+                                      style: const TextStyle(
+                                        color: Color(0xFF2B7FFF),
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: 'Net Cash: ${money.format(cash)}\n',
+                                      style: const TextStyle(
+                                        color: Color(0xFFFFC52C),
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: 'Profit: ${money.format(prof)}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }).toList();
+                            },
+                          ),
+                        ),
+                        titlesData: FlTitlesData(
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: leftAxis,
+                              getTitlesWidget: (_, __) => const SizedBox.shrink(),
+                            ),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: bottomReserved,
+                              getTitlesWidget: (_, __) => const SizedBox.shrink(),
+                            ),
+                          ),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        ),
+                        lineBarsData: [
+                          _lineNormalized(netCash, spotXN, _yellow),
+                          _lineNormalized(profit, spotXN, const Color(0xFFEFF4FF)),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-                lineBarsData: [
-                  _line(revenue, const Color(0xFF52D97B)),
-                  _line(expense, const Color(0xFF258CFF)),
-                  _line(netCash, _yellow),
-                  _line(profit, const Color(0xFFEFF4FF)),
-                ],
-              ),
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: 4),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _LegendDot('Revenue', Color(0xFF52D97B)),
-              SizedBox(width: 14),
-              _LegendDot('Expenses', Color(0xFF258CFF)),
-              SizedBox(width: 14),
-              _LegendDot('Net Cash', Color(0xFFFFC52C)),
-              SizedBox(width: 14),
-              _LegendDot('Profit', Color(0xFFEFF4FF)),
-            ],
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 14,
+              runSpacing: 6,
+              children: const [
+                _LegendDot('Revenue', Color(0xFF19C37D)),
+                _LegendDot('Expenses', Color(0xFF2B7FFF)),
+                _LegendLine('Net Cash', Color(0xFFFFC52C)),
+                _LegendLine('Profit', Color(0xFFEFF4FF)),
+              ],
+            ),
           ),
         ],
       ),
@@ -988,26 +1405,35 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
-          const SizedBox(width: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const AppText('Business Health Summary', fontSize: 12, color: _title, fontWeight: FontWeight.w600),
-              AppText(
-                message.$1,
-                fontSize: 12,
-                color: _text,
-                fontWeight: FontWeight.w600,
-              ),
-              AppText(
-                message.$2,
-                fontSize: 10,
-                color: _muted,
-              ),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const AppText(
+                  'Business Health Summary',
+                  fontSize: 12,
+                  color: _title,
+                  fontWeight: FontWeight.w600,
+                  textAlign: TextAlign.center,
+                ),
+                AppText(
+                  message.$1,
+                  fontSize: 12,
+                  color: _text,
+                  fontWeight: FontWeight.w600,
+                  textAlign: TextAlign.center,
+                ),
+                AppText(
+                  message.$2,
+                  fontSize: 10,
+                  color: _muted,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
           ),
-          const Spacer(),
+          const SizedBox(width: 10),
           const DecoratedBox(
             decoration: BoxDecoration(
               color: Color(0xFF092B55),
@@ -1137,14 +1563,17 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
           startAngle: 180,
           endAngle: 0,
           showTicks: true,
-          showLabels: false,
+          showLabels: true,
           interval: 20,
-          minorTicksPerInterval: 1,
+          minorTicksPerInterval: 0,
           radiusFactor: 0.98,
-          centerY: 0.86,
-          axisLabelStyle: const GaugeTextStyle(color: _title, fontSize: 9),
-          majorTickStyle: const MajorTickStyle(length: 6, thickness: 1.1, color: Color(0xFF7893B9)),
-          minorTickStyle: const MinorTickStyle(length: 3, thickness: 1, color: Color(0xFF456286)),
+          centerY: 0.84,
+          canScaleToFit: true,
+          showFirstLabel: true,
+          showLastLabel: true,
+          axisLabelStyle: const GaugeTextStyle(color: _text, fontSize: 10),
+          majorTickStyle: const MajorTickStyle(length: 7, thickness: 1.2, color: Color(0xFFB9C8DE)),
+          minorTickStyle: const MinorTickStyle(length: 0, thickness: 0),
           axisLineStyle: const AxisLineStyle(
             thickness: 14,
             cornerStyle: CornerStyle.bothCurve,
@@ -1168,84 +1597,114 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
       ],
     );
   }
-  List<double> _extractSeries(List<dynamic> monthlyData, String key) {
-    if (monthlyData.isEmpty) {
-      return List<double>.filled(14, 0);
+  /// Uses [FinancialReportController.trendChartSeries] — same buckets and x-axis
+  /// labels as Profit & Loss (daily / weekly / monthly / quarterly from selected range).
+  _DashChartSeries _dashChartSeries(FinancialReportController controller) {
+    final series = controller.trendChartSeries;
+    if (series.isEmpty) {
+      return _DashChartSeries(
+        income: const <double>[0],
+        expense: const <double>[0],
+        cashflow: const <double>[0],
+        profit: const <double>[0],
+        xLabels: const ['—'],
+      );
     }
-    final values = monthlyData.map((e) {
-      final val = e[key];
-      if (val is num) return val.toDouble();
-      if (key == 'cashflow') {
-        final n = (e['net'] as num?)?.toDouble();
-        if (n != null) return n;
-        final i = (e['income'] as num?)?.toDouble() ?? 0;
-        final ex = (e['expense'] as num?)?.toDouble() ?? 0;
-        return i - ex;
-      }
-      if (key == 'profit') {
-        final n = (e['net'] as num?)?.toDouble();
-        if (n != null) return n;
-        final i = (e['income'] as num?)?.toDouble() ?? 0;
-        final ex = (e['expense'] as num?)?.toDouble() ?? 0;
-        return i - ex;
-      }
-      return 0.0;
-    }).toList();
-    if (key == 'cashflow') {
-      // Plot Net Cash as cumulative position so it is distinct from period Profit.
-      double running = 0;
-      final cumulative = <double>[];
-      for (final v in values) {
-        running += v;
-        cumulative.add(running);
-      }
-      if (cumulative.length >= 14) return cumulative.take(14).toList();
-      return [...cumulative, ...List<double>.filled(14 - cumulative.length, cumulative.last)];
-    }
-    if (values.length >= 14) return values.take(14).toList();
-    return [...values, ...List<double>.filled(14 - values.length, values.last)];
-  }
 
-  LineChartBarData _line(List<double> data, Color color) {
-    return LineChartBarData(
-      spots: data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList(),
-      isCurved: true,
-      curveSmoothness: 0.3,
-      color: color,
-      barWidth: 2,
-      isStrokeCapRound: true,
-      dotData: const FlDotData(show: false),
-      belowBarData: BarAreaData(show: false),
+    final income = <double>[];
+    final expense = <double>[];
+    final profit = <double>[];
+    final xLabels = <String>[];
+
+    for (final row in series) {
+      xLabels.add(row['label']?.toString() ?? '');
+      income.add((row['income'] as num?)?.toDouble() ?? 0);
+      expense.add((row['expense'] as num?)?.toDouble() ?? 0);
+      profit.add((row['net'] as num?)?.toDouble() ?? 0);
+    }
+
+    // Net cash as cumulative sum of per-bucket net (distinct from period profit line).
+    double runningNet = 0;
+    final cashflow = <double>[];
+    for (final row in series) {
+      final net = (row['net'] as num?)?.toDouble() ?? 0;
+      runningNet += net;
+      cashflow.add(runningNet);
+    }
+
+    return _DashChartSeries(
+      income: income,
+      expense: expense,
+      cashflow: cashflow,
+      profit: profit,
+      xLabels: xLabels,
     );
   }
 
-  Map<String, List<double>> _filterTrendSeries(List<dynamic> monthlyData, int days) {
-    // We do best-effort slicing based on available aggregated points.
-    final allIncome = _extractSeries(monthlyData, 'income');
-    final allExpense = _extractSeries(monthlyData, 'expense');
-    final allCash = _extractSeries(monthlyData, 'cashflow');
-    final allProfit = _extractSeries(monthlyData, 'profit');
-    final points = days <= 7
-        ? 7
-        : days <= 30
-            ? 10
-            : days <= 90
-                ? 14
-                : days <= 180
-                    ? 18
-                    : 24;
-    return {
-      'income': _tailWithPad(allIncome, points),
-      'expense': _tailWithPad(allExpense, points),
-      'cashflow': _tailWithPad(allCash, points),
-      'profit': _tailWithPad(allProfit, points),
-    };
+  /// Bar group width for Revenue + Expense rods (same layout rule as P&L trend).
+  static double _dashTrendGroupWidth(int n) {
+    final rodW = (320 / n).clamp(4.0, 18.0);
+    return rodW * 2 + 6;
   }
 
-  List<double> _tailWithPad(List<double> values, int points) {
-    if (values.isEmpty) return List<double>.filled(points, 0);
-    if (values.length >= points) return values.sublist(values.length - points);
-    return [...List<double>.filled(points - values.length, values.first), ...values];
+  /// X center of each bar group for [BarChartAlignment.spaceAround] (matches fl_chart).
+  static List<double> _barGroupCenterXsSpaceAround(
+    double viewWidth,
+    int n,
+    double groupWidth,
+  ) {
+    if (n <= 0) return [];
+    final sumWidth = groupWidth * n;
+    final spaceAvailable = viewWidth - sumWidth;
+    final eachSpace = spaceAvailable / (n * 2);
+    var tempX = 0.0;
+    final out = <double>[];
+    for (var i = 0; i < n; i++) {
+      tempX += eachSpace;
+      tempX += groupWidth / 2;
+      out.add(tempX);
+      tempX += groupWidth / 2;
+      tempX += eachSpace;
+    }
+    return out;
+  }
+
+  /// Line overlay with x in 0..1 aligned to bar centers (P&L trend pattern).
+  LineChartBarData _lineNormalized(List<double> data, List<double> spotXN, Color color) {
+    final n = data.length;
+    return LineChartBarData(
+      spots: List.generate(
+        n,
+        (i) => FlSpot(i < spotXN.length ? spotXN[i] : 0.5, i < data.length ? data[i] : 0),
+      ),
+      isCurved: true,
+      curveSmoothness: 0.35,
+      preventCurveOverShooting: true,
+      color: color,
+      barWidth: 2,
+      isStrokeCapRound: true,
+      dotData: FlDotData(
+        show: true,
+        getDotPainter: (spot, p0, p1, p2) => FlDotCirclePainter(
+          radius: n > 60 ? 2.0 : 3.0,
+          color: color,
+          strokeWidth: 1.5,
+          strokeColor: const Color(0xFF0F1E37),
+        ),
+      ),
+      belowBarData: BarAreaData(
+        show: true,
+        applyCutOffY: true,
+        cutOffY: 0,
+        color: const Color(0xFF19C37D).withValues(alpha: 0.2),
+      ),
+      aboveBarData: BarAreaData(
+        show: true,
+        applyCutOffY: true,
+        cutOffY: 0,
+        color: const Color(0xFFE57373).withValues(alpha: 0.2),
+      ),
+    );
   }
 
   double _deductionPct(double taxDeduction, double income, double expenses) {
@@ -1329,6 +1788,22 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
   }
 }
 
+class _DashChartSeries {
+  _DashChartSeries({
+    required this.income,
+    required this.expense,
+    required this.cashflow,
+    required this.profit,
+    required this.xLabels,
+  });
+
+  final List<double> income;
+  final List<double> expense;
+  final List<double> cashflow;
+  final List<double> profit;
+  final List<String> xLabels;
+}
+
 class _LegendDot extends StatelessWidget {
   const _LegendDot(this.label, this.color);
 
@@ -1339,6 +1814,7 @@ class _LegendDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 8,
@@ -1346,6 +1822,34 @@ class _LegendDot extends StatelessWidget {
           decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
         ),
         const SizedBox(width: 4),
+        AppText(label, fontSize: 10, color: _legendText),
+      ],
+    );
+  }
+}
+
+/// Line-style legend swatch (matches Profit & Loss trend “profit” line key).
+class _LegendLine extends StatelessWidget {
+  const _LegendLine(this.label, this.color);
+
+  final String label;
+  final Color color;
+  static const Color _legendText = Color(0xFF6E86AD);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 16,
+          height: 2,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(5),
+          ),
+        ),
+        const SizedBox(width: 8),
         AppText(label, fontSize: 10, color: _legendText),
       ],
     );
