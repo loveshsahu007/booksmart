@@ -3,6 +3,7 @@ import 'package:booksmart/modules/user/controllers/organization_controller.dart'
 import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/supabase/tables.dart';
 import 'package:booksmart/utils/supabase.dart';
+import 'package:booksmart/utils/balance_sheet_from_transactions.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart' as intl;
 
@@ -23,7 +24,11 @@ class FinancialReportController extends GetxController {
     if (isDemoMode.value) {
       _loadMockBalanceSheetData();
     } else {
-      fetchAndAggregateData(startDate: lastStartDate, endDate: lastEndDate);
+      fetchAndAggregateData(
+        startDate: lastStartDate,
+        endDate: lastEndDate,
+        balanceSheetAsOfSnapshot: lastFetchBalanceSheetSnapshot,
+      );
     }
     update();
   }
@@ -36,6 +41,16 @@ class FinancialReportController extends GetxController {
   // using the same date range the user last selected.
   DateTime? lastStartDate;
   DateTime? lastEndDate;
+
+  /// When true, [lastStartDate] and [lastEndDate] are both the Balance Sheet "As Of" day and
+  /// the last fetch loaded cumulative balances through that day (see [fetchAndAggregateData]).
+  bool lastFetchBalanceSheetSnapshot = false;
+
+  /// Full transaction history through the Balance Sheet As Of (used for exports + engine verify).
+  List<TransactionModel> balanceSheetSnapshotSourceTransactions = [];
+
+  /// 0 = same day previous month, 1 = 7 days before As Of, 2 = 30 days, 3 = 6 calendar months.
+  int balanceSheetComparisonMode = 0;
   int? _availableYearsOrgId;
   RxList<int> availableYears = <int>[].obs;
 
@@ -273,6 +288,7 @@ class FinancialReportController extends GetxController {
   Future<void> fetchAndAggregateData({
     DateTime? startDate,
     DateTime? endDate,
+    bool balanceSheetAsOfSnapshot = false,
   }) async {
     final int requestId = ++_latestFetchRequestId;
     if (isDemoMode.value) return;
@@ -285,27 +301,56 @@ class FinancialReportController extends GetxController {
       isLoading.value = true;
       update();
 
-      DateTime effectiveStart = _dateOnly(startDate ?? firstDayOfYear);
-      DateTime effectiveEnd = _dateOnly(endDate ?? today);
-      if (effectiveStart.isAfter(effectiveEnd)) {
-        final tmp = effectiveStart;
+      late final DateTime effectiveStart;
+      late final DateTime effectiveEnd;
+      late final DateTime queryLowerBound;
+      late final DateTime metricsStartDate;
+      late final DateTime metricsEndDate;
+      late final DateTime metricsPrevStart;
+      late final DateTime metricsPrevEnd;
+      late final DateTime reportStart;
+
+      if (balanceSheetAsOfSnapshot) {
+        effectiveEnd = _dateOnly(endDate ?? today);
         effectiveStart = effectiveEnd;
-        effectiveEnd = tmp;
+        queryLowerBound = DateTime(2000, 1, 1);
+        reportStart = effectiveEnd;
+        final DateTime prevAsOf = _sameDayPreviousMonth(effectiveEnd);
+        metricsEndDate = effectiveEnd;
+        metricsStartDate = DateTime(effectiveEnd.year - 1, effectiveEnd.month, 1);
+        metricsPrevEnd = prevAsOf;
+        metricsPrevStart = DateTime(prevAsOf.year - 1, prevAsOf.month, 1);
+        lastFetchBalanceSheetSnapshot = true;
+      } else {
+        lastFetchBalanceSheetSnapshot = false;
+        var rangeStart = _dateOnly(startDate ?? firstDayOfYear);
+        var rangeEnd = _dateOnly(endDate ?? today);
+        if (rangeStart.isAfter(rangeEnd)) {
+          final tmp = rangeStart;
+          rangeStart = rangeEnd;
+          rangeEnd = tmp;
+        }
+        effectiveStart = rangeStart;
+        effectiveEnd = rangeEnd;
+        queryLowerBound = effectiveStart;
+        reportStart = effectiveStart;
+        metricsStartDate = effectiveStart;
+        metricsEndDate = effectiveEnd;
+        if (!effectiveStart.isAfter(effectiveEnd)) {
+          final inclusiveDays =
+              effectiveEnd.difference(effectiveStart).inDays + 1;
+          final pEnd = effectiveStart.subtract(const Duration(days: 1));
+          final pStart = pEnd.subtract(Duration(days: inclusiveDays - 1));
+          metricsPrevStart = pStart;
+          metricsPrevEnd = pEnd;
+        } else {
+          metricsPrevStart = DateTime(now.year - 1, 1, 1);
+          metricsPrevEnd = DateTime(now.year - 1, 12, 31);
+        }
       }
+
       lastStartDate = effectiveStart;
       lastEndDate = effectiveEnd;
-
-      DateTime pStart;
-      DateTime pEnd;
-      if (!effectiveStart.isAfter(effectiveEnd)) {
-        final inclusiveDays =
-            effectiveEnd.difference(effectiveStart).inDays + 1;
-        pEnd = effectiveStart.subtract(const Duration(days: 1));
-        pStart = pEnd.subtract(Duration(days: inclusiveDays - 1));
-      } else {
-        pStart = DateTime(now.year - 1, 1, 1);
-        pEnd = DateTime(now.year - 1, 12, 31);
-      }
 
       final orgId = getCurrentOrganization?.id;
       if (orgId == null) {
@@ -318,7 +363,7 @@ class FinancialReportController extends GetxController {
           .from(SupabaseTable.transaction)
           .select()
           .eq('org_id', orgId);
-      query = query.gte('date_time', _sqlDateLocal(effectiveStart));
+      query = query.gte('date_time', _sqlDateLocal(queryLowerBound));
       query = query.lt('date_time', _sqlDateLocal(_nextDay(effectiveEnd)));
 
       final res = await query;
@@ -330,9 +375,17 @@ class FinancialReportController extends GetxController {
       dynamic prevQuery = supabase
           .from(SupabaseTable.transaction)
           .select()
-          .eq('org_id', orgId)
-          .gte('date_time', _sqlDateLocal(pStart))
-          .lt('date_time', _sqlDateLocal(_nextDay(pEnd)));
+          .eq('org_id', orgId);
+      if (balanceSheetAsOfSnapshot) {
+        final DateTime prevAsOf = _sameDayPreviousMonth(effectiveEnd);
+        prevQuery = prevQuery
+            .gte('date_time', _sqlDateLocal(queryLowerBound))
+            .lt('date_time', _sqlDateLocal(_nextDay(prevAsOf)));
+      } else {
+        prevQuery = prevQuery
+            .gte('date_time', _sqlDateLocal(metricsPrevStart))
+            .lt('date_time', _sqlDateLocal(_nextDay(metricsPrevEnd)));
+      }
 
       final prevRes = await prevQuery;
       if (requestId != _latestFetchRequestId) return;
@@ -340,7 +393,6 @@ class FinancialReportController extends GetxController {
           .map((e) => TransactionModel.fromJson(e))
           .toList();
 
-      final DateTime reportStart = effectiveStart;
       final openingRes = await supabase
           .from(SupabaseTable.transaction)
           .select()
@@ -363,12 +415,33 @@ class FinancialReportController extends GetxController {
       _calculateMetrics(
         currentTransactions,
         previousTransactions,
-        startDate: effectiveStart,
-        endDate: effectiveEnd,
-        prevStart: pStart,
-        prevEnd: pEnd,
+        startDate: metricsStartDate,
+        endDate: metricsEndDate,
+        prevStart: metricsPrevStart,
+        prevEnd: metricsPrevEnd,
         openingCash: openingCash,
       );
+      if (balanceSheetAsOfSnapshot) {
+        balanceSheetSnapshotSourceTransactions =
+            List<TransactionModel>.from(currentTransactions);
+        _applyEngineBalanceSheetSnapshot();
+        refreshBalanceSheetComparisonBaselines();
+      } else {
+        // Range fetch (dashboard / P&L): cumulative balance sheet through [effectiveEnd] must not
+        // depend on transactions only inside the visible window (fixes export vs dashboard mismatch).
+        dynamic bsHistQuery = supabase
+            .from(SupabaseTable.transaction)
+            .select()
+            .eq('org_id', orgId)
+            .gte('date_time', _sqlDateLocal(DateTime(2000, 1, 1)))
+            .lt('date_time', _sqlDateLocal(_nextDay(effectiveEnd)));
+        final bsHistRes = await bsHistQuery;
+        if (requestId != _latestFetchRequestId) return;
+        balanceSheetSnapshotSourceTransactions = (bsHistRes as List)
+            .map((e) => TransactionModel.fromJson(e))
+            .toList();
+        _applyEngineBalanceSheetSnapshot(includeNetIncome: false);
+      }
     } catch (e, s) {
       log("❌ [FRC] fetchAndAggregateData error: $e");
       log(s.toString());
@@ -1048,6 +1121,99 @@ class FinancialReportController extends GetxController {
 
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
+  /// Calendar day in the previous month, clamped (e.g. Mar 31 → Feb 28/29).
+  DateTime _sameDayPreviousMonth(DateTime date) {
+    final d = _dateOnly(date);
+    var y = d.year;
+    var m = d.month - 1;
+    if (m < 1) {
+      m = 12;
+      y--;
+    }
+    final lastDay = DateTime(y, m + 1, 0).day;
+    final day = d.day > lastDay ? lastDay : d.day;
+    return DateTime(y, m, day);
+  }
+
+  DateTime _subtractCalendarMonths(DateTime date, int months) {
+    var y = date.year;
+    var m = date.month - months;
+    while (m < 1) {
+      m += 12;
+      y--;
+    }
+    final lastDay = DateTime(y, m + 1, 0).day;
+    final d = date.day > lastDay ? lastDay : date.day;
+    return DateTime(y, m, d);
+  }
+
+  DateTime _balanceSheetComparisonBaselineDate(DateTime asOf) {
+    final a = _dateOnly(asOf);
+    switch (balanceSheetComparisonMode) {
+      case 1:
+        return _dateOnly(a.subtract(const Duration(days: 7)));
+      case 2:
+        return _dateOnly(a.subtract(const Duration(days: 30)));
+      case 3:
+        return _subtractCalendarMonths(a, 6);
+      case 0:
+      default:
+        return _sameDayPreviousMonth(a);
+    }
+  }
+
+  void setBalanceSheetComparisonMode(int mode) {
+    if (balanceSheetComparisonMode == mode) return;
+    balanceSheetComparisonMode = mode;
+    refreshBalanceSheetComparisonBaselines();
+    update();
+  }
+
+  /// Reconciles Balance Sheet lines with [BalanceSheetLineMetrics] (same engine as exports).
+  ///
+  /// When [includeNetIncome] is false (e.g. dashboard date-range fetch), period P&L [netIncome]
+  /// from [_calculateMetrics] is left unchanged; only balance sheet maps and asset/liability totals update.
+  void _applyEngineBalanceSheetSnapshot({bool includeNetIncome = true}) {
+    if (balanceSheetSnapshotSourceTransactions.isEmpty || lastEndDate == null) {
+      return;
+    }
+    final m = BalanceSheetLineMetrics.computeThrough(
+      balanceSheetSnapshotSourceTransactions,
+      lastEndDate!,
+    );
+    totalAssets.value = m.totalAssets;
+    totalLiabilities.value = m.totalLiabilities;
+    if (includeNetIncome) {
+      netIncome.value = m.netIncome;
+    }
+    currentAssetsBreakdown.assignAll(m.currentAssetsBreakdown);
+    fixedAssetsBreakdown.assignAll(m.fixedAssetsBreakdown);
+    otherAssetsBreakdown.assignAll(m.otherAssetsBreakdown);
+    currentLiabilitiesBreakdown.assignAll(m.currentLiabilitiesBreakdown);
+    longTermLiabilitiesBreakdown.assignAll(m.longTermLiabilitiesBreakdown);
+    ownerEquityBreakdown.assignAll(m.ownerEquityBreakdown);
+  }
+
+  void refreshBalanceSheetComparisonBaselines() {
+    if (!lastFetchBalanceSheetSnapshot ||
+        balanceSheetSnapshotSourceTransactions.isEmpty ||
+        lastEndDate == null) {
+      return;
+    }
+    final base = _balanceSheetComparisonBaselineDate(lastEndDate!);
+    final p = BalanceSheetLineMetrics.computeThrough(
+      balanceSheetSnapshotSourceTransactions,
+      base,
+    );
+    prevPeriodAssets.value = p.totalAssets;
+    prevPeriodLiabilities.value = p.totalLiabilities;
+    prevPeriodNetIncome.value = p.netIncome;
+    prevPeriodCurrentAssets.value =
+        p.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
+    prevPeriodCurrentLiabilities.value =
+        p.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b);
+  }
+
   /// P&L trend bucketing (inclusive day count):
   /// - 1–31 days → daily (custom month-spanning ranges like the 30-day preset)
   /// - 32–186 days → weekly (~≤6 months)
@@ -1349,6 +1515,7 @@ class FinancialReportController extends GetxController {
   }
 
   void _loadMockBalanceSheetData() {
+    balanceSheetSnapshotSourceTransactions.clear();
     currentAssetsBreakdown.value = {
       "Cash": 145980.0,
       "Accounts Receivable": 291960.0,

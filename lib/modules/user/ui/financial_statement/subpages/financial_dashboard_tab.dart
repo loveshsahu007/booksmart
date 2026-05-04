@@ -66,6 +66,12 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
           final pNetCash = pCashIn - pCashOut;
 
           final dateRange = _formatRange(controller.lastStartDate, controller.lastEndDate);
+          final balanceSheetAsOf = controller.lastEndDate ??
+              DateTime(
+                DateTime.now().year,
+                DateTime.now().month,
+                DateTime.now().day,
+              );
           final deductionPct = _deductionPct(controller.totalTaxDeductions.value, income, expenses);
           final healthScore = _healthScore(
             netIncome: netIncome,
@@ -159,6 +165,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                     ),
                     _overviewBand(
                       dateRange: dateRange,
+                      balanceSheetAsOf: balanceSheetAsOf,
                       income: income, pIncome: pIncome,
                       expenses: expenses, pExpenses: pExpenses,
                       netIncome: netIncome, pNetIncome: pNetIncome,
@@ -404,6 +411,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
 
   Widget _overviewBand({
     required String dateRange,
+    required DateTime balanceSheetAsOf,
     required double income, required double pIncome,
     required double expenses, required double pExpenses,
     required double netIncome, required double pNetIncome,
@@ -427,6 +435,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
             netIncome: netIncome, pNetIncome: pNetIncome,
           ),
           _balanceOverviewCard(
+            balanceSheetAsOf: balanceSheetAsOf,
             assets: assets, pAssets: pAssets,
             liabilities: liabilities, pLiabilities: pLiabilities,
             equity: equity, pEquity: pEquity,
@@ -515,6 +524,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
   }
 
   Widget _balanceOverviewCard({
+    required DateTime balanceSheetAsOf,
     required double assets, required double pAssets,
     required double liabilities, required double pLiabilities,
     required double equity, required double pEquity,
@@ -528,7 +538,11 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const AppText('Balance Sheet Overview', fontSize: 13, color: _title, fontWeight: FontWeight.w600),
-          AppText('As of ${DateFormat('MMM dd, yyyy').format(DateTime.now())}', fontSize: 10, color: _muted),
+          AppText(
+            'As of ${DateFormat('MMM dd, yyyy').format(balanceSheetAsOf)}',
+            fontSize: 10,
+            color: _muted,
+          ),
           const SizedBox(height: 8),
           _overviewLine('Total Assets', money.format(assets), _pctChange(assets, pAssets), positiveIsGood: true),
           _overviewLine('Total Liabilities', money.format(liabilities), _pctChange(liabilities, pLiabilities), positiveIsGood: false),

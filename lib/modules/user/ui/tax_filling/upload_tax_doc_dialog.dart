@@ -9,11 +9,11 @@ import 'package:path/path.dart' as path;
 
 import '../../../../widgets/custom_drop_down.dart';
 
-/// Financial statement categories for uploads (do not use "Taxes" as label).
+/// Financial statement categories for uploads (order matches product spec).
 const List<String> kFinancialStatementCategories = [
+  'Balance Sheet',
   'Profit & Loss',
   'Income Statement',
-  'Balance Sheet',
   'Cash Flow Statement',
   'Transactions',
 ];
@@ -72,8 +72,13 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
   String? selectedCategory;
   DateTime? periodStart;
   DateTime? periodEnd;
+  DateTime? balanceSheetAsOf;
 
   late final TaxDocumentController _ctrl;
+
+  bool get _isBalanceSheetUpload =>
+      (selectedCategory?.trim() == 'Balance Sheet') ||
+      widget.type?.toLowerCase() == 'bs';
 
   String? _defaultCategoryForType() {
     switch (widget.type?.toLowerCase()) {
@@ -90,7 +95,7 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
   }
 
   List<String> get _yearItems {
-    final cap = DateTime.now().year + 3;
+    final cap = DateTime.now().year;
     return [for (var y = cap; y >= 1960; y--) y.toString()];
   }
 
@@ -102,6 +107,7 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
     periodStart = DateTime(y, 1, 1);
     periodEnd = DateTime(y, 12, 31);
     selectedCategory = _defaultCategoryForType();
+    balanceSheetAsOf = DateTime(y, DateTime.now().month, DateTime.now().day);
     _ctrl = Get.isRegistered<TaxDocumentController>()
         ? Get.find<TaxDocumentController>()
         : Get.put(TaxDocumentController());
@@ -136,14 +142,30 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
     });
   }
 
+  Future<void> _pickBalanceSheetAsOf(BuildContext context) async {
+    final initial = balanceSheetAsOf ?? DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1960),
+      lastDate: DateTime(DateTime.now().year + 10, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      balanceSheetAsOf = DateTime(picked.year, picked.month, picked.day);
+    });
+  }
+
   Future<void> _save(BuildContext context) async {
     final fileUrl = await _ctrl.uploadDocument(
       name: nameCtrl.text,
       taxYear: selectedYear,
       category: selectedCategory,
       type: widget.type,
-      periodStart: periodStart,
-      periodEnd: periodEnd,
+      periodStart: _isBalanceSheetUpload ? null : periodStart,
+      periodEnd: _isBalanceSheetUpload ? null : periodEnd,
+      balanceSheetAsOf:
+          _isBalanceSheetUpload ? balanceSheetAsOf : null,
     );
     if (fileUrl != null) {
       Get.back();
@@ -288,7 +310,7 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
 
               CustomDropDownWidget<String>(
                 dropDownKey: yearDropdownKey,
-                label: 'Year *',
+                label: 'Year',
                 hint: 'Select year',
                 items: _yearItems,
                 selectedItem: selectedYear,
@@ -296,7 +318,7 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
                   setState(() {
                     selectedYear = v;
                     final yi = int.tryParse(v ?? '');
-                    if (yi != null) {
+                    if (yi != null && !_isBalanceSheetUpload) {
                       periodStart = DateTime(yi, 1, 1);
                       periodEnd = DateTime(yi, 12, 31);
                     }
@@ -305,42 +327,63 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
               ),
               const SizedBox(height: 12),
 
-              Align(
-                alignment: Alignment.centerLeft,
-                child: AppText(
-                  'Document period (required) *',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+              if (_isBalanceSheetUpload) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: AppText(
+                    'As Of Date (required) *',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _pickDate(context, isStart: true),
-                      icon: const Icon(Icons.calendar_today, size: 18),
-                      label: Text(
-                        periodStart == null
-                            ? 'Start date *'
-                            : 'Start: ${_dateFmt.format(periodStart!)}',
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => _pickBalanceSheetAsOf(context),
+                  icon: const Icon(Icons.calendar_today, size: 18),
+                  label: Text(
+                    balanceSheetAsOf == null
+                        ? 'Select As Of date *'
+                        : 'As Of: ${_dateFmt.format(balanceSheetAsOf!)}',
+                  ),
+                ),
+              ] else ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: AppText(
+                    'Document period (required) *',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _pickDate(context, isStart: true),
+                        icon: const Icon(Icons.calendar_today, size: 18),
+                        label: Text(
+                          periodStart == null
+                              ? 'Start date *'
+                              : 'Start: ${_dateFmt.format(periodStart!)}',
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _pickDate(context, isStart: false),
-                      icon: const Icon(Icons.calendar_today, size: 18),
-                      label: Text(
-                        periodEnd == null
-                            ? 'End date *'
-                            : 'End: ${_dateFmt.format(periodEnd!)}',
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _pickDate(context, isStart: false),
+                        icon: const Icon(Icons.calendar_today, size: 18),
+                        label: Text(
+                          periodEnd == null
+                              ? 'End date *'
+                              : 'End: ${_dateFmt.format(periodEnd!)}',
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 20),
 
               Row(
@@ -400,16 +443,26 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
       showSnackBar('Please select a year', isError: true);
       return;
     }
-    if (periodStart == null || periodEnd == null) {
-      showSnackBar(
-        'Please select start and end dates for the document period',
-        isError: true,
-      );
-      return;
-    }
-    if (periodEnd!.isBefore(periodStart!)) {
-      showSnackBar('End date must be on or after the start date', isError: true);
-      return;
+    if (_isBalanceSheetUpload) {
+      if (balanceSheetAsOf == null) {
+        showSnackBar('Please select an As Of date', isError: true);
+        return;
+      }
+    } else {
+      if (periodStart == null || periodEnd == null) {
+        showSnackBar(
+          'Please select start and end dates for the document period',
+          isError: true,
+        );
+        return;
+      }
+      if (periodEnd!.isBefore(periodStart!)) {
+        showSnackBar(
+          'End date must be on or after the start date',
+          isError: true,
+        );
+        return;
+      }
     }
     await _save(context);
   }

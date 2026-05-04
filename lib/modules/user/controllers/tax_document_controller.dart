@@ -3,9 +3,13 @@ import 'package:path/path.dart' as p;
 import 'package:intl/intl.dart';
 
 import 'package:booksmart/models/financial_template_models.dart';
+import 'package:booksmart/modules/user/ui/tax_filling/bs_reconciliation_dialog.dart';
 import 'package:booksmart/modules/user/ui/tax_filling/manual_pnl_review_helper.dart';
 import 'package:booksmart/modules/user/ui/tax_filling/pl_reconciliation_dialog.dart';
+import 'package:booksmart/modules/user/ui/financial_statement/pdf_export_service.dart';
+import 'package:booksmart/utils/balance_sheet_from_transactions.dart';
 import 'package:booksmart/utils/pl_transaction_totals.dart';
+import 'package:booksmart/models/transaction_model.dart';
 import 'package:booksmart/models/user_document_model.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/modules/user/controllers/financial_report_controller.dart';
@@ -41,10 +45,13 @@ class _ManualPeriodColumn {
     required this.year,
     required this.start,
     required this.end,
+    this.displayLabel,
   });
   int year;
   DateTime start;
   DateTime end;
+  /// Balance sheet column header (e.g. "2026 (As of May 3, 2026)").
+  String? displayLabel;
 }
 
 class TaxDocumentController extends GetxController {
@@ -60,6 +67,14 @@ class TaxDocumentController extends GetxController {
   DateTime? _uploadPeriodStart;
   DateTime? _uploadPeriodEnd;
   List<_MultiPeriodSaveEntry>? _multiPeriodExtracted;
+
+  /// Balance Sheet upload: single As Of date (no range).
+  DateTime? _uploadBalanceSheetAsOf;
+
+  /// Manual review dialog (Balance Sheet): column generator state.
+  DateTime _dialogBsAsOf = DateTime.now();
+  int _dialogBsPeriodCount = 1;
+  PdfViewType _dialogBsFreq = PdfViewType.yearly;
 
   /// When true, [UploadTaxDocWidget] should not show the generic success snackbar
   /// (P&L uploads show a reconciliation-specific message instead).
@@ -156,6 +171,8 @@ class TaxDocumentController extends GetxController {
     String? type,
     DateTime? periodStart,
     DateTime? periodEnd,
+    /// Required for Balance Sheet uploads; snapshot date for reconciliation.
+    DateTime? balanceSheetAsOf,
     int? userId,
     int? orderId,
     int? cpaId,
@@ -187,8 +204,22 @@ class TaxDocumentController extends GetxController {
     try {
       isUploading.value = true;
       _multiPeriodExtracted = null;
+      _uploadBalanceSheetAsOf = null;
       _uploadPeriodStart = periodStart;
       _uploadPeriodEnd = periodEnd;
+
+      final isBsCategory =
+          category?.trim() == 'Balance Sheet' || _normalizeType(type) == 'bs';
+      if (isBsCategory && balanceSheetAsOf != null) {
+        final d = DateTime(
+          balanceSheetAsOf.year,
+          balanceSheetAsOf.month,
+          balanceSheetAsOf.day,
+        );
+        _uploadBalanceSheetAsOf = d;
+        _uploadPeriodStart = d;
+        _uploadPeriodEnd = d;
+      }
 
       // 1. Upload to Storage
       final mimeType = _guessMime(fileToUpload.name);
@@ -212,11 +243,19 @@ class TaxDocumentController extends GetxController {
 
       // 3. Insert DB row
       final periodMeta = <String, dynamic>{};
-      if (periodStart != null) {
-        periodMeta['period_start'] = periodStart.toIso8601String();
-      }
-      if (periodEnd != null) {
-        periodMeta['period_end'] = periodEnd.toIso8601String();
+      if (balanceSheetAsOf != null && isBsCategory) {
+        periodMeta['as_of'] = DateTime(
+          balanceSheetAsOf.year,
+          balanceSheetAsOf.month,
+          balanceSheetAsOf.day,
+        ).toIso8601String();
+      } else {
+        if (periodStart != null) {
+          periodMeta['period_start'] = periodStart.toIso8601String();
+        }
+        if (periodEnd != null) {
+          periodMeta['period_end'] = periodEnd.toIso8601String();
+        }
       }
       if (category != null && category.isNotEmpty) {
         periodMeta['document_category'] = category;
@@ -336,6 +375,31 @@ class TaxDocumentController extends GetxController {
               reconResult,
               shouldSaveTransactions,
             );
+          } else if (normalizedType == 'bs') {
+            suppressUploadSuccessSnack = true;
+            final uploaded = _activeBalanceSheetTemplateAfterReview();
+            if (uploaded != null) {
+              final asOf = _balanceSheetReconciliationAsOf();
+              final book = await _fetchBooksmartBsBook(orgId, asOf);
+              final reconResult =
+                  await showBsReconciliationDialog(
+                        book: book,
+                        uploaded: uploaded,
+                        periodLabel: _bsReconciliationPeriodLabel(taxYear),
+                      ) ??
+                      BsReconciliationOutcome.investigateDifference;
+
+              final shouldSave =
+                  reconResult == BsReconciliationOutcome.overrideWithUploaded;
+              if (shouldSave) {
+                await runSaveTransactions();
+              } else {
+                _multiPeriodExtracted = null;
+              }
+              _snackbarAfterBsReconciliation(reconResult, shouldSave);
+            } else {
+              await runSaveTransactions();
+            }
           } else {
             await runSaveTransactions();
           }
@@ -346,6 +410,7 @@ class TaxDocumentController extends GetxController {
             fc.fetchAndAggregateData(
               startDate: fc.lastStartDate,
               endDate: fc.lastEndDate,
+              balanceSheetAsOfSnapshot: fc.lastFetchBalanceSheetSnapshot,
             );
           }
         }
@@ -396,7 +461,35 @@ class TaxDocumentController extends GetxController {
     }
   }
 
-  List<_ManualPeriodColumn> _initialManualPeriodColumns() {
+  List<_ManualPeriodColumn> _initialManualPeriodColumns(String type) {
+    if (type == 'bs') {
+      final as = DateTime(
+        _dialogBsAsOf.year,
+        _dialogBsAsOf.month,
+        _dialogBsAsOf.day,
+      );
+      final n = _dialogBsPeriodCount.clamp(1, PdfExportService.maxColumns);
+      final ends = PdfExportService.buildBalanceSheetSnapshotColumnEnds(
+        asOf: as,
+        viewType: _dialogBsFreq,
+        periodCount: n,
+      );
+      final labels = PdfExportService.buildBalanceSheetSnapshotColumnLabels(
+        ends,
+        _dialogBsFreq,
+        as,
+      );
+      return [
+        for (var i = 0; i < ends.length; i++)
+          _ManualPeriodColumn(
+            year: ends[i].year,
+            start: ends[i],
+            end: ends[i],
+            displayLabel: labels[i],
+          ),
+      ];
+    }
+
     final s = _uploadPeriodStart;
     final e = _uploadPeriodEnd;
     final nowY = DateTime.now().year;
@@ -437,8 +530,160 @@ class TaxDocumentController extends GetxController {
   }
 
   List<int> _yearPickerRange() {
-    final cap = DateTime.now().year + 3;
+    final cap = DateTime.now().year;
     return [for (var y = cap; y >= 1960; y--) y];
+  }
+
+  String _sqlDateOnlyForTx(DateTime d) {
+    final x = DateTime(d.year, d.month, d.day);
+    return '${x.year}-${x.month.toString().padLeft(2, '0')}-${x.day.toString().padLeft(2, '0')}';
+  }
+
+  DateTime _sqlNextCalendarDay(DateTime d) =>
+      DateTime(d.year, d.month, d.day + 1);
+
+  Future<BsReconciliationBook> _fetchBooksmartBsBook(
+    int orgId,
+    DateTime asOf,
+  ) async {
+    final day = DateTime(asOf.year, asOf.month, asOf.day);
+    try {
+      final res = await supabase
+          .from(SupabaseTable.transaction)
+          .select()
+          .eq('org_id', orgId)
+          .gte('date_time', _sqlDateOnlyForTx(DateTime(2000, 1, 1)))
+          .lt('date_time', _sqlDateOnlyForTx(_sqlNextCalendarDay(day)));
+      final txs = (res as List)
+          .map((e) => TransactionModel.fromJson(e))
+          .toList();
+      final m = BalanceSheetLineMetrics.computeThrough(txs, day);
+      return BsReconciliationBook(
+        totalAssets: m.totalAssets,
+        totalLiabilities: m.totalLiabilities,
+        equity: m.totalEquity,
+      );
+    } catch (e, st) {
+      log('TaxDocumentController._fetchBooksmartBsBook: $e\n$st');
+      return const BsReconciliationBook(
+        totalAssets: 0,
+        totalLiabilities: 0,
+        equity: 0,
+      );
+    }
+  }
+
+  BalanceSheetTemplate? _activeBalanceSheetTemplateAfterReview() {
+    if (_multiPeriodExtracted != null && _multiPeriodExtracted!.isNotEmpty) {
+      for (var i = _multiPeriodExtracted!.length - 1; i >= 0; i--) {
+        final e = _multiPeriodExtracted![i];
+        if (e.type == 'bs' && e.template is BalanceSheetTemplate) {
+          return e.template as BalanceSheetTemplate;
+        }
+      }
+    }
+    final d = extractedData.value;
+    if (d is BalanceSheetTemplate) return d;
+    return null;
+  }
+
+  DateTime _balanceSheetReconciliationAsOf() {
+    if (_multiPeriodExtracted != null && _multiPeriodExtracted!.isNotEmpty) {
+      final d = _multiPeriodExtracted!.last.docDate;
+      return DateTime(d.year, d.month, d.day);
+    }
+    if (_uploadBalanceSheetAsOf != null) {
+      return DateTime(
+        _uploadBalanceSheetAsOf!.year,
+        _uploadBalanceSheetAsOf!.month,
+        _uploadBalanceSheetAsOf!.day,
+      );
+    }
+    if (_uploadPeriodEnd != null) {
+      return DateTime(
+        _uploadPeriodEnd!.year,
+        _uploadPeriodEnd!.month,
+        _uploadPeriodEnd!.day,
+      );
+    }
+    return DateTime.now();
+  }
+
+  String _bsReconciliationPeriodLabel(String? taxYear) {
+    if (_uploadBalanceSheetAsOf != null) {
+      return 'As of: ${_dateFmt.format(_uploadBalanceSheetAsOf!)}';
+    }
+    final s = _uploadPeriodStart;
+    final e = _uploadPeriodEnd;
+    if (s != null && e != null) {
+      return 'Period: ${_dateFmt.format(s)} – ${_dateFmt.format(e)}';
+    }
+    final y = int.tryParse((taxYear ?? '').trim()) ?? DateTime.now().year;
+    return 'Year: $y';
+  }
+
+  void _snackbarAfterBsReconciliation(
+    BsReconciliationOutcome outcome,
+    bool savedTransactions,
+  ) {
+    switch (outcome) {
+      case BsReconciliationOutcome.overrideWithUploaded:
+        showSnackBar(
+          savedTransactions
+              ? 'Reconciliation confirmed. Uploaded balance sheet totals were written to your transactions; refresh the balance sheet to see updates.'
+              : 'Reconciliation closed without saving transactions. Your balance sheet was not changed — adjust data and try again if needed.',
+        );
+        return;
+      case BsReconciliationOutcome.keepBookSmart:
+        showSnackBar(
+          'You kept BookSmart values. The file is saved for reference; your balance sheet totals were not overwritten.',
+        );
+        return;
+      case BsReconciliationOutcome.investigateDifference:
+        showSnackBar(
+          'Reconciliation paused. The file is saved; no balance sheet transactions were added. Update transactions or adjustments, then reconcile again.',
+        );
+        return;
+    }
+  }
+
+  void _syncBsManualPeriodColumns({
+    required List<_ManualPeriodColumn> periodColumns,
+    required Map<String, TextEditingController> controllers,
+    required DateTime asOf,
+    required int periodCount,
+    required PdfViewType frequency,
+  }) {
+    for (var i = periodColumns.length - 1; i >= 0; i--) {
+      _disposeControllersForColumn('bs', controllers, i);
+    }
+    periodColumns.clear();
+    _dialogBsAsOf = DateTime(asOf.year, asOf.month, asOf.day);
+    _dialogBsPeriodCount = periodCount.clamp(1, PdfExportService.maxColumns);
+    _dialogBsFreq = frequency;
+    final ends = PdfExportService.buildBalanceSheetSnapshotColumnEnds(
+      asOf: _dialogBsAsOf,
+      viewType: _dialogBsFreq,
+      periodCount: _dialogBsPeriodCount,
+    );
+    final labels = PdfExportService.buildBalanceSheetSnapshotColumnLabels(
+      ends,
+      _dialogBsFreq,
+      _dialogBsAsOf,
+    );
+    for (var i = 0; i < ends.length; i++) {
+      periodColumns.add(
+        _ManualPeriodColumn(
+          year: ends[i].year,
+          start: ends[i],
+          end: ends[i],
+          displayLabel: labels[i],
+        ),
+      );
+    }
+    for (var i = 0; i < periodColumns.length; i++) {
+      _seedManualColumnControllers('bs', controllers, i);
+    }
   }
 
   String _statementTypeLabel(String type) {
@@ -1132,6 +1377,7 @@ class TaxDocumentController extends GetxController {
     }
 
     void addPeriod() {
+      if (type == 'bs') return;
       if (periodColumns.length >= 8) return;
       final last = periodColumns.last;
       final nextY = last.year + 1;
@@ -1153,6 +1399,7 @@ class TaxDocumentController extends GetxController {
     }
 
     void removeLastPeriod() {
+      if (type == 'bs') return;
       if (periodColumns.length <= 1) return;
       final idx = periodColumns.length - 1;
       _disposeControllersForColumn(type, controllers, idx);
@@ -1183,28 +1430,139 @@ class TaxDocumentController extends GetxController {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            TextButton.icon(
-              onPressed: addPeriod,
-              icon: const Icon(Icons.add, color: Colors.white70, size: 18),
-              label: const Text(
-                'Add period',
-                style: TextStyle(color: Colors.white70),
-              ),
+        if (type == 'bs') ...[
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Define snapshot columns (As Of, number of periods, frequency). '
+              'Oldest period is first; the last column is your As Of snapshot.',
+              style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.3),
             ),
-            if (periodColumns.length > 1)
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 130,
+                child: DropdownButtonFormField<int>(
+                  value: _dialogBsPeriodCount,
+                  dropdownColor: const Color(0xFF1a2942),
+                  decoration: const InputDecoration(
+                    labelText: 'Periods',
+                    labelStyle: TextStyle(color: Colors.white54, fontSize: 11),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  items: [
+                    for (var n = 1; n <= PdfExportService.maxColumns; n++)
+                      DropdownMenuItem(value: n, child: Text('$n')),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    _syncBsManualPeriodColumns(
+                      periodColumns: periodColumns,
+                      controllers: controllers,
+                      asOf: _dialogBsAsOf,
+                      periodCount: v,
+                      frequency: _dialogBsFreq,
+                    );
+                    setLocalState(() {});
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 200,
+                child: DropdownButtonFormField<PdfViewType>(
+                  value: _dialogBsFreq,
+                  dropdownColor: const Color(0xFF1a2942),
+                  decoration: const InputDecoration(
+                    labelText: 'Frequency',
+                    labelStyle: TextStyle(color: Colors.white54, fontSize: 11),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  items: const [
+                    DropdownMenuItem(
+                      value: PdfViewType.monthly,
+                      child: Text('Monthly'),
+                    ),
+                    DropdownMenuItem(
+                      value: PdfViewType.quarterly,
+                      child: Text('Quarterly'),
+                    ),
+                    DropdownMenuItem(
+                      value: PdfViewType.yearly,
+                      child: Text('Yearly'),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    _syncBsManualPeriodColumns(
+                      periodColumns: periodColumns,
+                      controllers: controllers,
+                      asOf: _dialogBsAsOf,
+                      periodCount: _dialogBsPeriodCount,
+                      frequency: v,
+                    );
+                    setLocalState(() {});
+                  },
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _dialogBsAsOf,
+                    firstDate: DateTime(1960),
+                    lastDate: DateTime(DateTime.now().year + 10, 12, 31),
+                  );
+                  if (picked == null) return;
+                  _syncBsManualPeriodColumns(
+                    periodColumns: periodColumns,
+                    controllers: controllers,
+                    asOf: picked,
+                    periodCount: _dialogBsPeriodCount,
+                    frequency: _dialogBsFreq,
+                  );
+                  setLocalState(() {});
+                },
+                icon: const Icon(Icons.calendar_today, size: 16),
+                label: Text(
+                  'As of: ${_dateFmt.format(_dialogBsAsOf)}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (type != 'bs') ...[
+          Row(
+            children: [
               TextButton.icon(
-                onPressed: removeLastPeriod,
-                icon: const Icon(Icons.remove, color: Colors.white70, size: 18),
+                onPressed: addPeriod,
+                icon: const Icon(Icons.add, color: Colors.white70, size: 18),
                 label: const Text(
-                  'Remove last period',
+                  'Add period',
                   style: TextStyle(color: Colors.white70),
                 ),
               ),
-          ],
-        ),
-        const SizedBox(height: 8),
+              if (periodColumns.length > 1)
+                TextButton.icon(
+                  onPressed: removeLastPeriod,
+                  icon: const Icon(Icons.remove, color: Colors.white70, size: 18),
+                  label: const Text(
+                    'Remove last period',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
@@ -1230,54 +1588,73 @@ class TaxDocumentController extends GetxController {
                             ),
                           ),
                           const SizedBox(height: 6),
-                          DropdownButtonFormField<int>(
-                            value: col.year,
-                            dropdownColor: const Color(0xFF1a2942),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 13,
-                            ),
-                            decoration: const InputDecoration(
-                              labelText: 'Year',
-                              labelStyle: TextStyle(
-                                color: Colors.white54,
-                                fontSize: 11,
-                              ),
-                              isDense: true,
-                            ),
-                            items: [
-                              for (final y in _yearPickerRange())
-                                DropdownMenuItem(value: y, child: Text('$y')),
-                            ],
-                            onChanged: (v) {
-                              if (v == null) return;
-                              setLocalState(() {
-                                periodColumns[i].year = v;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 6),
-                          OutlinedButton(
-                            onPressed: () => pickColDate(i, true),
-                            child: Text(
-                              'Start: ${_dateFmt.format(col.start)}',
+                          if (type == 'bs' && col.displayLabel != null) ...[
+                            Text(
+                              col.displayLabel!,
                               style: const TextStyle(
-                                fontSize: 11,
                                 color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          OutlinedButton(
-                            onPressed: () => pickColDate(i, false),
-                            child: Text(
-                              'End: ${_dateFmt.format(col.end)}',
+                            const SizedBox(height: 4),
+                            Text(
+                              'Snapshot: ${_dateFmt.format(col.end)}',
                               style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.white,
+                                color: Colors.white38,
+                                fontSize: 10,
                               ),
                             ),
-                          ),
+                          ] else ...[
+                            DropdownButtonFormField<int>(
+                              value: col.year,
+                              dropdownColor: const Color(0xFF1a2942),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                              ),
+                              decoration: const InputDecoration(
+                                labelText: 'Year',
+                                labelStyle: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 11,
+                                ),
+                                isDense: true,
+                              ),
+                              items: [
+                                for (final y in _yearPickerRange())
+                                  DropdownMenuItem(value: y, child: Text('$y')),
+                              ],
+                              onChanged: (v) {
+                                if (v == null) return;
+                                setLocalState(() {
+                                  periodColumns[i].year = v;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 6),
+                            OutlinedButton(
+                              onPressed: () => pickColDate(i, true),
+                              child: Text(
+                                'Start: ${_dateFmt.format(col.start)}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            OutlinedButton(
+                              onPressed: () => pickColDate(i, false),
+                              child: Text(
+                                'End: ${_dateFmt.format(col.end)}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1310,8 +1687,15 @@ class TaxDocumentController extends GetxController {
 
     final isManual = _isZeroTemplate(type);
     final controllers = <String, TextEditingController>{};
-    var periodColumns =
-        isManual ? _initialManualPeriodColumns() : <_ManualPeriodColumn>[];
+    var periodColumns = <_ManualPeriodColumn>[];
+    if (isManual) {
+      if (type == 'bs') {
+        _dialogBsAsOf = _uploadBalanceSheetAsOf ?? DateTime.now();
+        _dialogBsPeriodCount = 1;
+        _dialogBsFreq = PdfViewType.yearly;
+      }
+      periodColumns = _initialManualPeriodColumns(type);
+    }
     final pnlManualOverrides =
         (isManual && type == 'pnl') ? <String, bool>{} : null;
 
@@ -1500,7 +1884,11 @@ class TaxDocumentController extends GetxController {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        '${periodColumns[i].year} (${_dateFmt.format(periodColumns[i].start)}–${_dateFmt.format(periodColumns[i].end)})',
+                                        type == 'bs' &&
+                                                periodColumns[i].displayLabel !=
+                                                    null
+                                            ? periodColumns[i].displayLabel!
+                                            : '${periodColumns[i].year} (${_dateFmt.format(periodColumns[i].start)}–${_dateFmt.format(periodColumns[i].end)})',
                                         style: const TextStyle(
                                           color: Colors.white54,
                                           fontSize: 11,
@@ -1611,6 +1999,11 @@ class TaxDocumentController extends GetxController {
                   } else {
                   _applyControllersToExtractedData(type, controllers);
                   }
+                  if (type == 'bs') {
+                    showSnackBar(
+                      'Please review and confirm differences before updating your balance sheet.',
+                    );
+                  }
                   confirmed = true;
                   Get.back();
                 },
@@ -1644,7 +2037,8 @@ class TaxDocumentController extends GetxController {
       return data.currentAssets == 0 &&
           data.nonCurrentAssets == 0 &&
           data.currentLiabilities == 0 &&
-          data.longTermLiabilities == 0;
+          data.longTermLiabilities == 0 &&
+          data.equity == 0;
     }
     if (type == 'cf' && data is CashFlowTemplate) {
       return data.operatingActivities == 0 &&

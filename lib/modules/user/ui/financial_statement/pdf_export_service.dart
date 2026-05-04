@@ -19,6 +19,7 @@ class PdfExportRequest {
     required this.companyName,
     required this.companyAddress,
     this.logoBytes,
+    this.balanceSheetSnapshotEnds,
   });
 
   final DateTime startDate;
@@ -28,6 +29,10 @@ class PdfExportRequest {
   final String companyName;
   final String companyAddress;
   final Uint8List? logoBytes;
+
+  /// When set (1–5 dates, oldest → newest, last = As Of), Balance Sheet exports
+  /// use a true cumulative snapshot per column instead of calendar bucket sums.
+  final List<DateTime>? balanceSheetSnapshotEnds;
 }
 
 class CashFlowPdfData {
@@ -126,6 +131,106 @@ class PdfExportService {
         if (years > 5) return 'Yearly view supports max 5 years.';
         return null;
     }
+  }
+
+  static DateTime _bsMonthEnd(int y, int m) => DateTime(y, m + 1, 0);
+
+  static DateTime _bsEndOfQuarterForDay(DateTime d) {
+    final qm = ((d.month - 1) ~/ 3 + 1) * 3;
+    return _bsMonthEnd(d.year, qm);
+  }
+
+  static DateTime _bsPreviousQuarterEnd(DateTime day) {
+    final d = DateTime(day.year, day.month, day.day);
+    final qe = _bsEndOfQuarterForDay(d);
+    if (d.year == qe.year && d.month == qe.month && d.day == qe.day) {
+      final pm = qe.month - 3;
+      if (pm < 1) return _bsMonthEnd(qe.year - 1, 12);
+      return _bsMonthEnd(qe.year, pm);
+    }
+    final pm2 = qe.month - 3;
+    if (pm2 < 1) return _bsMonthEnd(qe.year - 1, 12);
+    return _bsMonthEnd(qe.year, pm2);
+  }
+
+  static DateTime _bsPreviousYearEnd(DateTime day) {
+    final d = DateTime(day.year, day.month, day.day);
+    return DateTime(d.year - 1, 12, 31);
+  }
+
+  /// Balance Sheet export: oldest → newest; last date is always [asOf].
+  static List<DateTime> buildBalanceSheetSnapshotColumnEnds({
+    required DateTime asOf,
+    required PdfViewType viewType,
+    required int periodCount,
+  }) {
+    final n = periodCount.clamp(1, maxColumns);
+    final as = DateTime(asOf.year, asOf.month, asOf.day);
+    final ends = <DateTime>[as];
+    var cursor = as;
+    for (var i = 1; i < n; i++) {
+      switch (viewType) {
+        case PdfViewType.monthly:
+          cursor = DateTime(cursor.year, cursor.month, 0);
+          break;
+        case PdfViewType.quarterly:
+          cursor = _bsPreviousQuarterEnd(cursor);
+          break;
+        case PdfViewType.yearly:
+          cursor = _bsPreviousYearEnd(cursor);
+          break;
+      }
+      ends.insert(0, cursor);
+    }
+    return ends;
+  }
+
+  static bool _bsSameCalendarDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  static List<String> buildBalanceSheetSnapshotColumnLabels(
+    List<DateTime> ends,
+    PdfViewType viewType,
+    DateTime asOf,
+  ) {
+    final as = DateTime(asOf.year, asOf.month, asOf.day);
+    return ends.map((e) {
+      final isLast = _bsSameCalendarDay(e, as);
+      switch (viewType) {
+        case PdfViewType.monthly:
+          final base = DateFormat('MMM yyyy').format(e);
+          if (isLast) {
+            final endM = DateTime(e.year, e.month + 1, 0);
+            if (!_bsSameCalendarDay(e, endM)) {
+              return '$base (As of ${DateFormat('MMM d, yyyy').format(as)})';
+            }
+          }
+          return base;
+        case PdfViewType.quarterly:
+          final q = ((e.month - 1) ~/ 3) + 1;
+          final base = 'Q$q ${e.year}';
+          if (isLast) {
+            final qEnd = _bsEndOfQuarterForDay(e);
+            if (!_bsSameCalendarDay(e, qEnd)) {
+              return '$base (As of ${DateFormat('MMM d, yyyy').format(as)})';
+            }
+          }
+          return base;
+        case PdfViewType.yearly:
+          final ye = DateTime(e.year, 12, 31);
+          if (isLast && !_bsSameCalendarDay(e, ye)) {
+            return '${e.year} (As of ${DateFormat('MMM d, yyyy').format(as)})';
+          }
+          return e.year.toString();
+      }
+    }).toList();
+  }
+
+  static String? validateBalanceSheetPeriodCount(int periodCount) {
+    if (periodCount < 1 || periodCount > maxColumns) {
+      return 'Choose between 1 and $maxColumns periods.';
+    }
+    return null;
   }
 
   List<String> buildBucketLabels(

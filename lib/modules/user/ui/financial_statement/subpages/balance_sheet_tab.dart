@@ -8,7 +8,6 @@ import 'package:excel/excel.dart' as excel_lib;
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 import 'package:booksmart/modules/user/ui/tax_filling/upload_tax_doc_dialog.dart';
 import 'package:booksmart/widgets/recent_documents_widget.dart';
 import 'package:booksmart/widgets/app_button.dart';
@@ -22,6 +21,7 @@ import 'package:booksmart/utils/downloader.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/balance_sheet_excel_service.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/export_modal_widget.dart';
 import 'package:booksmart/modules/user/ui/financial_statement/pdf_export_service.dart';
+import 'package:booksmart/utils/balance_sheet_from_transactions.dart';
 import 'package:xml/xml.dart';
 
 class BalanceSheetTab extends StatefulWidget {
@@ -32,18 +32,13 @@ class BalanceSheetTab extends StatefulWidget {
 }
 
 class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderStateMixin {
-  DateTime selectedDate = DateTime.now();
-  int _selectedFilterIdx = 2; // 3 Months by default
-  DateTime? _startDate;
-  DateTime? _endDate;
+  late DateTime _asOfDate;
 
   @override
   void initState() {
     super.initState();
-    // Initialize with default 3 months
     final now = DateTime.now();
-    _startDate = now.subtract(const Duration(days: 90));
-    _endDate = now;
+    _asOfDate = DateTime(now.year, now.month, now.day);
   }
 
   bool _isSyncingControllerRange = false;
@@ -53,21 +48,18 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  void _syncRangeIfNeeded(FinancialReportController controller) {
+  void _syncAsOfIfNeeded(FinancialReportController controller) {
     if (!TickerMode.of(context)) return;
-    if (_isSyncingControllerRange || _startDate == null || _endDate == null) {
-      return;
-    }
-    if (_isSameDate(controller.lastStartDate, _startDate) &&
-        _isSameDate(controller.lastEndDate, _endDate)) {
-      return;
-    }
+    if (_isSyncingControllerRange) return;
+    final needsFetch = !controller.lastFetchBalanceSheetSnapshot ||
+        !_isSameDate(controller.lastEndDate, _asOfDate);
+    if (!needsFetch) return;
     _isSyncingControllerRange = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       await controller.fetchAndAggregateData(
-        startDate: _startDate,
-        endDate: _endDate,
+        endDate: _asOfDate,
+        balanceSheetAsOfSnapshot: true,
       );
       if (mounted) {
         _isSyncingControllerRange = false;
@@ -75,10 +67,87 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     });
   }
 
-  Future<void> _selectDate(BuildContext context, FinancialReportController controller) async {
+  String _balanceSheetComparisonCaption(FinancialReportController c) {
+    switch (c.balanceSheetComparisonMode) {
+      case 1:
+        return 'vs 7 days earlier';
+      case 2:
+        return 'vs 30 days earlier';
+      case 3:
+        return 'vs 6 months earlier';
+      case 0:
+      default:
+        return 'vs same day prior month';
+    }
+  }
+
+  Widget _buildBalanceSheetComparisonChips(
+    FinancialReportController controller,
+    bool isDark,
+  ) {
+    Widget chip(String label, int mode) {
+      final selected = controller.balanceSheetComparisonMode == mode;
+      return Padding(
+        padding: const EdgeInsets.only(right: 6, bottom: 4),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => controller.setBalanceSheetComparisonMode(mode),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: selected
+                    ? orangeColor.withValues(alpha: 0.18)
+                    : (isDark ? Colors.white10 : Colors.grey.shade200),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: selected
+                      ? orangeColor
+                      : (isDark ? Colors.white24 : Colors.black12),
+                ),
+              ),
+              child: AppText(
+                label,
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: isDark ? Colors.white70 : Colors.black87,
+                disableFormat: true,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppText(
+          'Compare % change only — snapshot totals stay on the As Of date',
+          fontSize: 11,
+          color: isDark ? Colors.white38 : Colors.black45,
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          children: [
+            chip('Prior month', 0),
+            chip('7 days', 1),
+            chip('30 days', 2),
+            chip('6 months', 3),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickAsOfDate(
+    BuildContext context,
+    FinancialReportController controller,
+  ) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: selectedDate,
+      initialDate: _asOfDate,
       firstDate: DateTime(2000),
       lastDate: DateTime(2101),
       builder: (context, child) {
@@ -97,138 +166,72 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         );
       },
     );
-    if (picked != null && picked != selectedDate) {
-      final asOf = DateTime(picked.year, picked.month, picked.day);
-      final start = _deriveStartDateForEndDate(asOf);
-      setState(() {
-        selectedDate = picked;
-        _selectedFilterIdx = 5;
-        _startDate = start;
-        _endDate = asOf;
-      });
-      await controller.fetchAndAggregateData(
-        startDate: start,
-        endDate: asOf,
-      );
-    }
+    if (picked == null) return;
+    final asOf = DateTime(picked.year, picked.month, picked.day);
+    if (_isSameDate(asOf, _asOfDate)) return;
+    setState(() => _asOfDate = asOf);
+    await controller.fetchAndAggregateData(
+      endDate: asOf,
+      balanceSheetAsOfSnapshot: true,
+    );
   }
 
-  DateTime? _deriveStartDateForEndDate(DateTime endDate) {
-    final end = DateTime(endDate.year, endDate.month, endDate.day);
-    switch (_selectedFilterIdx) {
-      case 0:
-        return end.subtract(const Duration(days: 7));
-      case 1:
-        return end.subtract(const Duration(days: 30));
-      case 2:
-        return end.subtract(const Duration(days: 90));
-      case 3:
-        return end.subtract(const Duration(days: 364));
-      case 4:
-        final yr = _selectedYear ?? end.year;
-        return DateTime(yr, 1, 1);
-      case 5:
-        if (_startDate == null) return null;
-        return DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
-      default:
-        return null;
-    }
-  }
-
-  Future<void> _selectCustomRange(FinancialReportController controller) async {
+  Widget _buildAsOfDateControl(FinancialReportController controller) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    DateTime? tempStart;
-    DateTime? tempEnd;
-
-    await showDialog(
-      context: context,
-      builder: (context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Dialog(
-          backgroundColor: isDark ? const Color(0xFF0F1E37) : Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Container(
-            padding: const EdgeInsets.all(24),
-          width: 400,
-          child: Column(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _pickAsOfDate(context, controller),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+          ),
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AppText("Select Date Range", fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
-              const SizedBox(height: 24),
-              SfDateRangePicker(
-                view: DateRangePickerView.month,
-                selectionMode: DateRangePickerSelectionMode.range,
-                headerStyle: DateRangePickerHeaderStyle(
-                  textStyle: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
-                ),
-                monthCellStyle: DateRangePickerMonthCellStyle(
-                  textStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                  todayTextStyle: const TextStyle(color: orangeColor),
-                ),
-                rangeTextStyle: TextStyle(color: isDark ? Colors.white : Colors.black87),
-                monthViewSettings: DateRangePickerMonthViewSettings(
-                  viewHeaderStyle: DateRangePickerViewHeaderStyle(
-                    textStyle: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 12),
-                  ),
-                ),
-                yearCellStyle: DateRangePickerYearCellStyle(
-                  textStyle: TextStyle(color: isDark ? Colors.white70 : Colors.black54),
-                  todayTextStyle: const TextStyle(color: orangeColor),
-                ),
-                rangeSelectionColor: orangeColor.withValues(alpha: 0.1),
-                startRangeSelectionColor: orangeColor,
-                endRangeSelectionColor: orangeColor,
-                todayHighlightColor: orangeColor,
-                onSelectionChanged: (DateRangePickerSelectionChangedArgs args) {
-                  if (args.value is PickerDateRange) {
-                    tempStart = args.value.startDate;
-                    tempEnd = args.value.endDate;
-                  }
-                },
+              AppText(
+                'As Of Date',
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white38 : Colors.black45,
               ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const AppText("Close", color: Colors.white38),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: orangeColor,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    onPressed: () {
-                      if (tempStart != null && tempEnd != null) {
-                        setState(() {
-                          _selectedFilterIdx = 5;
-                          _startDate = tempStart;
-                          _endDate = tempEnd;
-                        });
-                        controller.fetchAndAggregateData(startDate: tempStart, endDate: tempEnd);
-                        Navigator.pop(context);
-                      }
-                    },
-                    child: const AppText("Select", color: Colors.black, fontWeight: FontWeight.bold),
-                  ),
-                ],
+              const SizedBox(width: 10),
+              AppText(
+                DateFormat('MMM dd, yyyy').format(_asOfDate),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
               ),
+              const SizedBox(width: 6),
+              const Icon(Icons.calendar_today_outlined, size: 16, color: orangeColor),
             ],
           ),
         ),
-      );
-    },
-  );
-}
+      ),
+    );
+  }
+
+  BalanceSheetLineMetrics _balanceSheetMetricsAt(
+    FinancialReportController controller,
+    DateTime columnEnd,
+  ) {
+    final src = controller.balanceSheetSnapshotSourceTransactions;
+    if (src.isEmpty) {
+      return BalanceSheetLineMetrics.compute(const [], 0);
+    }
+    return BalanceSheetLineMetrics.computeThrough(src, columnEnd);
+  }
 
   void _exportExcel(
     FinancialReportController controller, {
     PdfExportRequest? request,
   }) async {
     try {
-      final asOfDate = _endDate ?? DateTime.now();
+      final asOfDate = request?.endDate ?? _asOfDate;
       final org = getCurrentOrganization;
       final orgName = org?.name.trim().isNotEmpty == true
           ? org!.name.trim()
@@ -241,28 +244,43 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       ].where((e) => e.isNotEmpty).join(', ');
       final asOfLine = 'As of ${DateFormat('MMMM dd,').format(asOfDate)}';
       final exportService = PdfExportService();
-      final exportStart =
-          request?.startDate ??
-          _startDate ??
-          asOfDate.subtract(const Duration(days: 89));
-      final exportEnd = request?.endDate ?? asOfDate;
+      final exportEnd = DateTime(asOfDate.year, asOfDate.month, asOfDate.day);
       final exportViewType = request?.viewType ?? PdfViewType.monthly;
-      final bucketLabels = exportService.buildBucketLabels(
-        exportStart,
-        exportEnd,
-        exportViewType,
-      );
-      final candidateYearLabels = bucketLabels
-          .map(
-            (label) =>
-                RegExp(r'(19|20)\d{2}').firstMatch(label)?.group(0) ?? label,
-          )
-          .toList();
-      final displayBucketLabels =
-          candidateYearLabels.toSet().length == candidateYearLabels.length
-          ? candidateYearLabels
-          : bucketLabels;
-      if (bucketLabels.isEmpty) {
+      final exportStart = request?.startDate ??
+          DateTime(exportEnd.year, exportEnd.month, 1);
+      final List<DateTime> columnEnds;
+      final List<String> displayBucketLabels;
+      if (request?.balanceSheetSnapshotEnds != null &&
+          request!.balanceSheetSnapshotEnds!.isNotEmpty) {
+        columnEnds = List<DateTime>.from(request.balanceSheetSnapshotEnds!);
+        displayBucketLabels = PdfExportService.buildBalanceSheetSnapshotColumnLabels(
+          columnEnds,
+          exportViewType,
+          exportEnd,
+        );
+      } else {
+        final bucketLabels = exportService.buildBucketLabels(
+          exportStart,
+          exportEnd,
+          exportViewType,
+        );
+        if (bucketLabels.isEmpty) {
+          throw Exception('No Excel columns available for selected range.');
+        }
+        columnEnds = List<DateTime>.filled(bucketLabels.length, exportEnd);
+        final candidateYearLabels = bucketLabels
+            .map(
+              (label) =>
+                  RegExp(r'(19|20)\d{2}').firstMatch(label)?.group(0) ?? label,
+            )
+            .toList();
+        displayBucketLabels =
+            candidateYearLabels.toSet().length == candidateYearLabels.length
+            ? candidateYearLabels
+            : bucketLabels;
+      }
+      final int yearCount = displayBucketLabels.length;
+      if (yearCount == 0) {
         throw Exception('No Excel columns available for selected range.');
       }
       final excel = excel_lib.Excel.createExcel();
@@ -276,7 +294,6 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       }
       final int labelCol = 0;
       final int firstSymbolCol = 1;
-      final int yearCount = bucketLabels.length;
       int symbolCol(int index) => firstSymbolCol + (index * 2);
       int amountCol(int index) => symbolCol(index) + 1;
       final int titleStartCol = yearCount >= 3
@@ -308,6 +325,9 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF6F8DAB'),
         horizontalAlign: excel_lib.HorizontalAlign.Center,
         verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final headerColumnDateStyle = headerStyle.copyWith(
+        horizontalAlignVal: excel_lib.HorizontalAlign.Right,
       );
       final liabilityHeaderStyle = excel_lib.CellStyle(
         bold: true,
@@ -383,14 +403,14 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       );
       final dollarStyle = excel_lib.CellStyle(
         fontSize: 9,
-        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
       );
       final currencyStyle = excel_lib.CellStyle(
         fontSize: 9,
         numberFormat: const excel_lib.CustomNumericNumFormat(
           formatCode: r'#,##0.00;[Red](#,##0.00);"-"',
         ),
-        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
       );
       final totalCurrencyStyle = currencyStyle.copyWith(
         boldVal: true,
@@ -517,6 +537,17 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         return total;
       }
 
+      double pickKeywordsMap(Map<String, double> map, List<String> keywords) {
+        double total = 0;
+        for (final entry in map.entries) {
+          final key = entry.key.toLowerCase();
+          if (keywords.any((k) => key.contains(k))) {
+            total += entry.value;
+          }
+        }
+        return total;
+      }
+
       Map<int, double> valuesMap(List<double> values) => {
         for (int i = 0; i < values.length; i++) i: values[i],
       };
@@ -627,7 +658,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
             amountCol(i),
             row,
             excel_lib.TextCellValue(displayBucketLabels[i]),
-            style,
+            headerColumnDateStyle,
           );
           sheet.merge(
             excel_lib.CellIndex.indexByColumnRow(columnIndex: symbolCol(i), rowIndex: row),
@@ -635,7 +666,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
           );
           sheet.setMergedCellStyle(
             excel_lib.CellIndex.indexByColumnRow(columnIndex: symbolCol(i), rowIndex: row),
-            style,
+            headerColumnDateStyle,
           );
         }
         row++;
@@ -730,100 +761,139 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         series[series.length - 1] += diff;
       }
 
+      final useEngineColumns =
+          controller.balanceSheetSnapshotSourceTransactions.isNotEmpty;
       for (int i = 0; i < yearCount; i++) {
-        final curAssets = sumAllForBucket(
-          controller.periodicCurrentAssetsBreakdown,
-          i,
-        );
-        final fixedAssets = sumAllForBucket(
-          controller.periodicFixedAssetsBreakdown,
-          i,
-        );
-        final otherAssets = sumAllForBucket(
-          controller.periodicOtherAssetsBreakdown,
-          i,
-        );
-        final curLiab = sumAllForBucket(
-          controller.periodicCurrentLiabilitiesBreakdown,
-          i,
-        );
-        final longLiab = sumAllForBucket(
-          controller.periodicLongTermLiabilitiesBreakdown,
-          i,
-        );
-        final cash = sumMatchingForBucket(
-          controller.periodicCurrentAssetsBreakdown,
-          i,
-          ['cash'],
-        );
-        final ar = sumMatchingForBucket(
-          controller.periodicCurrentAssetsBreakdown,
-          i,
-          ['receivable'],
-        );
-        final inventory = sumMatchingForBucket(
-          controller.periodicCurrentAssetsBreakdown,
-          i,
-          ['inventory'],
-        );
-        final ownerInvestment = sumMatchingForBucket(
-          controller.periodicEquityBreakdown,
-          i,
-          ['owner', 'capital', 'contribution'],
-        );
-        final totalAssets = curAssets + fixedAssets + otherAssets;
-        final totalLiabilities = curLiab + longLiab;
-        final totalEquity = totalAssets - totalLiabilities;
+        if (useEngineColumns) {
+          final m = _balanceSheetMetricsAt(controller, columnEnds[i]);
+          final curAssets =
+              m.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
+          final fixedAssets =
+              m.fixedAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
+          final otherAssets =
+              m.otherAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
+          final curLiab =
+              m.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b);
+          final longLiab =
+              m.longTermLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b);
+          final cash = m.currentAssetsBreakdown['Cash'] ?? 0;
+          final ar = m.currentAssetsBreakdown['Accounts Receivable'] ?? 0;
+          final inventory = m.currentAssetsBreakdown['Inventory'] ?? 0;
+          final ownerInvestment = pickKeywordsMap(m.ownerEquityBreakdown, [
+            'owner',
+            'capital',
+            'contribution',
+          ]);
+          final totalAssets = m.totalAssets;
+          final totalLiabilities = m.totalLiabilities;
+          final totalEquity = m.totalEquity;
 
-        currentAssetsVals.add(curAssets);
-        fixedAssetsVals.add(fixedAssets);
-        otherAssetsVals.add(otherAssets);
-        cashVals.add(cash);
-        arVals.add(ar);
-        inventoryVals.add(inventory);
-        shortTermInvestmentsVals.add(curAssets - cash - ar - inventory);
-        currentLiabilitiesVals.add(curLiab);
-        longTermLiabilitiesVals.add(longLiab);
-        ownerInvestmentVals.add(ownerInvestment);
-        retainedEarningsVals.add(totalEquity - ownerInvestment);
-        totalAssetsVals.add(totalAssets);
-        totalLiabilitiesVals.add(totalLiabilities);
-        totalEquityVals.add(totalEquity);
+          currentAssetsVals.add(curAssets);
+          fixedAssetsVals.add(fixedAssets);
+          otherAssetsVals.add(otherAssets);
+          cashVals.add(cash);
+          arVals.add(ar);
+          inventoryVals.add(inventory);
+          shortTermInvestmentsVals.add(curAssets - cash - ar - inventory);
+          currentLiabilitiesVals.add(curLiab);
+          longTermLiabilitiesVals.add(longLiab);
+          ownerInvestmentVals.add(ownerInvestment);
+          retainedEarningsVals.add(totalEquity - ownerInvestment);
+          totalAssetsVals.add(totalAssets);
+          totalLiabilitiesVals.add(totalLiabilities);
+          totalEquityVals.add(totalEquity);
+        } else {
+          final curAssets = sumAllForBucket(
+            controller.periodicCurrentAssetsBreakdown,
+            i,
+          );
+          final fixedAssets = sumAllForBucket(
+            controller.periodicFixedAssetsBreakdown,
+            i,
+          );
+          final otherAssets = sumAllForBucket(
+            controller.periodicOtherAssetsBreakdown,
+            i,
+          );
+          final curLiab = sumAllForBucket(
+            controller.periodicCurrentLiabilitiesBreakdown,
+            i,
+          );
+          final longLiab = sumAllForBucket(
+            controller.periodicLongTermLiabilitiesBreakdown,
+            i,
+          );
+          final cash = sumMatchingForBucket(
+            controller.periodicCurrentAssetsBreakdown,
+            i,
+            ['cash'],
+          );
+          final ar = sumMatchingForBucket(
+            controller.periodicCurrentAssetsBreakdown,
+            i,
+            ['receivable'],
+          );
+          final inventory = sumMatchingForBucket(
+            controller.periodicCurrentAssetsBreakdown,
+            i,
+            ['inventory'],
+          );
+          final ownerInvestment = sumMatchingForBucket(
+            controller.periodicEquityBreakdown,
+            i,
+            ['owner', 'capital', 'contribution'],
+          );
+          final totalAssets = curAssets + fixedAssets + otherAssets;
+          final totalLiabilities = curLiab + longLiab;
+          final totalEquity = totalAssets - totalLiabilities;
+
+          currentAssetsVals.add(curAssets);
+          fixedAssetsVals.add(fixedAssets);
+          otherAssetsVals.add(otherAssets);
+          cashVals.add(cash);
+          arVals.add(ar);
+          inventoryVals.add(inventory);
+          shortTermInvestmentsVals.add(curAssets - cash - ar - inventory);
+          currentLiabilitiesVals.add(curLiab);
+          longTermLiabilitiesVals.add(longLiab);
+          ownerInvestmentVals.add(ownerInvestment);
+          retainedEarningsVals.add(totalEquity - ownerInvestment);
+          totalAssetsVals.add(totalAssets);
+          totalLiabilitiesVals.add(totalLiabilities);
+          totalEquityVals.add(totalEquity);
+        }
       }
 
-      // Reconcile exported bucket totals with currently displayed dashboard totals.
-      // This guarantees Excel aggregates match BS dashboard numbers for selected range.
-      final expectedCurrentAssets = controller.currentAssetsBreakdown.values.fold(
-        0.0,
-        (a, b) => a + b,
-      );
-      final expectedFixedAssets = controller.fixedAssetsBreakdown.values.fold(
-        0.0,
-        (a, b) => a + b,
-      );
-      final expectedOtherAssets = controller.otherAssetsBreakdown.values.fold(
-        0.0,
-        (a, b) => a + b,
-      );
-      final expectedCurrentLiabilities = controller
-          .currentLiabilitiesBreakdown
-          .values
-          .fold(0.0, (a, b) => a + b);
-      final expectedLongTermLiabilities = controller
-          .longTermLiabilitiesBreakdown
-          .values
-          .fold(0.0, (a, b) => a + b);
-      final expectedOwnerInvestment = controller.ownerEquityBreakdown.values.fold(
-        0.0,
-        (a, b) => a + b,
-      );
+      // Legacy periodic export: nudge columns to match dashboard. Engine path skips this.
+      if (!useEngineColumns) {
+        final expectedCurrentAssets = controller.currentAssetsBreakdown.values
+            .fold(0.0, (a, b) => a + b);
+        final expectedFixedAssets = controller.fixedAssetsBreakdown.values.fold(
+          0.0,
+          (a, b) => a + b,
+        );
+        final expectedOtherAssets = controller.otherAssetsBreakdown.values.fold(
+          0.0,
+          (a, b) => a + b,
+        );
+        final expectedCurrentLiabilities = controller
+            .currentLiabilitiesBreakdown
+            .values
+            .fold(0.0, (a, b) => a + b);
+        final expectedLongTermLiabilities = controller
+            .longTermLiabilitiesBreakdown
+            .values
+            .fold(0.0, (a, b) => a + b);
+        final expectedOwnerInvestment = controller.ownerEquityBreakdown.values
+            .fold(0.0, (a, b) => a + b);
 
-      adjustSeriesTotal(currentAssetsVals, expectedCurrentAssets);
-      adjustSeriesTotal(fixedAssetsVals, expectedFixedAssets);
-      adjustSeriesTotal(otherAssetsVals, expectedOtherAssets);
-      adjustSeriesTotal(currentLiabilitiesVals, expectedCurrentLiabilities);
-      adjustSeriesTotal(longTermLiabilitiesVals, expectedLongTermLiabilities);
-      adjustSeriesTotal(ownerInvestmentVals, expectedOwnerInvestment);
+        adjustSeriesTotal(currentAssetsVals, expectedCurrentAssets);
+        adjustSeriesTotal(fixedAssetsVals, expectedFixedAssets);
+        adjustSeriesTotal(otherAssetsVals, expectedOtherAssets);
+        adjustSeriesTotal(currentLiabilitiesVals, expectedCurrentLiabilities);
+        adjustSeriesTotal(longTermLiabilitiesVals, expectedLongTermLiabilities);
+        adjustSeriesTotal(ownerInvestmentVals, expectedOwnerInvestment);
+      }
 
       for (int i = 0; i < yearCount; i++) {
         totalAssetsVals[i] =
@@ -867,6 +937,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         isTotal: true,
         valuesByYearIndex: valuesMap(currentAssetsVals),
       );
+      row++;
 
       writeLine('FIXED (LONG-TERM) ASSETS', isSection: true);
       writeLine(
@@ -894,6 +965,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         isTotal: true,
         valuesByYearIndex: valuesMap(fixedAssetsVals),
       );
+      row++;
 
       writeLine('OTHER ASSETS', isSection: true);
       writeLine(
@@ -917,6 +989,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         isTotal: true,
         valuesByYearIndex: valuesMap(totalAssetsVals),
       );
+      row++;
 
       writeYearHeader(
         "LIABILITIES AND OWNER'S EQUITY",
@@ -1154,7 +1227,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
   void _exportCSV(FinancialReportController controller) async {
     final buffer = StringBuffer();
     final orgName = getCurrentOrganization?.name ?? 'Financial Report';
-    final dateStr = _endDate != null ? "As of ${DateFormat('MMM dd, yyyy').format(_endDate!)}" : "Current Period";
+    final dateStr = "As of ${DateFormat('MMM dd, yyyy').format(_asOfDate)}";
 
     buffer.writeln('Balance Sheet Report');
     buffer.writeln('Organization,$orgName');
@@ -1203,23 +1276,6 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     await downloadFile('Balance_Sheet_${orgName.replaceAll(" ", "_")}.csv', csvBytes, mimeType: 'text/csv');
   }
 
-  String _getTimeframeLabel() {
-    switch (_selectedFilterIdx) {
-      case 0:
-        return "7 days";
-      case 1:
-        return "30 days";
-      case 2:
-        return "3 months";
-      case 3:
-        return "12 months";
-      case 4:
-        return "year";
-      default:
-        return "period";
-    }
-  }
-
   double _percentChange(double current, double previous) {
     if (previous.abs() < 0.000001) return 0.0;
     final pct = ((current - previous) / previous) * 100;
@@ -1252,7 +1308,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     required String value,
     required double change,
     required bool isCurrency,
-    String? timeframe,
+    String comparisonCaption = 'vs previous month',
     Color? borderColor,
     double? borderWidth,
     bool showInfoIcon = true,
@@ -1334,7 +1390,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                   ],
                 ),
               ),
-              AppText("vs previous $timeframe", fontSize: 11, color: isDark ? Colors.white30 : Colors.black38, disableFormat: true),
+              AppText(comparisonCaption, fontSize: 11, color: isDark ? Colors.white30 : Colors.black38, disableFormat: true),
             ],
               ),
             ],
@@ -1361,7 +1417,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         if (controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator(color: orangeColor));
         }
-        _syncRangeIfNeeded(controller);
+        _syncAsOfIfNeeded(controller);
 
         final totalAssets = controller.totalAssets.value;
         final totalLiabilities = controller.totalLiabilities.value;
@@ -1395,6 +1451,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         final roeValue = equityBase.abs() < 0.000001
             ? "N/A"
             : "${controller.returnOnEquity.toStringAsFixed(1)}%";
+        final compareCap = _balanceSheetComparisonCaption(controller);
 
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final screenWidth = MediaQuery.sizeOf(context).width;
@@ -1407,34 +1464,9 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 🔹 Title & Filter Header
-                isNarrow 
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      AppText(
-                        "Balance Sheet",
-                        fontSize: 28,
-                        fontWeight: FontWeight.w900,
-                        color: isDark ? Colors.white : Colors.black87,
-                      ),
-                      if (_endDate != null) ...[
-                        const SizedBox(height: 4),
-                        AppText(
-                          "As of ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
-                          fontSize: 12,
-                          color: isDark ? Colors.white38 : Colors.black45,
-                        ),
-                      ],
-                      const SizedBox(height: 12),
-                      _buildTimeFilter(controller),
-                    ],
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Column(
+                // 🔹 Title & As Of header
+                isNarrow
+                    ? Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           AppText(
@@ -1443,19 +1475,44 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                             fontWeight: FontWeight.w900,
                             color: isDark ? Colors.white : Colors.black87,
                           ),
-                          if (_endDate != null) ...[
-                            const SizedBox(height: 4),
-                            AppText(
-                              "As of ${DateFormat('MMM dd, yyyy').format(_endDate!)}",
-                              fontSize: 12,
-                              color: isDark ? Colors.white38 : Colors.black45,
-                            ),
-                          ],
+                          const SizedBox(height: 4),
+                          AppText(
+                            "Snapshot as of ${DateFormat('MMM dd, yyyy').format(_asOfDate)}",
+                            fontSize: 12,
+                            color: isDark ? Colors.white38 : Colors.black45,
+                          ),
+                          const SizedBox(height: 8),
+                          _buildBalanceSheetComparisonChips(controller, isDark),
+                          const SizedBox(height: 12),
+                          _buildAsOfDateControl(controller),
+                        ],
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              AppText(
+                                "Balance Sheet",
+                                fontSize: 28,
+                                fontWeight: FontWeight.w900,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                              const SizedBox(height: 4),
+                              AppText(
+                                "Snapshot as of ${DateFormat('MMM dd, yyyy').format(_asOfDate)}",
+                                fontSize: 12,
+                                color: isDark ? Colors.white38 : Colors.black45,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildBalanceSheetComparisonChips(controller, isDark),
+                            ],
+                          ),
+                          _buildAsOfDateControl(controller),
                         ],
                       ),
-                      _buildTimeFilter(controller),
-                    ],
-                  ),
                 const SizedBox(height: 24),
 
                 Align(
@@ -1485,33 +1542,21 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                                       : 'Booksmart',
                               companyAddress: 'Address not available',
                               reportType: ExportPdfReportType.balanceSheet,
-                              useSingleDate: true,
+                              balanceSheetAdvancedExport: true,
                               singleDateLabel: 'As Of Date',
-                              initialEndDate: _endDate,
+                              initialEndDate: _asOfDate,
                               onExport: (request) async {
-                                final DateTime asOfDate = request.endDate;
-                                final start = _deriveStartDateForEndDate(asOfDate);
-                                final normalizedRequest = PdfExportRequest(
-                                  startDate: start ?? request.startDate,
-                                  endDate: asOfDate,
-                                  viewType: request.viewType,
-                                  templateVariant: request.templateVariant,
-                                  companyName: request.companyName,
-                                  companyAddress: request.companyAddress,
-                                  logoBytes: request.logoBytes,
+                                final asOfDate = DateTime(
+                                  request.endDate.year,
+                                  request.endDate.month,
+                                  request.endDate.day,
                                 );
-                                setState(() {
-                                  _startDate = normalizedRequest.startDate;
-                                  _endDate = normalizedRequest.endDate;
-                                });
+                                setState(() => _asOfDate = asOfDate);
                                 await controller.fetchAndAggregateData(
-                                  startDate: normalizedRequest.startDate,
-                                  endDate: normalizedRequest.endDate,
+                                  endDate: asOfDate,
+                                  balanceSheetAsOfSnapshot: true,
                                 );
-                                await _exportPDF(
-                                  controller,
-                                  request: normalizedRequest,
-                                );
+                                await _exportPDF(controller, request: request);
                               },
                             );
                           }
@@ -1527,36 +1572,22 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                                       : 'Booksmart',
                               companyAddress: 'Address not available',
                               reportType: ExportPdfReportType.balanceSheet,
-                              useSingleDate: true,
+                              balanceSheetAdvancedExport: true,
                               singleDateLabel: 'As Of Date',
-                              initialEndDate: _endDate,
-                              initialStartDate: _startDate,
+                              initialEndDate: _asOfDate,
+                              initialStartDate: _asOfDate,
                               onExport: (request) async {
-                                final asOfDate = request.endDate;
-                                final derivedStart =
-                                    _deriveStartDateForEndDate(asOfDate) ??
-                                    request.startDate;
-                                final normalizedRequest = PdfExportRequest(
-                                  startDate: derivedStart,
-                                  endDate: asOfDate,
-                                  viewType: request.viewType,
-                                  templateVariant: request.templateVariant,
-                                  companyName: request.companyName,
-                                  companyAddress: request.companyAddress,
-                                  logoBytes: request.logoBytes,
+                                final asOfDate = DateTime(
+                                  request.endDate.year,
+                                  request.endDate.month,
+                                  request.endDate.day,
                                 );
-                                setState(() {
-                                  _startDate = normalizedRequest.startDate;
-                                  _endDate = normalizedRequest.endDate;
-                                });
+                                setState(() => _asOfDate = asOfDate);
                                 await controller.fetchAndAggregateData(
-                                  startDate: normalizedRequest.startDate,
-                                  endDate: normalizedRequest.endDate,
+                                  endDate: asOfDate,
+                                  balanceSheetAsOfSnapshot: true,
                                 );
-                                _exportExcel(
-                                  controller,
-                                  request: normalizedRequest,
-                                );
+                                _exportExcel(controller, request: request);
                               },
                             );
                           }
@@ -1617,7 +1648,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                         value: _formatCurrency(totalAssets),
                         change: assetsChange,
                         isCurrency: true,
-                        timeframe: _getTimeframeLabel(),
+                        comparisonCaption: compareCap,
                         borderColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.15) : Colors.black12,
                         borderWidth: 0.8,
                         showInfoIcon: false,
@@ -1630,7 +1661,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                         value: _formatCurrency(totalLiabilities),
                         change: liabilitiesChange,
                         isCurrency: true,
-                        timeframe: _getTimeframeLabel(),
+                        comparisonCaption: compareCap,
                         borderColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.15) : Colors.black12,
                         borderWidth: 0.8,
                       ),
@@ -1642,7 +1673,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                         value: _formatCurrency(totalEquity),
                         change: equityChange,
                         isCurrency: true,
-                        timeframe: _getTimeframeLabel(),
+                        comparisonCaption: compareCap,
                         borderColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.15) : Colors.black12,
                         borderWidth: 0.8,
                       ),
@@ -1659,7 +1690,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           value: _formatCurrency(totalAssets),
                           change: assetsChange,
                           isCurrency: true,
-                          timeframe: _getTimeframeLabel(),
+                          comparisonCaption: compareCap,
                           borderColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.15) : Colors.black12,
                           borderWidth: 0.8,
                           showInfoIcon: false,
@@ -1672,7 +1703,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           value: _formatCurrency(totalLiabilities),
                           change: liabilitiesChange,
                           isCurrency: true,
-                          timeframe: _getTimeframeLabel(),
+                          comparisonCaption: compareCap,
                           borderColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.15) : Colors.black12,
                           borderWidth: 0.8,
                         ),
@@ -1684,7 +1715,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           value: _formatCurrency(totalEquity),
                           change: equityChange,
                           isCurrency: true,
-                          timeframe: _getTimeframeLabel(),
+                          comparisonCaption: compareCap,
                           borderColor: Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.15) : Colors.black12,
                           borderWidth: 0.8,
                         ),
@@ -1707,7 +1738,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                         value: currentRatioValue,
                         change: currentRatioChange,
                         isCurrency: false,
-                        timeframe: _getTimeframeLabel(),
+                        comparisonCaption: compareCap,
                         borderColor: Colors.yellow.withValues(alpha: 0.6),
                         borderWidth: 1.5,
                       ),
@@ -1719,7 +1750,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                         value: debtToEquityValue,
                         change: debtToEquityChange,
                         isCurrency: false,
-                        timeframe: _getTimeframeLabel(),
+                        comparisonCaption: compareCap,
                         borderColor: Colors.yellow.withValues(alpha: 0.6),
                         borderWidth: 1.5,
                       ),
@@ -1731,7 +1762,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                         value: roeValue,
                         change: roeChange,
                         isCurrency: false,
-                        timeframe: _getTimeframeLabel(),
+                        comparisonCaption: compareCap,
                         borderColor: Colors.yellow.withValues(alpha: 0.6),
                         borderWidth: 1.5,
                       ),
@@ -1743,7 +1774,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                         value: _formatCurrency(totalAssets),
                         change: assetsChange,
                         isCurrency: true,
-                        timeframe: _getTimeframeLabel(),
+                        comparisonCaption: compareCap,
                         borderColor: Colors.yellow.withValues(alpha: 0.6),
                         borderWidth: 1.5,
                       ),
@@ -1760,7 +1791,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           value: currentRatioValue,
                           change: currentRatioChange,
                           isCurrency: false,
-                          timeframe: _getTimeframeLabel(),
+                          comparisonCaption: compareCap,
                           borderColor: Colors.yellow.withValues(alpha: 0.6),
                           borderWidth: 1.5,
                         ),
@@ -1772,7 +1803,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           value: debtToEquityValue,
                           change: debtToEquityChange,
                           isCurrency: false,
-                          timeframe: _getTimeframeLabel(),
+                          comparisonCaption: compareCap,
                           borderColor: Colors.yellow.withValues(alpha: 0.6),
                           borderWidth: 1.5,
                         ),
@@ -1784,7 +1815,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           value: roeValue,
                           change: roeChange,
                           isCurrency: false,
-                          timeframe: _getTimeframeLabel(),
+                          comparisonCaption: compareCap,
                           borderColor: Colors.yellow.withValues(alpha: 0.6),
                           borderWidth: 1.5,
                         ),
@@ -1796,7 +1827,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           value: _formatCurrency(totalAssets),
                           change: assetsChange,
                           isCurrency: true,
-                          timeframe: _getTimeframeLabel(),
+                          comparisonCaption: compareCap,
                           borderColor: Colors.yellow.withValues(alpha: 0.6),
                           borderWidth: 1.5,
                         ),
@@ -1867,139 +1898,20 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                     ],
                   ),
                 ),
-                const RecentDocumentsWidget(type: 'bs'),
+                const RecentDocumentsWidget(
+                  type: 'bs',
+                  sectionTitle: 'Recently Added',
+                  showUploadDateInSubtitle: true,
+                  useImageThumbnailWhenPossible: true,
+                  showDeleteAction: true,
+                  showExportTemplateAction: false,
+                ),
                 const SizedBox(height: 24),
               ],
             ),
           ),
         );
       },
-    );
-  }
-
-  int? _selectedYear;
-
-  // Helper method to update filter and trigger data fetch
-  Future<void> _updateFilter(int index, FinancialReportController controller, {int? year}) async {
-    DateTime now = DateTime.now();
-    DateTime? start;
-    DateTime end = now;
-
-    if (index == 0) {
-      start = now.subtract(const Duration(days: 7));
-    } else if (index == 1) {
-      start = now.subtract(const Duration(days: 30));
-    } else if (index == 2) {
-      start = now.subtract(const Duration(days: 90));
-    } else if (index == 3) {
-      start = now.subtract(const Duration(days: 364));
-    } else if (index == 4) {
-      // Specific Year
-      final yr = year ?? _selectedYear ?? now.year;
-      start = DateTime(yr, 1, 1);
-      if (yr == now.year) {
-        end = now;
-      } else {
-        end = DateTime(yr, 12, 31);
-      }
-    }
-
-    setState(() {
-      _selectedFilterIdx = index;
-      if (year != null) _selectedYear = year;
-      _startDate = start;
-      _endDate = end;
-    });
-    
-    if (start != null) {
-      await controller.fetchAndAggregateData(startDate: start, endDate: end);
-    }
-  }
-
-  Widget _buildTimeFilter(FinancialReportController controller) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Theme.of(context).brightness == Brightness.dark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          _filterItem("7 Days", _selectedFilterIdx == 0, () => _updateFilter(0, controller)),
-          _filterItem("30 Days", _selectedFilterIdx == 1, () => _updateFilter(1, controller)),
-          _filterItem("3 Months", _selectedFilterIdx == 2, () => _updateFilter(2, controller)),
-          _filterItem("12 Months", _selectedFilterIdx == 3, () => _updateFilter(3, controller)),
-          _buildYearDropdown(controller),
-          _filterItem("Custom", _selectedFilterIdx == 5, () => _selectCustomRange(controller)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildYearDropdown(FinancialReportController controller) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final int currentYear = DateTime.now().year;
-    final List<int> years = controller.availableYears.isNotEmpty
-        ? List<int>.from(controller.availableYears)
-        : List.generate(5, (index) => currentYear - index);
-    final bool isSelected = _selectedFilterIdx == 4;
-
-    return PopupMenuButton<int>(
-      offset: const Offset(0, 40),
-      onSelected: (year) => _updateFilter(4, controller, year: year),
-      itemBuilder: (context) => years.map((y) => PopupMenuItem(
-        value: y,
-        child: AppText(y.toString(), fontSize: 13, disableFormat: true),
-      )).toList(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? (isDark
-                    ? orangeColor.withValues(alpha: 0.28)
-                    : orangeColor.withValues(alpha: 0.16))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected
-              ? Border.all(color: orangeColor.withValues(alpha: 0.8))
-              : null,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AppText(
-              isSelected ? (_selectedYear?.toString() ?? "Yearly") : "Yearly",
-              fontSize: 11,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              color: isSelected ? (isDark ? Colors.white : Colors.black87) : (isDark ? Colors.white38 : Colors.black45),
-              disableFormat: true,
-            ),
-            const SizedBox(width: 4),
-            Icon(Icons.keyboard_arrow_down, size: 12, color: isSelected ? (isDark ? Colors.white : Colors.black87) : (isDark ? Colors.white38 : Colors.black45)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _filterItem(String text, bool isSelected, VoidCallback onTap) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? (isDark ? const Color(0xFF1E293B) : Colors.black.withValues(alpha: 0.05)) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: isDark ? Colors.white12 : Colors.black12) : null,
-        ),
-        child: AppText(
-          text,
-          fontSize: 11,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? (isDark ? Colors.white : Colors.black87) : (isDark ? Colors.white38 : Colors.black45),
-        ),
-      ),
     );
   }
 
@@ -2058,7 +1970,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                   AppText(title, fontSize: 18, fontWeight: FontWeight.w900, color: isDark ? Colors.white : Colors.black87),
                   const SizedBox(height: 4),
                   AppText(
-                    "As of ${DateFormat('MMM dd, yyyy').format(_endDate ?? DateTime.now())}",
+                    "As of ${DateFormat('MMM dd, yyyy').format(_asOfDate)}",
                     fontSize: 10,
                     color: isDark ? Colors.white38 : Colors.black54,
                   ),
@@ -2237,7 +2149,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     PdfExportRequest? request,
   }) async {
     try {
-      final asOfDate = _endDate ?? DateTime.now();
+      final asOfDate = request?.endDate ?? _asOfDate;
       final org = getCurrentOrganization;
       final orgName = org?.name.trim().isNotEmpty == true
           ? org!.name.trim()
@@ -2249,31 +2161,58 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         org?.zip.trim() ?? '',
       ].where((e) => e.isNotEmpty).join(', ');
       final exportService = PdfExportService();
-      final exportStart =
-          request?.startDate ??
-          _startDate ??
-          asOfDate.subtract(const Duration(days: 89));
-      final exportEnd = request?.endDate ?? asOfDate;
+      final exportEnd = DateTime(asOfDate.year, asOfDate.month, asOfDate.day);
+      final exportStart = request?.startDate ??
+          DateTime(exportEnd.year, exportEnd.month, 1);
       final exportViewType = request?.viewType ?? PdfViewType.monthly;
-      final labels = exportService.buildBucketLabels(
-        exportStart,
-        exportEnd,
-        exportViewType,
-      );
-      final displayLabels = <String>[
-        for (final label in labels)
-          switch (exportViewType) {
-            PdfViewType.monthly => label,
-            PdfViewType.quarterly => label,
-            PdfViewType.yearly => label,
-          },
-      ];
-      if (labels.isEmpty) {
+      final List<DateTime> columnEnds;
+      final List<String> displayLabels;
+      if (request?.balanceSheetSnapshotEnds != null &&
+          request!.balanceSheetSnapshotEnds!.isNotEmpty) {
+        columnEnds = List<DateTime>.from(request.balanceSheetSnapshotEnds!);
+        displayLabels = PdfExportService.buildBalanceSheetSnapshotColumnLabels(
+          columnEnds,
+          exportViewType,
+          exportEnd,
+        );
+      } else {
+        final labels = exportService.buildBucketLabels(
+          exportStart,
+          exportEnd,
+          exportViewType,
+        );
+        if (labels.isEmpty) {
+          throw Exception('No PDF columns available for selected range.');
+        }
+        columnEnds = List<DateTime>.filled(labels.length, exportEnd);
+        final candidateYearLabels = labels
+            .map(
+              (label) =>
+                  RegExp(r'(19|20)\d{2}').firstMatch(label)?.group(0) ?? label,
+            )
+            .toList();
+        displayLabels =
+            candidateYearLabels.toSet().length == candidateYearLabels.length
+            ? candidateYearLabels
+            : labels;
+      }
+      final int yearCount = displayLabels.length;
+      if (yearCount == 0) {
         throw Exception('No PDF columns available for selected range.');
       }
-      final int yearCount = labels.length;
 
       double pickByKeywords(Map<String, double> map, List<String> keywords) {
+        double total = 0;
+        for (final entry in map.entries) {
+          final key = entry.key.toLowerCase();
+          if (keywords.any((k) => key.contains(k))) {
+            total += entry.value;
+          }
+        }
+        return total;
+      }
+
+      double pickKeywordsMap(Map<String, double> map, List<String> keywords) {
         double total = 0;
         for (final entry in map.entries) {
           final key = entry.key.toLowerCase();
@@ -2409,109 +2348,166 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       final totalEquityVals = <double>[];
       final retainedEarningsVals = <double>[];
 
+      final useEngineColumns =
+          controller.balanceSheetSnapshotSourceTransactions.isNotEmpty;
       for (int i = 0; i < yearCount; i++) {
-        final curAssets = sumAllForBucket(
-          controller.periodicCurrentAssetsBreakdown,
-          i,
-        );
-        final fixedAssets = sumAllForBucket(
-          controller.periodicFixedAssetsBreakdown,
-          i,
-        );
-        final otherAssets = sumAllForBucket(
-          controller.periodicOtherAssetsBreakdown,
-          i,
-        );
-        final curLiab = sumAllForBucket(
-          controller.periodicCurrentLiabilitiesBreakdown,
-          i,
-        );
-        final longLiab = sumAllForBucket(
-          controller.periodicLongTermLiabilitiesBreakdown,
-          i,
-        );
-        final cash = sumMatchingForBucket(
-          controller.periodicCurrentAssetsBreakdown,
-          i,
-          ['cash'],
-        );
-        final ar = sumMatchingForBucket(
-          controller.periodicCurrentAssetsBreakdown,
-          i,
-          ['receivable'],
-        );
-        final inventory = sumMatchingForBucket(
-          controller.periodicCurrentAssetsBreakdown,
-          i,
-          ['inventory'],
-        );
-        final rawDep = sumMatchingForBucket(
-          controller.periodicFixedAssetsBreakdown,
-          i,
-          ['depreciation', 'amortization', 'accumulated'],
-        );
-        final dep = rawDep > 0 ? -rawDep : rawDep;
-        final ppe = fixedAssets - dep;
-        final ownerInvestment = sumMatchingForBucket(
-          controller.periodicEquityBreakdown,
-          i,
-          ['owner', 'capital', 'contribution'],
-        );
-        final totalAssets = curAssets + fixedAssets + otherAssets;
-        final totalLiabilities = curLiab + longLiab;
-        final totalEquity = totalAssets - totalLiabilities;
+        if (useEngineColumns) {
+          final m = _balanceSheetMetricsAt(controller, columnEnds[i]);
+          final curAssets =
+              m.currentAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
+          final fixedAssets =
+              m.fixedAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
+          final otherAssets =
+              m.otherAssetsBreakdown.values.fold(0.0, (a, b) => a + b);
+          final curLiab =
+              m.currentLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b);
+          final longLiab =
+              m.longTermLiabilitiesBreakdown.values.fold(0.0, (a, b) => a + b);
+          final cash = m.currentAssetsBreakdown['Cash'] ?? 0;
+          final ar = m.currentAssetsBreakdown['Accounts Receivable'] ?? 0;
+          final inventory = m.currentAssetsBreakdown['Inventory'] ?? 0;
+          final rawDep = pickKeywordsMap(m.fixedAssetsBreakdown, [
+            'depreciation',
+            'amortization',
+            'accumulated',
+          ]);
+          final dep = rawDep > 0 ? -rawDep : rawDep;
+          final ppe = fixedAssets - dep;
+          final ownerInvestment = pickKeywordsMap(m.ownerEquityBreakdown, [
+            'owner',
+            'capital',
+            'contribution',
+          ]);
+          final totalAssets = m.totalAssets;
+          final totalLiabilities = m.totalLiabilities;
+          final totalEquity = m.totalEquity;
 
-        currentAssetsVals.add(curAssets);
-        fixedAssetsVals.add(fixedAssets);
-        otherAssetsVals.add(otherAssets);
-        cashVals.add(cash);
-        arVals.add(ar);
-        inventoryVals.add(inventory);
-        shortTermInvestmentsVals.add(curAssets - cash - ar - inventory);
-        ppeVals.add(ppe);
-        depreciationVals.add(dep);
-        currentLiabilitiesVals.add(curLiab);
-        longTermLiabilitiesVals.add(longLiab);
-        ownerInvestmentVals.add(ownerInvestment);
-        totalAssetsVals.add(totalAssets);
-        totalLiabilitiesVals.add(totalLiabilities);
-        totalEquityVals.add(totalEquity);
-        retainedEarningsVals.add(totalEquity - ownerInvestment);
+          currentAssetsVals.add(curAssets);
+          fixedAssetsVals.add(fixedAssets);
+          otherAssetsVals.add(otherAssets);
+          cashVals.add(cash);
+          arVals.add(ar);
+          inventoryVals.add(inventory);
+          shortTermInvestmentsVals.add(curAssets - cash - ar - inventory);
+          ppeVals.add(ppe);
+          depreciationVals.add(dep);
+          currentLiabilitiesVals.add(curLiab);
+          longTermLiabilitiesVals.add(longLiab);
+          ownerInvestmentVals.add(ownerInvestment);
+          totalAssetsVals.add(totalAssets);
+          totalLiabilitiesVals.add(totalLiabilities);
+          totalEquityVals.add(totalEquity);
+          retainedEarningsVals.add(totalEquity - ownerInvestment);
+        } else {
+          final curAssets = sumAllForBucket(
+            controller.periodicCurrentAssetsBreakdown,
+            i,
+          );
+          final fixedAssets = sumAllForBucket(
+            controller.periodicFixedAssetsBreakdown,
+            i,
+          );
+          final otherAssets = sumAllForBucket(
+            controller.periodicOtherAssetsBreakdown,
+            i,
+          );
+          final curLiab = sumAllForBucket(
+            controller.periodicCurrentLiabilitiesBreakdown,
+            i,
+          );
+          final longLiab = sumAllForBucket(
+            controller.periodicLongTermLiabilitiesBreakdown,
+            i,
+          );
+          final cash = sumMatchingForBucket(
+            controller.periodicCurrentAssetsBreakdown,
+            i,
+            ['cash'],
+          );
+          final ar = sumMatchingForBucket(
+            controller.periodicCurrentAssetsBreakdown,
+            i,
+            ['receivable'],
+          );
+          final inventory = sumMatchingForBucket(
+            controller.periodicCurrentAssetsBreakdown,
+            i,
+            ['inventory'],
+          );
+          final rawDep = sumMatchingForBucket(
+            controller.periodicFixedAssetsBreakdown,
+            i,
+            ['depreciation', 'amortization', 'accumulated'],
+          );
+          final dep = rawDep > 0 ? -rawDep : rawDep;
+          final ppe = fixedAssets - dep;
+          final ownerInvestment = sumMatchingForBucket(
+            controller.periodicEquityBreakdown,
+            i,
+            ['owner', 'capital', 'contribution'],
+          );
+          final totalAssets = curAssets + fixedAssets + otherAssets;
+          final totalLiabilities = curLiab + longLiab;
+          final totalEquity = totalAssets - totalLiabilities;
+
+          currentAssetsVals.add(curAssets);
+          fixedAssetsVals.add(fixedAssets);
+          otherAssetsVals.add(otherAssets);
+          cashVals.add(cash);
+          arVals.add(ar);
+          inventoryVals.add(inventory);
+          shortTermInvestmentsVals.add(curAssets - cash - ar - inventory);
+          ppeVals.add(ppe);
+          depreciationVals.add(dep);
+          currentLiabilitiesVals.add(curLiab);
+          longTermLiabilitiesVals.add(longLiab);
+          ownerInvestmentVals.add(ownerInvestment);
+          totalAssetsVals.add(totalAssets);
+          totalLiabilitiesVals.add(totalLiabilities);
+          totalEquityVals.add(totalEquity);
+          retainedEarningsVals.add(totalEquity - ownerInvestment);
+        }
       }
 
-      // Keep latest visible bucket synced with dashboard values.
-      final int lastIdx = yearCount - 1;
-      currentAssetsVals[lastIdx] = dashboardCurrentAssets;
-      fixedAssetsVals[lastIdx] = dashboardFixedAssets;
-      otherAssetsVals[lastIdx] = dashboardOtherAssets;
-      currentLiabilitiesVals[lastIdx] = dashboardCurrentLiabilities;
-      longTermLiabilitiesVals[lastIdx] = dashboardLongTermLiabilities;
-      ownerInvestmentVals[lastIdx] = dashboardOwnerInvestment;
-      totalAssetsVals[lastIdx] = dashboardTotalAssets;
-      totalLiabilitiesVals[lastIdx] = dashboardTotalLiabilities;
-      totalEquityVals[lastIdx] = dashboardTotalEquity;
-      retainedEarningsVals[lastIdx] =
-          dashboardTotalEquity - dashboardOwnerInvestment;
+      if (!useEngineColumns) {
+        // Keep latest visible bucket synced with dashboard values (legacy periodic path).
+        final int lastIdx = yearCount - 1;
+        currentAssetsVals[lastIdx] = dashboardCurrentAssets;
+        fixedAssetsVals[lastIdx] = dashboardFixedAssets;
+        otherAssetsVals[lastIdx] = dashboardOtherAssets;
+        currentLiabilitiesVals[lastIdx] = dashboardCurrentLiabilities;
+        longTermLiabilitiesVals[lastIdx] = dashboardLongTermLiabilities;
+        ownerInvestmentVals[lastIdx] = dashboardOwnerInvestment;
+        totalAssetsVals[lastIdx] = dashboardTotalAssets;
+        totalLiabilitiesVals[lastIdx] = dashboardTotalLiabilities;
+        totalEquityVals[lastIdx] = dashboardTotalEquity;
+        retainedEarningsVals[lastIdx] =
+            dashboardTotalEquity - dashboardOwnerInvestment;
 
-      final cashNow = pickByKeywords(controller.currentAssetsBreakdown, ['cash']);
-      final arNow = pickByKeywords(controller.currentAssetsBreakdown, ['receivable']);
-      final inventoryNow = pickByKeywords(
-        controller.currentAssetsBreakdown,
-        ['inventory'],
-      );
-      final rawDepNow = pickByKeywords(controller.fixedAssetsBreakdown, [
-        'depreciation',
-        'amortization',
-        'accumulated',
-      ]);
-      final depNow = rawDepNow > 0 ? -rawDepNow : rawDepNow;
-      cashVals[lastIdx] = cashNow;
-      arVals[lastIdx] = arNow;
-      inventoryVals[lastIdx] = inventoryNow;
-      shortTermInvestmentsVals[lastIdx] =
-          dashboardCurrentAssets - cashNow - arNow - inventoryNow;
-      depreciationVals[lastIdx] = depNow;
-      ppeVals[lastIdx] = dashboardFixedAssets - depNow;
+        final cashNow = pickByKeywords(controller.currentAssetsBreakdown, [
+          'cash',
+        ]);
+        final arNow = pickByKeywords(controller.currentAssetsBreakdown, [
+          'receivable',
+        ]);
+        final inventoryNow = pickByKeywords(
+          controller.currentAssetsBreakdown,
+          ['inventory'],
+        );
+        final rawDepNow = pickByKeywords(controller.fixedAssetsBreakdown, [
+          'depreciation',
+          'amortization',
+          'accumulated',
+        ]);
+        final depNow = rawDepNow > 0 ? -rawDepNow : rawDepNow;
+        cashVals[lastIdx] = cashNow;
+        arVals[lastIdx] = arNow;
+        inventoryVals[lastIdx] = inventoryNow;
+        shortTermInvestmentsVals[lastIdx] =
+            dashboardCurrentAssets - cashNow - arNow - inventoryNow;
+        depreciationVals[lastIdx] = depNow;
+        ppeVals[lastIdx] = dashboardFixedAssets - depNow;
+      }
 
       final moneyFmt = NumberFormat('#,##0.00');
       String amountText(double v) {
@@ -2615,7 +2611,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       for (int i = 0; i < yearCount; i++) {
         header.cells[1 + i].style = pdf_gen.PdfGridCellStyle(
           format: pdf_gen.PdfStringFormat(
-            alignment: pdf_gen.PdfTextAlignment.center,
+            alignment: pdf_gen.PdfTextAlignment.right,
             lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
           ),
           borders: pdf_gen.PdfBorders(
@@ -2648,7 +2644,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
           row.cells[1 + i].value = amountText(values[i]);
           row.cells[1 + i].style = pdf_gen.PdfGridCellStyle(
             format: pdf_gen.PdfStringFormat(
-              alignment: pdf_gen.PdfTextAlignment.center,
+              alignment: pdf_gen.PdfTextAlignment.right,
               lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
             ),
             borders: pdf_gen.PdfBorders(
@@ -2687,7 +2683,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
           row.cells[1 + i].value = values[i];
           row.cells[1 + i].style = pdf_gen.PdfGridCellStyle(
             format: pdf_gen.PdfStringFormat(
-              alignment: pdf_gen.PdfTextAlignment.center,
+              alignment: pdf_gen.PdfTextAlignment.right,
               lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
             ),
             borders: pdf_gen.PdfBorders(
@@ -2721,7 +2717,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
           row.cells[1 + i].value = displayLabels[i];
           row.cells[1 + i].style = pdf_gen.PdfGridCellStyle(
           format: pdf_gen.PdfStringFormat(
-              alignment: pdf_gen.PdfTextAlignment.center,
+              alignment: pdf_gen.PdfTextAlignment.right,
               lineAlignment: pdf_gen.PdfVerticalAlignment.middle,
             ),
             borders: pdf_gen.PdfBorders(
@@ -2745,6 +2741,16 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
           backgroundBrush: pdf_gen.PdfSolidBrush(templateHeaderBlue),
           textBrush: pdf_gen.PdfBrushes.white,
         );
+      }
+
+      void addPdfSectionGap() {
+        final row = grid.rows.add();
+        row.height = 4;
+        row.cells[0].value = ' ';
+        for (int i = 0; i < yearCount; i++) {
+          row.cells[1 + i].value = ' ';
+        }
+        row.style = pdf_gen.PdfGridRowStyle(font: smallFont);
       }
 
       addTemplateRow(
@@ -2771,6 +2777,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         bold: true,
         shaded: true,
       );
+      addPdfSectionGap();
 
       addTemplateRow(
         'FIXED (LONG-TERM) ASSETS',
@@ -2803,6 +2810,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         bold: true,
         shaded: true,
       );
+      addPdfSectionGap();
 
       addTemplateRow(
         'OTHER ASSETS',
@@ -2827,6 +2835,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         bold: true,
         shaded: true,
       );
+      addPdfSectionGap();
 
       addHeaderRow("LIABILITIES AND OWNER'S EQUITY");
       addTemplateRow(
@@ -2870,6 +2879,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         bold: true,
         shaded: true,
       );
+      addPdfSectionGap();
 
       addTemplateRow(
         'LONG-TERM LIABILITIES',
@@ -2889,6 +2899,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         bold: true,
         shaded: true,
       );
+      addPdfSectionGap();
       addTemplateRow(
         'TOTAL LIABILITIES',
         totalLiabilitiesVals,
