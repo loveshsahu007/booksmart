@@ -776,7 +776,7 @@ class BalanceSheetExcelService {
       balanceCheckStyle,
     );
 
-    final List<int>? bytes = excel.save();
+    final List<int>? bytes = excel.encode();
     if (bytes == null) return;
 
     final List<int> groupedBytes = _applyRowGroupingToFirstSheet(

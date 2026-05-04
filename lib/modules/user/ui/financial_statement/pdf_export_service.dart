@@ -143,6 +143,81 @@ class PdfExportService {
     }
   }
 
+  /// Sums [periodicMap] values for [category] so each entry aligns with
+  /// [buildBucketLabels] (same column count and order as PDF/Excel exports).
+  List<double> aggregatePeriodicCategoryForPl(
+    Map<String, Map<String, double>> periodicMap,
+    String category,
+    DateTime rangeStart,
+    DateTime rangeEnd,
+    PdfViewType viewType,
+  ) {
+    final labels = buildBucketLabels(rangeStart, rangeEnd, viewType);
+    final n = labels.length;
+    final out = List<double>.filled(n, 0);
+
+    switch (viewType) {
+      case PdfViewType.monthly:
+        var c = DateTime(rangeStart.year, rangeStart.month, 1);
+        final last = DateTime(rangeEnd.year, rangeEnd.month, 1);
+        var i = 0;
+        while (!c.isAfter(last) && i < n) {
+          final key = DateFormat('yyyy-MM').format(c);
+          out[i] = periodicMap[key]?[category] ?? 0;
+          c = DateTime(c.year, c.month + 1, 1);
+          i++;
+        }
+        return out;
+      case PdfViewType.yearly:
+        var i = 0;
+        for (var y = rangeStart.year; y <= rangeEnd.year && i < n; y++) {
+          var t = 0.0;
+          periodicMap.forEach((key, values) {
+            if (key.startsWith('$y-')) {
+              t += values[category] ?? 0;
+            }
+          });
+          out[i] = t;
+          i++;
+        }
+        return out;
+      case PdfViewType.quarterly:
+        var cursor = DateTime(
+          rangeStart.year,
+          (((rangeStart.month - 1) ~/ 3) * 3) + 1,
+          1,
+        );
+        var i = 0;
+        while (!cursor.isAfter(rangeEnd) && i < n) {
+          var t = 0.0;
+          for (var mi = 0; mi < 3; mi++) {
+            final m = cursor.month + mi;
+            final monthStart = DateTime(cursor.year, m, 1);
+            if (!_monthOverlapsExportRange(monthStart, rangeStart, rangeEnd)) {
+              continue;
+            }
+            final key = DateFormat('yyyy-MM').format(monthStart);
+            t += periodicMap[key]?[category] ?? 0;
+          }
+          out[i] = t;
+          i++;
+          cursor = DateTime(cursor.year, cursor.month + 3, 1);
+        }
+        return out;
+    }
+  }
+
+  bool _monthOverlapsExportRange(
+    DateTime monthStart,
+    DateTime rangeStart,
+    DateTime rangeEnd,
+  ) {
+    final monthEnd = DateTime(monthStart.year, monthStart.month + 1, 0);
+    final rs = DateTime(rangeStart.year, rangeStart.month, rangeStart.day);
+    final re = DateTime(rangeEnd.year, rangeEnd.month, rangeEnd.day);
+    return !monthEnd.isBefore(rs) && !monthStart.isAfter(re);
+  }
+
   Future<void> exportProfitLossPresentationPdf(
     PdfExportRequest request, {
     PnlPdfData? pnlData,
@@ -276,7 +351,11 @@ class PdfExportService {
         ? 'Organization'
         : request.companyName.trim();
     final datePrepared = DateFormat('MM/dd/yyyy').format(DateTime.now());
-    final periodText = _asOfTextByViewType(request);
+    final forThePeriodText =
+        'For the Period ${DateFormat('MMM d, yyyy').format(request.startDate)} to ${DateFormat('MMM d, yyyy').format(request.endDate)}';
+    const double margin = 34;
+    final double rightBlockLeft = size.width * 0.46;
+    final double rightBlockWidth = size.width - margin - rightBlockLeft;
     final companyMeta = request.companyAddress.trim().isEmpty
         ? 'Address not available'
         : request.companyAddress.trim();
@@ -286,6 +365,14 @@ class PdfExportService {
         .where((e) => e.isNotEmpty)
         .toList();
 
+    final rightAlign = pdf_gen.PdfStringFormat(
+      alignment: pdf_gen.PdfTextAlignment.right,
+    );
+    final leftCompanyWidth = size.width * 0.40;
+    // Same three rows: left = company / address, right = title & dates (font sizes unchanged).
+    const double yCompanyTitle = 12;
+    const double yAddrPeriod = 36;
+    const double yAddr2Date = 52;
     graphics.drawString(
       companyName,
       pdf_gen.PdfStandardFont(
@@ -294,54 +381,53 @@ class PdfExportService {
         style: pdf_gen.PdfFontStyle.bold,
       ),
       brush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(35, 35, 35)),
-      bounds: Rect.fromLTWH(34, 22, size.width * 0.38, 18),
+      bounds: Rect.fromLTWH(margin, yCompanyTitle, leftCompanyWidth, 22),
+    );
+    graphics.drawString(
+      'Profit & Loss Statement',
+      titleFont,
+      brush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(20, 20, 20)),
+      bounds: Rect.fromLTWH(rightBlockLeft, yCompanyTitle, rightBlockWidth, 24),
+      format: rightAlign,
     );
     graphics.drawString(
       addressLines.isNotEmpty ? addressLines.first : companyMeta,
       bodyFont,
       brush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(90, 90, 90)),
-      bounds: Rect.fromLTWH(34, 38, size.width * 0.38, 12),
+      bounds: Rect.fromLTWH(margin, yAddrPeriod, leftCompanyWidth, 14),
+    );
+    graphics.drawString(
+      forThePeriodText,
+      bodyFont,
+      brush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(70, 70, 70)),
+      bounds: Rect.fromLTWH(rightBlockLeft, yAddrPeriod, rightBlockWidth, 14),
+      format: rightAlign,
     );
     if (addressLines.length > 1) {
       graphics.drawString(
         addressLines[1],
         bodyFont,
         brush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(90, 90, 90)),
-        bounds: Rect.fromLTWH(34, 49, size.width * 0.38, 12),
+        bounds: Rect.fromLTWH(margin, yAddr2Date, leftCompanyWidth, 12),
       );
     }
-
-    graphics.drawString(
-      'Profit & Loss Statement',
-      titleFont,
-      brush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(20, 20, 20)),
-      bounds: Rect.fromLTWH(size.width * 0.50, 16, size.width * 0.44, 24),
-      format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
-    );
     graphics.drawString(
       'Date Prepared: $datePrepared',
       bodyFont,
       brush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(70, 70, 70)),
-      bounds: Rect.fromLTWH(size.width * 0.50, 41, size.width * 0.44, 12),
-      format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
-    );
-    graphics.drawString(
-      periodText,
-      bodyFont,
-      brush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(70, 70, 70)),
-      bounds: Rect.fromLTWH(size.width * 0.50, 53, size.width * 0.44, 12),
-      format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
+      bounds: Rect.fromLTWH(rightBlockLeft, yAddr2Date, rightBlockWidth, 12),
+      format: rightAlign,
     );
     graphics.drawLine(
       pdf_gen.PdfPen(pdf_gen.PdfColor(190, 196, 204), width: 0.7),
-      Offset(34, 72),
-      Offset(size.width - 34, 72),
+      Offset(margin, 78),
+      Offset(size.width - margin, 78),
     );
 
     _drawTabularStatement(
       page: page,
       graphics: graphics,
-      yStart: 82,
+      yStart: 88,
       labels: labels,
       headerFont: headerFont,
       bodyFont: bodyFont,
@@ -508,7 +594,7 @@ class PdfExportService {
       );
     }
     grid.style = pdf_gen.PdfGridStyle(
-      cellPadding: pdf_gen.PdfPaddings(left: 4, right: 4, top: 3, bottom: 3),
+      cellPadding: pdf_gen.PdfPaddings(left: 5, right: 5, top: 3, bottom: 3),
     );
 
     for (var sIndex = 0; sIndex < statement.sections.length; sIndex++) {
@@ -565,10 +651,29 @@ class PdfExportService {
           backgroundBrush: row.isBold ? pdf_gen.PdfSolidBrush(totalHighlight) : null,
         );
       }
+
+      // Breathing room after each section before the next header / net row.
+      if (sIndex < statement.sections.length - 1) {
+        final spacer = grid.rows.add();
+        spacer.cells[0].value = '';
+        spacer.cells[0].columnSpan = colCount;
+        spacer.style = pdf_gen.PdfGridRowStyle(
+          font: bodyFont,
+          textBrush: pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(255, 255, 255)),
+        );
+        spacer.cells[0].style = pdf_gen.PdfGridCellStyle(
+          borders: pdf_gen.PdfBorders(
+            bottom: pdf_gen.PdfPens.transparent,
+            left: pdf_gen.PdfPens.transparent,
+            right: pdf_gen.PdfPens.transparent,
+            top: pdf_gen.PdfPens.transparent,
+          ),
+        );
+      }
     }
 
     final netRow = grid.rows.add();
-    netRow.cells[0].value = 'Net Income';
+    netRow.cells[0].value = 'Net Income (Loss)';
     for (var i = 0; i < labels.length; i++) {
       final value = statement.netProfit[i];
       netRow.cells[i + 1].value = _money(value);
@@ -1167,18 +1272,6 @@ class PdfExportService {
   }
 
   int _yearSpanInclusive(DateTime start, DateTime end) => end.year - start.year + 1;
-
-  String _asOfTextByViewType(PdfExportRequest request) {
-    switch (request.viewType) {
-      case PdfViewType.monthly:
-        return 'As of ${DateFormat('MMMM yyyy').format(request.endDate)}';
-      case PdfViewType.quarterly:
-        final q = ((request.endDate.month - 1) ~/ 3) + 1;
-        return 'As of Q$q ${request.endDate.year}';
-      case PdfViewType.yearly:
-        return 'As of ${DateFormat('MMMM dd,').format(DateTime(request.endDate.year, 12, 31))}';
-    }
-  }
 
   String _money(double value) {
     if (value.abs() < 0.000001) return '\$ -';

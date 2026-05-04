@@ -1048,12 +1048,16 @@ class FinancialReportController extends GetxController {
 
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
-  /// Spec: 7–30 days → daily; 1–6 months → weekly; 6–18 months → monthly; 2+ years → quarterly.
+  /// P&L trend bucketing (inclusive day count):
+  /// - 1–31 days → daily (custom month-spanning ranges like the 30-day preset)
+  /// - 32–186 days → weekly (~≤6 months)
+  /// - 187–729 days → monthly
+  /// - 730+ days → quarterly
   _TrendGranularity _trendGranularityForRange(DateTime start, DateTime end) {
     final s = _dateOnly(start);
     final e = _dateOnly(end);
     final days = e.difference(s).inDays + 1;
-    if (days <= 30) return _TrendGranularity.daily;
+    if (days <= 31) return _TrendGranularity.daily;
     if (days <= 186) return _TrendGranularity.weekly;
     if (days < 730) return _TrendGranularity.monthly;
     return _TrendGranularity.quarterly;
@@ -1294,16 +1298,19 @@ class FinancialReportController extends GetxController {
   ) {
     double? prevRevenue;
     double? prevExpense;
-    const double minBaseForGrowthPct = 100.0;
+    double? prevCogs;
     const double growthCapPct = 500.0;
 
+    /// Period-over-period % change, aligned with [trendSeries] buckets.
+    /// Prior revenue/expense of 0 with non-zero current caps at [growthCapPct] for chart stability.
     ({double value, bool isNew}) growthFromPrevious(
       double current,
       double? previous,
     ) {
       if (previous == null) return (value: 0.0, isNew: false);
-      if (previous.abs() < minBaseForGrowthPct) {
-        return (value: 0.0, isNew: current.abs() >= minBaseForGrowthPct);
+      if (previous == 0.0) {
+        if (current == 0.0) return (value: 0.0, isNew: false);
+        return (value: growthCapPct, isNew: true);
       }
       final raw = ((current - previous) / previous) * 100;
       return (value: raw.clamp(-growthCapPct, growthCapPct), isNew: false);
@@ -1318,17 +1325,22 @@ class FinancialReportController extends GetxController {
       final label = row['label'];
       final revenueGrowthData = growthFromPrevious(currentRevenue, prevRevenue);
       final expenseGrowthData = growthFromPrevious(currentExpense, prevExpense);
+      final cogsGrowthData = growthFromPrevious(currentCogs, prevCogs);
       prevRevenue = currentRevenue;
       prevExpense = currentExpense;
+      prevCogs = currentCogs;
       return <String, dynamic>{
         'bucketStart': bucket,
         'name': label,
         'tooltipDate': tooltipDate,
         'revenueGrowth': revenueGrowthData.value,
         'expenseGrowth': expenseGrowthData.value,
+        'cogsGrowth': cogsGrowthData.value,
         'revenueGrowthIsNew': revenueGrowthData.isNew,
         'expenseGrowthIsNew': expenseGrowthData.isNew,
+        'cogsGrowthIsNew': cogsGrowthData.isNew,
         'revenue': currentRevenue,
+        'cogs': currentCogs,
         'cogsPct': currentRevenue != 0
             ? (currentCogs / currentRevenue) * 100
             : 0.0,
@@ -1357,6 +1369,7 @@ class FinancialReportController extends GetxController {
         'revenue': 450000,
         'revenueGrowth': 5.2,
         'expenseGrowth': 3.1,
+        'cogsGrowth': 4.5,
         'cogsPct': 42,
       },
       {
@@ -1364,6 +1377,7 @@ class FinancialReportController extends GetxController {
         'revenue': 480000,
         'revenueGrowth': 6.6,
         'expenseGrowth': 2.8,
+        'cogsGrowth': 3.2,
         'cogsPct': 40,
       },
       {
@@ -1371,6 +1385,7 @@ class FinancialReportController extends GetxController {
         'revenue': 510000,
         'revenueGrowth': 6.2,
         'expenseGrowth': 4.2,
+        'cogsGrowth': 4.0,
         'cogsPct': 41,
       },
     ];
@@ -1378,12 +1393,14 @@ class FinancialReportController extends GetxController {
     trendChartSeries = mockChart.map((e) {
       final rev = (e['revenue'] as num).toDouble();
       final exp = rev * 0.55;
+      final pct = (e['cogsPct'] as num?)?.toDouble() ?? 0;
       return {
         'bucketStart': DateTime.now(),
         'label': e['name'],
         'tooltipDate': e['name'],
         'income': rev,
         'expense': exp,
+        'cogs': rev * pct / 100,
         'net': rev - exp,
         'sortKey': e['name'],
       };

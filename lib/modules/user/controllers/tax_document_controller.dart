@@ -3,6 +3,9 @@ import 'package:path/path.dart' as p;
 import 'package:intl/intl.dart';
 
 import 'package:booksmart/models/financial_template_models.dart';
+import 'package:booksmart/modules/user/ui/tax_filling/manual_pnl_review_helper.dart';
+import 'package:booksmart/modules/user/ui/tax_filling/pl_reconciliation_dialog.dart';
+import 'package:booksmart/utils/pl_transaction_totals.dart';
 import 'package:booksmart/models/user_document_model.dart';
 import 'package:booksmart/modules/common/controllers/auth_controller.dart';
 import 'package:booksmart/modules/user/controllers/financial_report_controller.dart';
@@ -20,6 +23,30 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
+class _MultiPeriodSaveEntry {
+  _MultiPeriodSaveEntry({
+    required this.type,
+    required this.displayName,
+    required this.docDate,
+    required this.template,
+  });
+  final String type;
+  final String displayName;
+  final DateTime docDate;
+  final Object template;
+}
+
+class _ManualPeriodColumn {
+  _ManualPeriodColumn({
+    required this.year,
+    required this.start,
+    required this.end,
+  });
+  int year;
+  DateTime start;
+  DateTime end;
+}
+
 class TaxDocumentController extends GetxController {
   // ── Reactive state ────────────────────────────────────────────────────────
 
@@ -28,6 +55,15 @@ class TaxDocumentController extends GetxController {
   final isUploading = false.obs;
   final extractedData = Rxn<dynamic>();
   final NumberFormat _moneyFmt = NumberFormat('#,##0.00');
+  final DateFormat _dateFmt = DateFormat.yMMMd();
+
+  DateTime? _uploadPeriodStart;
+  DateTime? _uploadPeriodEnd;
+  List<_MultiPeriodSaveEntry>? _multiPeriodExtracted;
+
+  /// When true, [UploadTaxDocWidget] should not show the generic success snackbar
+  /// (P&L uploads show a reconciliation-specific message instead).
+  bool suppressUploadSuccessSnack = false;
 
   // ── Form state (used by the upload dialog) ────────────────────────────────
 
@@ -118,6 +154,8 @@ class TaxDocumentController extends GetxController {
     String? taxYear,
     String? category,
     String? type,
+    DateTime? periodStart,
+    DateTime? periodEnd,
     int? userId,
     int? orderId,
     int? cpaId,
@@ -148,6 +186,9 @@ class TaxDocumentController extends GetxController {
 
     try {
       isUploading.value = true;
+      _multiPeriodExtracted = null;
+      _uploadPeriodStart = periodStart;
+      _uploadPeriodEnd = periodEnd;
 
       // 1. Upload to Storage
       final mimeType = _guessMime(fileToUpload.name);
@@ -170,6 +211,17 @@ class TaxDocumentController extends GetxController {
       } catch (_) {}
 
       // 3. Insert DB row
+      final periodMeta = <String, dynamic>{};
+      if (periodStart != null) {
+        periodMeta['period_start'] = periodStart.toIso8601String();
+      }
+      if (periodEnd != null) {
+        periodMeta['period_end'] = periodEnd.toIso8601String();
+      }
+      if (category != null && category.isNotEmpty) {
+        periodMeta['document_category'] = category;
+      }
+
       final payload = <String, dynamic>{
         'user_id': effectiveUserId,
         'name': finalName,
@@ -182,11 +234,13 @@ class TaxDocumentController extends GetxController {
         'mime_type': mimeType,
         'created_at': DateTime.now().toIso8601String(),
         'updated_at': DateTime.now().toIso8601String(),
+        if (periodMeta.isNotEmpty) 'parsed_data': periodMeta,
       };
 
       await supabase.from(SupabaseTable.userDocuments).insert(payload);
 
-      final normalizedType = _normalizeType(type);
+      final normalizedType =
+          _documentCategoryToParserType(category) ?? _normalizeType(type);
       if (normalizedType != null) {
         final parsedData = await DocumentParserService.parseDocument(
           fileToUpload,
@@ -221,12 +275,28 @@ class TaxDocumentController extends GetxController {
           }
         }
 
-        final confirmed = await _showReviewDialog(normalizedType);
+        final confirmed =
+            await _showReviewDialog(normalizedType, documentBaseName: finalName);
         if (!confirmed) return null;
 
         final orgId = getCurrentOrganization?.id;
         if (orgId != null) {
-          final txDate = _effectiveTxDate(taxYear);
+          Future<void> runSaveTransactions() async {
+            if (_multiPeriodExtracted != null &&
+                _multiPeriodExtracted!.isNotEmpty) {
+              for (final entry in _multiPeriodExtracted!) {
+                await _saveExtractedData(
+                  effectiveUserId,
+                  orgId,
+                  entry.displayName,
+                  entry.docDate,
+                  entry.type,
+                  templateOverride: entry.template,
+                );
+              }
+              _multiPeriodExtracted = null;
+            } else {
+              final txDate = _uploadPeriodEnd ?? _effectiveTxDate(taxYear);
           await _saveExtractedData(
             effectiveUserId,
             orgId,
@@ -234,6 +304,42 @@ class TaxDocumentController extends GetxController {
             txDate,
             normalizedType,
           );
+            }
+          }
+
+          if (normalizedType == 'pnl') {
+            suppressUploadSuccessSnack = true;
+            final book = await fetchBooksmartPlBucketsForRange(
+              orgId: orgId,
+              rangeStart: _reconciliationRangeStart(taxYear),
+              rangeEnd: _reconciliationRangeEnd(taxYear),
+            );
+            final upRev = _aggregateUploadedPnlRevenue();
+            final upExp = _aggregateUploadedPnlExpenses();
+            final reconResult =
+                await showPlReconciliationDialog(
+                      book: book,
+                      uploadedRevenue: upRev,
+                      uploadedExpenses: upExp,
+                      periodLabel: _reconciliationPeriodLabel(taxYear),
+                    ) ??
+                    PlReconciliationOutcome.reviewLater;
+
+            final shouldSaveTransactions =
+                reconResult == PlReconciliationOutcome.saveTransactions;
+            if (shouldSaveTransactions) {
+              await runSaveTransactions();
+            } else {
+              _multiPeriodExtracted = null;
+            }
+            _snackbarAfterPnlReconciliation(
+              reconResult,
+              shouldSaveTransactions,
+            );
+          } else {
+            await runSaveTransactions();
+          }
+
           final tag = orgId.toString();
           if (Get.isRegistered<FinancialReportController>(tag: tag)) {
             final fc = Get.find<FinancialReportController>(tag: tag);
@@ -252,6 +358,7 @@ class TaxDocumentController extends GetxController {
       await fetchDocuments();
       return fileUrl;
     } catch (e, st) {
+      suppressUploadSuccessSnack = false;
       log('TaxDocumentController.uploadDocument error: $e\n$st');
       showSnackBar('Failed to upload document: $e', isError: true);
       return null;
@@ -271,18 +378,953 @@ class TaxDocumentController extends GetxController {
     return null;
   }
 
+  /// Maps upload UI labels to parser keys. `Transactions` → no statement parse.
+  String? _documentCategoryToParserType(String? category) {
+    if (category == null || category.isEmpty) return null;
+    switch (category) {
+      case 'Profit & Loss':
+      case 'Income Statement':
+        return 'pnl';
+      case 'Balance Sheet':
+        return 'bs';
+      case 'Cash Flow Statement':
+        return 'cf';
+      case 'Transactions':
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  List<_ManualPeriodColumn> _initialManualPeriodColumns() {
+    final s = _uploadPeriodStart;
+    final e = _uploadPeriodEnd;
+    final nowY = DateTime.now().year;
+    if (s == null || e == null) {
+      return [
+        _ManualPeriodColumn(
+          year: nowY,
+          start: DateTime(nowY, 1, 1),
+          end: DateTime(nowY, 12, 31),
+        ),
+      ];
+    }
+    if (e.isBefore(s)) {
+      return [
+        _ManualPeriodColumn(
+          year: s.year,
+          start: s,
+          end: e,
+        ),
+      ];
+    }
+    final out = <_ManualPeriodColumn>[];
+    for (var y = s.year; y <= e.year && out.length < 8; y++) {
+      final yStart = DateTime(y, 1, 1);
+      final yEnd = DateTime(y, 12, 31);
+      out.add(
+        _ManualPeriodColumn(
+          year: y,
+          start: yStart.isBefore(s) ? s : yStart,
+          end: yEnd.isAfter(e) ? e : yEnd,
+        ),
+      );
+    }
+    if (out.isEmpty) {
+      out.add(_ManualPeriodColumn(year: s.year, start: s, end: e));
+    }
+    return out;
+  }
+
+  List<int> _yearPickerRange() {
+    final cap = DateTime.now().year + 3;
+    return [for (var y = cap; y >= 1960; y--) y];
+  }
+
+  String _statementTypeLabel(String type) {
+    switch (type) {
+      case 'pnl':
+        return 'Profit & Loss / Income Statement';
+      case 'bs':
+        return 'Balance Sheet';
+      case 'cf':
+        return 'Cash Flow Statement';
+      default:
+        return type;
+    }
+  }
+
   DateTime _effectiveTxDate(String? taxYear) {
     final yr = int.tryParse((taxYear ?? '').trim());
     if (yr == null || yr == DateTime.now().year) return DateTime.now();
     return DateTime(yr, 1, 1);
   }
 
-  Future<bool> _showReviewDialog(String type) async {
+  DateTime _reconciliationRangeStart(String? taxYear) {
+    if (_uploadPeriodStart != null) return _uploadPeriodStart!;
+    final y = int.tryParse((taxYear ?? '').trim()) ?? DateTime.now().year;
+    return DateTime(y, 1, 1);
+  }
+
+  DateTime _reconciliationRangeEnd(String? taxYear) {
+    if (_uploadPeriodEnd != null) return _uploadPeriodEnd!;
+    final y = int.tryParse((taxYear ?? '').trim()) ?? DateTime.now().year;
+    return DateTime(y, 12, 31);
+  }
+
+  String _reconciliationPeriodLabel(String? taxYear) {
+    final s = _uploadPeriodStart;
+    final e = _uploadPeriodEnd;
+    if (s != null && e != null) {
+      return 'Period: ${_dateFmt.format(s)} – ${_dateFmt.format(e)}';
+    }
+    final y = int.tryParse((taxYear ?? '').trim()) ?? DateTime.now().year;
+    return 'Period: calendar year $y';
+  }
+
+  double _aggregateUploadedPnlRevenue() {
+    if (_multiPeriodExtracted != null && _multiPeriodExtracted!.isNotEmpty) {
+      var sum = 0.0;
+      for (final entry in _multiPeriodExtracted!) {
+        if (entry.type == 'pnl' && entry.template is ProfitAndLossTemplate) {
+          sum += (entry.template as ProfitAndLossTemplate).revenue;
+        }
+      }
+      return sum;
+    }
+    final d = extractedData.value;
+    if (d is ProfitAndLossTemplate) return d.revenue;
+    return 0;
+  }
+
+  double _aggregateUploadedPnlExpenses() {
+    if (_multiPeriodExtracted != null && _multiPeriodExtracted!.isNotEmpty) {
+      var sum = 0.0;
+      for (final entry in _multiPeriodExtracted!) {
+        if (entry.type == 'pnl' && entry.template is ProfitAndLossTemplate) {
+          final p = entry.template as ProfitAndLossTemplate;
+          sum += p.cogs.abs() + p.operatingExpenses.abs();
+        }
+      }
+      return sum;
+    }
+    final d = extractedData.value;
+    if (d is ProfitAndLossTemplate) {
+      return d.cogs.abs() + d.operatingExpenses.abs();
+    }
+    return 0;
+  }
+
+  void _snackbarAfterPnlReconciliation(
+    PlReconciliationOutcome outcome,
+    bool savedTransactions,
+  ) {
+    switch (outcome) {
+      case PlReconciliationOutcome.saveTransactions:
+        showSnackBar(
+          savedTransactions
+              ? 'Document uploaded. Your P&L values were saved to your transaction register.'
+              : 'Document uploaded.',
+        );
+      case PlReconciliationOutcome.keepBookSmart:
+        showSnackBar(
+          'Document uploaded. No P&L changes were made — BookSmart amounts were kept.',
+        );
+      case PlReconciliationOutcome.addMissingTransactions:
+        showSnackBar(
+          'Your uploaded statement does not match your current BookSmart records. '
+          'Please update or add missing transactions before finalizing.',
+        );
+      case PlReconciliationOutcome.reviewLater:
+        showSnackBar(
+          'Document uploaded. Reconciliation was deferred — P&L transactions were not added.',
+        );
+    }
+  }
+
+  /// Clears [suppressUploadSuccessSnack] and returns the previous value.
+  bool consumeSuppressUploadSuccessSnack() {
+    final v = suppressUploadSuccessSnack;
+    suppressUploadSuccessSnack = false;
+    return v;
+  }
+
+  void _seedManualColumnControllers(
+    String type,
+    Map<String, TextEditingController> map,
+    int i,
+  ) {
+    String k(String b) => '${b}__$i';
+    if (type == 'pnl') {
+      for (final field in ManualPnlKeys.allValueKeys) {
+        final initial =
+            field == ManualPnlKeys.taxRatePercent ? '0' : '0.00';
+        map[k(field)] = TextEditingController(text: initial);
+      }
+    } else if (type == 'bs') {
+      map[k('currentAssets')] = TextEditingController(text: '0.00');
+      map[k('nonCurrentAssets')] = TextEditingController(text: '0.00');
+      map[k('currentLiabilities')] = TextEditingController(text: '0.00');
+      map[k('longTermLiabilities')] = TextEditingController(text: '0.00');
+      map[k('equity')] = TextEditingController(text: '0.00');
+    } else if (type == 'cf') {
+      map[k('operatingActivities')] = TextEditingController(text: '0.00');
+      map[k('operatingAdjustments')] = TextEditingController(text: '0.00');
+      map[k('workingCapitalChanges')] = TextEditingController(text: '0.00');
+      map[k('investingActivities')] = TextEditingController(text: '0.00');
+      map[k('assetPurchases')] = TextEditingController(text: '0.00');
+      map[k('investmentActivities')] = TextEditingController(text: '0.00');
+      map[k('financingActivities')] = TextEditingController(text: '0.00');
+      map[k('loanActivities')] = TextEditingController(text: '0.00');
+      map[k('ownerContributions')] = TextEditingController(text: '0.00');
+      map[k('distributions')] = TextEditingController(text: '0.00');
+    }
+  }
+
+  void _disposeControllersForColumn(
+    String type,
+    Map<String, TextEditingController> controllers,
+    int i,
+  ) {
+    final prefixes = type == 'pnl'
+        ? ManualPnlKeys.allValueKeys
+        : type == 'bs'
+        ? [
+            'currentAssets',
+            'nonCurrentAssets',
+            'currentLiabilities',
+            'longTermLiabilities',
+            'equity',
+          ]
+        : [
+            'operatingActivities',
+            'operatingAdjustments',
+            'workingCapitalChanges',
+            'investingActivities',
+            'assetPurchases',
+            'investmentActivities',
+            'financingActivities',
+            'loanActivities',
+            'ownerContributions',
+            'distributions',
+          ];
+    for (final p in prefixes) {
+      final c = controllers.remove('${p}__$i');
+      c?.dispose();
+    }
+  }
+
+  void _onPnlDetailFieldEdited(Map<String, bool> o, int i, String key) {
+    final s = '__$i';
+    void clear(List<String> keys) {
+      for (final k in keys) {
+        o['$k$s'] = false;
+      }
+    }
+
+    if (ManualPnlKeys.revenueInputs.contains(key)) {
+      clear([
+        ManualPnlKeys.totalRevenue,
+        ManualPnlKeys.grossProfit,
+        ManualPnlKeys.ebitda,
+        ManualPnlKeys.taxExpense,
+        ManualPnlKeys.netIncome,
+      ]);
+    } else if (ManualPnlKeys.cogsInputs.contains(key)) {
+      clear([
+        ManualPnlKeys.totalCogs,
+        ManualPnlKeys.grossProfit,
+        ManualPnlKeys.ebitda,
+        ManualPnlKeys.taxExpense,
+        ManualPnlKeys.netIncome,
+      ]);
+    } else if (ManualPnlKeys.opexInputs.contains(key)) {
+      clear([
+        ManualPnlKeys.totalOperatingExpenses,
+        ManualPnlKeys.ebitda,
+        ManualPnlKeys.taxExpense,
+        ManualPnlKeys.netIncome,
+      ]);
+    } else if (key == ManualPnlKeys.depreciation ||
+        key == ManualPnlKeys.amortization ||
+        key == ManualPnlKeys.interestExpense) {
+      clear([ManualPnlKeys.taxExpense, ManualPnlKeys.netIncome]);
+    } else if (key == ManualPnlKeys.taxRatePercent) {
+      clear([ManualPnlKeys.taxExpense, ManualPnlKeys.netIncome]);
+    }
+  }
+
+  void _recalcDetailedPnlColumn(
+    Map<String, TextEditingController> c,
+    Map<String, bool> over,
+    int i,
+  ) {
+    final s = '__$i';
+    bool ov(String field) => over['$field$s'] == true;
+    double gv(String field) =>
+        _parseMoney(c['$field$s']?.text ?? '0');
+
+    if (!ov(ManualPnlKeys.totalRevenue)) {
+      var tr = 0.0;
+      for (final k in ManualPnlKeys.revenueInputs) {
+        tr += gv(k);
+      }
+      c['${ManualPnlKeys.totalRevenue}$s']?.text = _formatMoneyInput(tr);
+    }
+
+    if (!ov(ManualPnlKeys.totalCogs)) {
+      var tc = 0.0;
+      for (final k in ManualPnlKeys.cogsInputs) {
+        tc += gv(k);
+      }
+      c['${ManualPnlKeys.totalCogs}$s']?.text = _formatMoneyInput(tc);
+    }
+
+    if (!ov(ManualPnlKeys.grossProfit)) {
+      final tr = gv(ManualPnlKeys.totalRevenue);
+      final tc = gv(ManualPnlKeys.totalCogs);
+      c['${ManualPnlKeys.grossProfit}$s']?.text = _formatMoneyInput(tr - tc);
+    }
+
+    if (!ov(ManualPnlKeys.totalOperatingExpenses)) {
+      var to = 0.0;
+      for (final k in ManualPnlKeys.opexInputs) {
+        to += gv(k);
+      }
+      c['${ManualPnlKeys.totalOperatingExpenses}$s']?.text =
+          _formatMoneyInput(to);
+    }
+
+    if (!ov(ManualPnlKeys.ebitda)) {
+      final gp = gv(ManualPnlKeys.grossProfit);
+      final to = gv(ManualPnlKeys.totalOperatingExpenses);
+      c['${ManualPnlKeys.ebitda}$s']?.text = _formatMoneyInput(gp - to);
+    }
+
+    if (!ov(ManualPnlKeys.taxExpense)) {
+      final ebitda = gv(ManualPnlKeys.ebitda);
+      final dep = gv(ManualPnlKeys.depreciation);
+      final amort = gv(ManualPnlKeys.amortization);
+      final intexp = gv(ManualPnlKeys.interestExpense);
+      final pretax = ebitda - dep - amort - intexp;
+      final rate = gv(ManualPnlKeys.taxRatePercent);
+      c['${ManualPnlKeys.taxExpense}$s']?.text =
+          _formatMoneyInput(pretax * (rate / 100.0));
+    }
+
+    if (!ov(ManualPnlKeys.netIncome)) {
+      final ebitda = gv(ManualPnlKeys.ebitda);
+      final dep = gv(ManualPnlKeys.depreciation);
+      final amort = gv(ManualPnlKeys.amortization);
+      final intexp = gv(ManualPnlKeys.interestExpense);
+      final tax = gv(ManualPnlKeys.taxExpense);
+      c['${ManualPnlKeys.netIncome}$s']?.text =
+          _formatMoneyInput(ebitda - dep - amort - intexp - tax);
+    }
+  }
+
+  void _recalcCashFlowColumnFull(Map<String, TextEditingController> c, int i) {
+    final s = '__$i';
+    final assetPurchases = _parseMoney(c['assetPurchases$s']?.text ?? '0');
+    final investmentActivities =
+        _parseMoney(c['investmentActivities$s']?.text ?? '0');
+    c['investingActivities$s']?.text =
+        _formatMoneyInput(assetPurchases + investmentActivities);
+    final loanActivities = _parseMoney(c['loanActivities$s']?.text ?? '0');
+    final ownerContributions =
+        _parseMoney(c['ownerContributions$s']?.text ?? '0');
+    final distributions = _parseMoney(c['distributions$s']?.text ?? '0');
+    c['financingActivities$s']?.text = _formatMoneyInput(
+      loanActivities + ownerContributions + distributions,
+    );
+  }
+
+  double _netIncomeForPnlColumn(Map<String, TextEditingController> c, int i) {
+    final s = '__$i';
+    return _parseMoney(c['${ManualPnlKeys.netIncome}$s']?.text ?? '0');
+  }
+
+  dynamic _templateFromControllersColumn(
+    String type,
+    Map<String, TextEditingController> controllers,
+    int i,
+  ) {
+    double v(String key) =>
+        _parseMoney(controllers['${key}__$i']?.text ?? '0');
+    if (type == 'pnl') {
+      final totalRev = v(ManualPnlKeys.totalRevenue);
+      final totalCogs = v(ManualPnlKeys.totalCogs);
+      final totalOpex = v(ManualPnlKeys.totalOperatingExpenses);
+      final dep = v(ManualPnlKeys.depreciation);
+      final amort = v(ManualPnlKeys.amortization);
+      final interest = v(ManualPnlKeys.interestExpense);
+      final tax = v(ManualPnlKeys.taxExpense);
+      final rolledOpex = totalOpex + dep + amort + interest + tax;
+      return ProfitAndLossTemplate(
+        revenue: totalRev,
+        cogs: totalCogs,
+        grossProfit: v(ManualPnlKeys.grossProfit),
+        operatingExpenses: rolledOpex,
+        netIncome: v(ManualPnlKeys.netIncome),
+      );
+    } else if (type == 'bs') {
+      return BalanceSheetTemplate(
+        currentAssets: v('currentAssets'),
+        nonCurrentAssets: v('nonCurrentAssets'),
+        currentLiabilities: v('currentLiabilities'),
+        longTermLiabilities: v('longTermLiabilities'),
+        equity: v('equity'),
+      );
+    }
+    final investingByParts = v('assetPurchases') + v('investmentActivities');
+    final financingByParts =
+        v('loanActivities') + v('ownerContributions') + v('distributions');
+    final hasInvestingBreakdown =
+        v('assetPurchases') != 0 || v('investmentActivities') != 0;
+    final hasFinancingBreakdown =
+        v('loanActivities') != 0 ||
+        v('ownerContributions') != 0 ||
+        v('distributions') != 0;
+
+    return CashFlowTemplate(
+      operatingActivities: v('operatingActivities'),
+      operatingAdjustments: v('operatingAdjustments'),
+      workingCapitalChanges: v('workingCapitalChanges'),
+      investingActivities: hasInvestingBreakdown
+          ? investingByParts
+          : v('investingActivities'),
+      assetPurchases: v('assetPurchases'),
+      investmentActivities: v('investmentActivities'),
+      financingActivities: hasFinancingBreakdown
+          ? financingByParts
+          : v('financingActivities'),
+      loanActivities: v('loanActivities'),
+      ownerContributions: v('ownerContributions'),
+      distributions: v('distributions'),
+    );
+  }
+
+  double _summaryBsColumn(Map<String, TextEditingController> c, int i) {
+    double v(String k) => _parseMoney(c['${k}__$i']?.text ?? '0');
+    return (v('currentAssets') + v('nonCurrentAssets')) -
+        (v('currentLiabilities') + v('longTermLiabilities') + v('equity'));
+  }
+
+  double _summaryCfColumn(Map<String, TextEditingController> c, int i) {
+    double v(String k) => _parseMoney(c['${k}__$i']?.text ?? '0');
+    final investingByParts = v('assetPurchases') + v('investmentActivities');
+    final financingByParts =
+        v('loanActivities') + v('ownerContributions') + v('distributions');
+    final hasInvestingBreakdown =
+        v('assetPurchases') != 0 || v('investmentActivities') != 0;
+    final hasFinancingBreakdown =
+        v('loanActivities') != 0 ||
+        v('ownerContributions') != 0 ||
+        v('distributions') != 0;
+    final operating = v('operatingActivities');
+    final investing = hasInvestingBreakdown
+        ? investingByParts
+        : v('investingActivities');
+    final financing = hasFinancingBreakdown
+        ? financingByParts
+        : v('financingActivities');
+    return operating + investing + financing;
+  }
+
+  List<Widget> _buildManualPnlDetailRows(
+    List<_ManualPeriodColumn> periodColumns,
+    Map<String, TextEditingController> controllers,
+    Map<String, bool> pnlManualOverrides,
+    void Function(void Function()) setLocalState,
+  ) {
+    final n = periodColumns.length;
+    final specs = manualPnlRowSpecs();
+    return [
+      for (final spec in specs)
+        if (spec.key == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                spec.label,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 200,
+                    child: Text(
+                      spec.label,
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ),
+                  ...List.generate(n, (i) {
+                    final fk = '${spec.key}__$i';
+                    final ctrl = controllers[fk];
+                    final isAuto =
+                        ManualPnlKeys.autoKeys.contains(spec.key);
+                    final overridden = pnlManualOverrides[fk] == true;
+                    final isPercent = spec.isPercent;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: SizedBox(
+                        width: 118,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextFormField(
+                              controller: ctrl,
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                decimal: true,
+                                signed: true,
+                              ),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                              ),
+                              decoration: InputDecoration(
+                                prefixText: isPercent ? null : '\$ ',
+                                suffixText: isPercent ? ' %' : null,
+                                prefixStyle: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10,
+                                ),
+                                suffixStyle: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10,
+                                ),
+                                fillColor: Colors.white.withValues(alpha: 0.1),
+                                filled: true,
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 8,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                              ),
+                              onChanged: (_) {
+                                final k = spec.key!;
+                                if (isAuto) {
+                                  pnlManualOverrides[fk] = true;
+                                } else {
+                                  _onPnlDetailFieldEdited(
+                                    pnlManualOverrides,
+                                    i,
+                                    k,
+                                  );
+                                }
+                                _recalcDetailedPnlColumn(
+                                  controllers,
+                                  pnlManualOverrides,
+                                  i,
+                                );
+                                setLocalState(() {});
+                              },
+                            ),
+                            if (isAuto && overridden) ...[
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2),
+                                child: Text(
+                                  'Manually Overridden',
+                                  style: TextStyle(
+                                    color: Colors.orangeAccent,
+                                    fontSize: 9,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  pnlManualOverrides[fk] = false;
+                                  _recalcDetailedPnlColumn(
+                                    controllers,
+                                    pnlManualOverrides,
+                                    i,
+                                  );
+                                  setLocalState(() {});
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text(
+                                  'Use calculated',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.lightBlueAccent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+    ];
+  }
+
+  List<Widget> _manualMetricRows(
+    String type,
+    List<_ManualPeriodColumn> periodColumns,
+    Map<String, TextEditingController> controllers,
+    void Function(String fieldBase, int col, [String? cfKey]) onField,
+  ) {
+    final n = periodColumns.length;
+    if (type == 'pnl') {
+      return [];
+    }
+    if (type == 'bs') {
+      const defs = [
+        ('Current Assets', 'currentAssets'),
+        ('Non-Current Assets', 'nonCurrentAssets'),
+        ('Current Liabilities', 'currentLiabilities'),
+        ('Long-Term Liabilities', 'longTermLiabilities'),
+        ('Equity', 'equity'),
+      ];
+      return [
+        for (final def in defs)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 108,
+                    child: Text(
+                      def.$1,
+                      style: const TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ),
+                  ...List.generate(n, (i) {
+                    final key = '${def.$2}__$i';
+                    return SizedBox(
+                      width: 115,
+                      child: TextFormField(
+                        controller: controllers[key],
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                        decoration: InputDecoration(
+                          prefixText: '\$ ',
+                          prefixStyle: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                          ),
+                          fillColor: Colors.white.withValues(alpha: 0.1),
+                          filled: true,
+                          isDense: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        onChanged: (_) => onField(def.$2, i),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+      ];
+    }
+    const cfDefs = [
+      ('Net Operating Activities', 'operatingActivities'),
+      ('Operating adjustments', 'operatingAdjustments'),
+      ('Working Capital changes', 'workingCapitalChanges'),
+      ('Net Investing Activities', 'investingActivities'),
+      ('Asset purchases', 'assetPurchases'),
+      ('Investment activities', 'investmentActivities'),
+      ('Net Financing Activities', 'financingActivities'),
+      ('Loan activities (Debt)', 'loanActivities'),
+      ('Owner contributions', 'ownerContributions'),
+      ('Distributions / Dividends', 'distributions'),
+    ];
+    return [
+      for (final def in cfDefs)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 108,
+                  child: Text(
+                    def.$1,
+                    style: const TextStyle(color: Colors.white, fontSize: 10),
+                  ),
+                ),
+                ...List.generate(n, (i) {
+                  final key = '${def.$2}__$i';
+                  final ro = def.$2 == 'investingActivities' ||
+                      def.$2 == 'financingActivities';
+                  return SizedBox(
+                    width: 115,
+                    child: TextFormField(
+                      controller: controllers[key],
+                      readOnly: ro,
+                      keyboardType: TextInputType.number,
+                      style: const TextStyle(color: Colors.white, fontSize: 12),
+                      decoration: InputDecoration(
+                        prefixText: '\$ ',
+                        prefixStyle: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11,
+                        ),
+                        fillColor: Colors.white.withValues(alpha: 0.1),
+                        filled: true,
+                        isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      onChanged: (_) {
+                        if (!ro) onField(def.$2, i, def.$2);
+                      },
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ),
+    ];
+  }
+
+  Widget _buildManualMultiReviewBody(
+    BuildContext context,
+    String type,
+    List<_ManualPeriodColumn> periodColumns,
+    Map<String, TextEditingController> controllers,
+    void Function(void Function()) setLocalState, {
+    Map<String, bool>? pnlManualOverrides,
+  }) {
+    void onField(String fieldBase, int col, [String? cfKey]) {
+      if (type == 'cf' && cfKey != null) {
+        _recalcCashFlowColumnFull(controllers, col);
+      }
+      setLocalState(() {});
+    }
+
+    void addPeriod() {
+      if (periodColumns.length >= 8) return;
+      final last = periodColumns.last;
+      final nextY = last.year + 1;
+      periodColumns.add(
+        _ManualPeriodColumn(
+          year: nextY,
+          start: DateTime(nextY, 1, 1),
+          end: DateTime(nextY, 12, 31),
+        ),
+      );
+      final idx = periodColumns.length - 1;
+      _seedManualColumnControllers(type, controllers, idx);
+      if (type == 'pnl' && pnlManualOverrides != null) {
+        _recalcDetailedPnlColumn(controllers, pnlManualOverrides, idx);
+      } else if (type == 'cf') {
+        _recalcCashFlowColumnFull(controllers, idx);
+      }
+      setLocalState(() {});
+    }
+
+    void removeLastPeriod() {
+      if (periodColumns.length <= 1) return;
+      final idx = periodColumns.length - 1;
+      _disposeControllersForColumn(type, controllers, idx);
+      periodColumns.removeLast();
+      setLocalState(() {});
+    }
+
+    Future<void> pickColDate(int col, bool isStart) async {
+      final colData = periodColumns[col];
+      final initial = isStart ? colData.start : colData.end;
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: initial,
+        firstDate: DateTime(1960),
+        lastDate: DateTime(DateTime.now().year + 10, 12, 31),
+      );
+      if (picked == null) return;
+      setLocalState(() {
+        if (isStart) {
+          periodColumns[col].start = picked;
+        } else {
+          periodColumns[col].end = picked;
+        }
+      });
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            TextButton.icon(
+              onPressed: addPeriod,
+              icon: const Icon(Icons.add, color: Colors.white70, size: 18),
+              label: const Text(
+                'Add period',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+            if (periodColumns.length > 1)
+              TextButton.icon(
+                onPressed: removeLastPeriod,
+                icon: const Icon(Icons.remove, color: Colors.white70, size: 18),
+                label: const Text(
+                  'Remove last period',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(width: 108),
+              ...List.generate(periodColumns.length, (i) {
+                final col = periodColumns[i];
+                return SizedBox(
+                  width: 200,
+                  child: Card(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            _statementTypeLabel(type),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<int>(
+                            value: col.year,
+                            dropdownColor: const Color(0xFF1a2942),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Year',
+                              labelStyle: TextStyle(
+                                color: Colors.white54,
+                                fontSize: 11,
+                              ),
+                              isDense: true,
+                            ),
+                            items: [
+                              for (final y in _yearPickerRange())
+                                DropdownMenuItem(value: y, child: Text('$y')),
+                            ],
+                            onChanged: (v) {
+                              if (v == null) return;
+                              setLocalState(() {
+                                periodColumns[i].year = v;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 6),
+                          OutlinedButton(
+                            onPressed: () => pickColDate(i, true),
+                            child: Text(
+                              'Start: ${_dateFmt.format(col.start)}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          OutlinedButton(
+                            onPressed: () => pickColDate(i, false),
+                            child: Text(
+                              'End: ${_dateFmt.format(col.end)}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        const Divider(color: Colors.white24),
+        if (type == 'pnl' && pnlManualOverrides != null)
+          ..._buildManualPnlDetailRows(
+            periodColumns,
+            controllers,
+            pnlManualOverrides,
+            setLocalState,
+          )
+        else
+          ..._manualMetricRows(type, periodColumns, controllers, onField),
+      ],
+    );
+  }
+
+  Future<bool> _showReviewDialog(
+    String type, {
+    required String documentBaseName,
+  }) async {
     final data = extractedData.value;
     if (data == null) return false;
 
+    final isManual = _isZeroTemplate(type);
     final controllers = <String, TextEditingController>{};
-    if (type == 'pnl' && data is ProfitAndLossTemplate) {
+    var periodColumns =
+        isManual ? _initialManualPeriodColumns() : <_ManualPeriodColumn>[];
+    final pnlManualOverrides =
+        (isManual && type == 'pnl') ? <String, bool>{} : null;
+
+    if (isManual) {
+      for (var i = 0; i < periodColumns.length; i++) {
+        _seedManualColumnControllers(type, controllers, i);
+        if (type == 'pnl' && pnlManualOverrides != null) {
+          _recalcDetailedPnlColumn(controllers, pnlManualOverrides, i);
+        } else if (type == 'cf') {
+          _recalcCashFlowColumnFull(controllers, i);
+        }
+      }
+    } else if (type == 'pnl' && data is ProfitAndLossTemplate) {
       controllers['revenue'] = TextEditingController(
         text: _formatMoneyInput(data.revenue),
       );
@@ -348,7 +1390,6 @@ class TaxDocumentController extends GetxController {
     }
 
     bool confirmed = false;
-    final isManual = _isZeroTemplate(type);
     await Get.dialog(
       StatefulBuilder(
         builder: (context, setLocalState) {
@@ -405,11 +1446,23 @@ class TaxDocumentController extends GetxController {
               ],
             ),
             content: SizedBox(
-              width: 450,
+              width: isManual
+                  ? MediaQuery.sizeOf(context).width.clamp(320, 920)
+                  : 450,
               child: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (isManual)
+                      _buildManualMultiReviewBody(
+                        context,
+                        type,
+                        periodColumns,
+                        controllers,
+                        setLocalState,
+                        pnlManualOverrides: pnlManualOverrides,
+                      ),
+                    if (!isManual)
                     ..._buildReviewFields(
                       type,
                       controllers,
@@ -421,7 +1474,78 @@ class TaxDocumentController extends GetxController {
                     const SizedBox(height: 20),
                     const Divider(color: Colors.white24),
                     const SizedBox(height: 10),
+                    if (isManual)
                     Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AppText(
+                              type == 'pnl'
+                                  ? 'Net income by period'
+                                  : _summaryLabel(type),
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white70,
+                            ),
+                            const SizedBox(height: 8),
+                            for (var i = 0; i < periodColumns.length; i++)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 2),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '${periodColumns[i].year} (${_dateFmt.format(periodColumns[i].start)}–${_dateFmt.format(periodColumns[i].end)})',
+                                        style: const TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+                                    AppText(
+                                      _formatMoneyDisplay(
+                                        type == 'pnl'
+                                            ? _netIncomeForPnlColumn(
+                                                controllers,
+                                                i,
+                                              )
+                                            : type == 'bs'
+                                            ? _summaryBsColumn(controllers, i)
+                                            : _summaryCfColumn(controllers, i),
+                                      ),
+                                      fontWeight: FontWeight.w800,
+                                      color:
+                                          (type == 'pnl'
+                                                  ? _netIncomeForPnlColumn(
+                                                      controllers,
+                                                      i,
+                                                    )
+                                                  : type == 'bs'
+                                                  ? _summaryBsColumn(
+                                                      controllers,
+                                                      i,
+                                                    )
+                                                  : _summaryCfColumn(
+                                                      controllers,
+                                                      i,
+                                                    )) >=
+                                              0
+                                          ? const Color(0xFF19C37D)
+                                          : const Color(0xFFE57373),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      )
+                    else
+                      Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.05),
@@ -436,7 +1560,9 @@ class TaxDocumentController extends GetxController {
                             color: Colors.white70,
                           ),
                           AppText(
-                            _formatMoneyDisplay(_summaryValue(type, controllers)),
+                              _formatMoneyDisplay(
+                                _summaryValue(type, controllers),
+                              ),
                             fontWeight: FontWeight.w900,
                             color: _summaryValue(type, controllers) >= 0
                                 ? const Color(0xFF19C37D)
@@ -463,7 +1589,28 @@ class TaxDocumentController extends GetxController {
                   foregroundColor: Colors.black,
                 ),
                 onPressed: () {
+                  if (isManual) {
+                    _multiPeriodExtracted = [];
+                    for (var i = 0; i < periodColumns.length; i++) {
+                      final col = periodColumns[i];
+                      final label =
+                          '$documentBaseName (${col.year}: ${_dateFmt.format(col.start)}–${_dateFmt.format(col.end)})';
+                      _multiPeriodExtracted!.add(
+                        _MultiPeriodSaveEntry(
+                          type: type,
+                          displayName: label,
+                          docDate: col.end,
+                          template: _templateFromControllersColumn(
+                            type,
+                            controllers,
+                            i,
+                          ),
+                        ),
+                      );
+                    }
+                  } else {
                   _applyControllersToExtractedData(type, controllers);
+                  }
                   confirmed = true;
                   Get.back();
                 },
@@ -808,9 +1955,10 @@ class TaxDocumentController extends GetxController {
     int orgId,
     String name,
     DateTime docDate,
-    String type,
-  ) async {
-    final data = extractedData.value;
+    String type, {
+    dynamic templateOverride,
+  }) async {
+    final data = templateOverride ?? extractedData.value;
     if (data == null) return;
 
     final transactions = <Map<String, dynamic>>[];

@@ -4,9 +4,19 @@ import 'package:booksmart/widgets/snackbar.dart';
 import 'package:dropdown_search/dropdown_search.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:path/path.dart' as path;
 
 import '../../../../widgets/custom_drop_down.dart';
+
+/// Financial statement categories for uploads (do not use "Taxes" as label).
+const List<String> kFinancialStatementCategories = [
+  'Profit & Loss',
+  'Income Statement',
+  'Balance Sheet',
+  'Cash Flow Statement',
+  'Transactions',
+];
 
 void showUploadTaxDocumentDialog({String? type}) {
   Get.generalDialog(
@@ -21,7 +31,7 @@ void showUploadTaxDocumentDialog({String? type}) {
                 ? Get.theme.colorScheme.surface
                 : Colors.white,
           ),
-          constraints: const BoxConstraints(maxWidth: 400),
+          constraints: const BoxConstraints(maxWidth: 480),
           child: Material(
             color: Colors.transparent,
             child: UploadTaxDocWidget(type: type),
@@ -44,21 +54,15 @@ class UploadTaxDocWidget extends StatefulWidget {
 }
 
 class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
+  static final _dateFmt = DateFormat.yMMMd();
+
   String get _dialogTitle {
     final t = widget.type?.toLowerCase();
     if (t == 'bs') return 'Upload Balance Sheet Document';
     if (t == 'cf') return 'Upload Cash Flow Document';
     if (t == 'pl' || t == 'pnl') return 'Upload Profit & Loss Document';
-    return 'Upload Tax Document';
+    return 'Upload Financial Document';
   }
-
-  final List<String> categories = [
-    'Income',
-    'Expenses',
-    'Forms',
-    'Education',
-    'Other',
-  ];
 
   final yearDropdownKey = GlobalKey<DropdownSearchState<String>>();
   final categoryDropdownKey = GlobalKey<DropdownSearchState<String>>();
@@ -66,14 +70,38 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
 
   String? selectedYear;
   String? selectedCategory;
+  DateTime? periodStart;
+  DateTime? periodEnd;
 
   late final TaxDocumentController _ctrl;
-  bool get _isBalanceSheetUpload => widget.type?.toLowerCase() == 'bs';
+
+  String? _defaultCategoryForType() {
+    switch (widget.type?.toLowerCase()) {
+      case 'bs':
+        return 'Balance Sheet';
+      case 'cf':
+        return 'Cash Flow Statement';
+      case 'pl':
+      case 'pnl':
+        return 'Profit & Loss';
+      default:
+        return null;
+    }
+  }
+
+  List<String> get _yearItems {
+    final cap = DateTime.now().year + 3;
+    return [for (var y = cap; y >= 1960; y--) y.toString()];
+  }
 
   @override
   void initState() {
     super.initState();
-    // Ensure the controller is available; if already registered, find it.
+    final y = DateTime.now().year;
+    selectedYear = y.toString();
+    periodStart = DateTime(y, 1, 1);
+    periodEnd = DateTime(y, 12, 31);
+    selectedCategory = _defaultCategoryForType();
     _ctrl = Get.isRegistered<TaxDocumentController>()
         ? Get.find<TaxDocumentController>()
         : Get.put(TaxDocumentController());
@@ -85,16 +113,43 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
     super.dispose();
   }
 
-  Future<void> _save() async {
+  Future<void> _pickDate(
+    BuildContext context, {
+    required bool isStart,
+  }) async {
+    final initial = isStart
+        ? (periodStart ?? DateTime.now())
+        : (periodEnd ?? DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1960),
+      lastDate: DateTime(DateTime.now().year + 10, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isStart) {
+        periodStart = picked;
+      } else {
+        periodEnd = picked;
+      }
+    });
+  }
+
+  Future<void> _save(BuildContext context) async {
     final fileUrl = await _ctrl.uploadDocument(
       name: nameCtrl.text,
       taxYear: selectedYear,
       category: selectedCategory,
       type: widget.type,
+      periodStart: periodStart,
+      periodEnd: periodEnd,
     );
     if (fileUrl != null) {
       Get.back();
-      showSnackBar('Document Uploaded Successfully');
+      if (!_ctrl.consumeSuppressUploadSuccessSnack()) {
+        showSnackBar('Document Uploaded Successfully');
+      }
     }
   }
 
@@ -111,7 +166,6 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── Title ───────────────────────────────────────────────────
               AppText(
                 _dialogTitle,
                 fontSize: 16,
@@ -119,11 +173,9 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
               ),
               const SizedBox(height: 15),
 
-              // ── Pick source ─────────────────────────────────────────────
               Row(
                 spacing: 10,
                 children: [
-                  // Camera card — hidden on web
                   if (!kIsWeb)
                     Expanded(
                       child: SizedBox(
@@ -156,7 +208,6 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
                       ),
                     ),
 
-                  // Device / Gallery card
                   Expanded(
                     child: SizedBox(
                       height: 130,
@@ -190,7 +241,6 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
                 ],
               ),
 
-              // ── Selected file label ─────────────────────────────────────
               if (pickedName != null) ...[
                 const SizedBox(height: 8),
                 Row(
@@ -204,7 +254,6 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    // Clear selection
                     IconButton(
                       icon: const Icon(Icons.close, size: 16),
                       padding: EdgeInsets.zero,
@@ -220,7 +269,6 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
 
               const SizedBox(height: 10),
 
-              // ── Form fields ────────────────────────────────────────────
               AppTextField(
                 controller: nameCtrl,
                 hintText: 'Document Name *',
@@ -229,34 +277,72 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
               const SizedBox(height: 10),
 
               CustomDropDownWidget<String>(
-                dropDownKey: yearDropdownKey,
-                label: 'Tax Year',
-                hint: 'Select Year',
-                items: const [
-                  '2029',
-                  '2028',
-                  '2027',
-                  '2026',
-                  '2025',
-                  '2024',
-                  '2023',
-                  '2022',
-                ],
-                onChanged: (v) => setState(() => selectedYear = v),
+                dropDownKey: categoryDropdownKey,
+                label: 'Document category *',
+                hint: 'Select category',
+                items: kFinancialStatementCategories,
+                selectedItem: selectedCategory,
+                onChanged: (v) => setState(() => selectedCategory = v),
               ),
               const SizedBox(height: 10),
 
-              if (!_isBalanceSheetUpload)
-                CustomDropDownWidget<String>(
-                  dropDownKey: categoryDropdownKey,
-                  label: 'Category',
-                  hint: 'Select Category',
-                  items: categories,
-                  onChanged: (v) => setState(() => selectedCategory = v),
+              CustomDropDownWidget<String>(
+                dropDownKey: yearDropdownKey,
+                label: 'Year *',
+                hint: 'Select year',
+                items: _yearItems,
+                selectedItem: selectedYear,
+                onChanged: (v) {
+                  setState(() {
+                    selectedYear = v;
+                    final yi = int.tryParse(v ?? '');
+                    if (yi != null) {
+                      periodStart = DateTime(yi, 1, 1);
+                      periodEnd = DateTime(yi, 12, 31);
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+
+              Align(
+                alignment: Alignment.centerLeft,
+                child: AppText(
+                  'Document period (required) *',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _pickDate(context, isStart: true),
+                      icon: const Icon(Icons.calendar_today, size: 18),
+                      label: Text(
+                        periodStart == null
+                            ? 'Start date *'
+                            : 'Start: ${_dateFmt.format(periodStart!)}',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _pickDate(context, isStart: false),
+                      icon: const Icon(Icons.calendar_today, size: 18),
+                      label: Text(
+                        periodEnd == null
+                            ? 'End date *'
+                            : 'End: ${_dateFmt.format(periodEnd!)}',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 20),
 
-              // ── Actions ─────────────────────────────────────────────────
               Row(
                 spacing: 10,
                 children: [
@@ -280,7 +366,9 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
                           buttonText: ctrl.isUploading.value
                               ? 'Uploading…'
                               : 'Save',
-                          onTapFunction: ctrl.isUploading.value ? null : _save,
+                          onTapFunction: ctrl.isUploading.value
+                              ? null
+                              : () => _validateAndSave(context, ctrl),
                           radius: 10,
                           fontSize: 12,
                           padding: const EdgeInsets.symmetric(
@@ -298,5 +386,31 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
         );
       },
     );
+  }
+
+  Future<void> _validateAndSave(
+    BuildContext context,
+    TaxDocumentController ctrl,
+  ) async {
+    if (selectedCategory == null || selectedCategory!.isEmpty) {
+      showSnackBar('Please select a document category', isError: true);
+      return;
+    }
+    if (selectedYear == null || selectedYear!.isEmpty) {
+      showSnackBar('Please select a year', isError: true);
+      return;
+    }
+    if (periodStart == null || periodEnd == null) {
+      showSnackBar(
+        'Please select start and end dates for the document period',
+        isError: true,
+      );
+      return;
+    }
+    if (periodEnd!.isBefore(periodStart!)) {
+      showSnackBar('End date must be on or after the start date', isError: true);
+      return;
+    }
+    await _save(context);
   }
 }

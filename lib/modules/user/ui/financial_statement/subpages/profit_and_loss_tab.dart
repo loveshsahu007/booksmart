@@ -941,15 +941,10 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       const totalBand = 'FFEAEDF4';
 
       final titleStyle = excel_lib.CellStyle(
-        fontSize: 22,
+        bold: true,
+        fontSize: 14,
         fontFamily: excel_lib.getFontFamily(excel_lib.FontFamily.Calibri),
         horizontalAlign: excel_lib.HorizontalAlign.Left,
-        verticalAlign: excel_lib.VerticalAlign.Center,
-      );
-      final reportTitleStyle = excel_lib.CellStyle(
-        fontSize: 22,
-        fontFamily: excel_lib.getFontFamily(excel_lib.FontFamily.Calibri),
-        horizontalAlign: excel_lib.HorizontalAlign.Right,
         verticalAlign: excel_lib.VerticalAlign.Center,
       );
       final metaStyle = excel_lib.CellStyle(
@@ -958,14 +953,21 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         horizontalAlign: excel_lib.HorizontalAlign.Left,
         verticalAlign: excel_lib.VerticalAlign.Center,
       );
-      final metaRightStyle = excel_lib.CellStyle(
+      final statementBannerStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 16,
+        fontFamily: excel_lib.getFontFamily(excel_lib.FontFamily.Calibri),
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
+      final periodBannerStyle = excel_lib.CellStyle(
         fontSize: 11,
         fontFamily: excel_lib.getFontFamily(excel_lib.FontFamily.Calibri),
         horizontalAlign: excel_lib.HorizontalAlign.Right,
         verticalAlign: excel_lib.VerticalAlign.Center,
       );
-      final asOfStyle = excel_lib.CellStyle(
-        fontSize: 12,
+      final metaDatePreparedStyle = excel_lib.CellStyle(
+        fontSize: 11,
         fontFamily: excel_lib.getFontFamily(excel_lib.FontFamily.Calibri),
         horizontalAlign: excel_lib.HorizontalAlign.Right,
         verticalAlign: excel_lib.VerticalAlign.Center,
@@ -1023,45 +1025,81 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         if (style != null) cell.cellStyle = style;
       }
 
-      // Keep geometry close to the client template: narrower description band
-      // and evenly sized period columns.
-      final double descriptionWidth = labels.length <= 4 ? 40.0 : 36.0;
-      final double periodWidth = labels.length <= 4 ? 15.0 : 13.5;
+      // Wider label column for readability; period columns sized for currency.
+      final double descriptionWidth = labels.length <= 4 ? 54.0 : 48.0;
+      final double periodWidth = labels.length <= 4 ? 17.0 : 15.0;
       sheet.setColumnWidth(0, descriptionWidth);
       for (int i = 0; i < labels.length; i++) {
         sheet.setColumnWidth(1 + i, periodWidth);
       }
-      sheet.setRowHeight(0, 31);
-      sheet.setRowHeight(1, 16);
-      sheet.setRowHeight(2, 16);
-      sheet.setRowHeight(3, 18);
-      sheet.setRowHeight(4, 19);
 
-      setCell(0, 0, excel_lib.TextCellValue(orgName), titleStyle);
-      setCell(0, 1, excel_lib.TextCellValue(line1), metaStyle);
-      setCell(0, 2, excel_lib.TextCellValue(line2), metaStyle);
-      setCell(1, 0, excel_lib.TextCellValue('Profit & Loss Statement'), reportTitleStyle);
-      sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 0),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: labels.length, rowIndex: 0),
+      final lastCol = labels.length;
+      void mergeRow(int r, int fromC, int toC) {
+        if (toC > fromC) {
+          sheet.merge(
+            excel_lib.CellIndex.indexByColumnRow(columnIndex: fromC, rowIndex: r),
+            excel_lib.CellIndex.indexByColumnRow(columnIndex: toC, rowIndex: r),
+          );
+        }
+      }
+
+      /// Header row: col A = company/meta (left), cols B..last = title or dates (right).
+      void writeHeaderPairRow(
+        int r,
+        excel_lib.CellValue left,
+        excel_lib.CellStyle? leftStyle,
+        excel_lib.CellValue right,
+        excel_lib.CellStyle? rightStyle,
+        double rowHeight,
+      ) {
+        setCell(0, r, left, leftStyle);
+        if (lastCol >= 1) {
+          if (lastCol > 1) {
+            mergeRow(r, 1, lastCol);
+          }
+          setCell(1, r, right, rightStyle);
+        }
+        sheet.setRowHeight(r, rowHeight);
+      }
+
+      final periodRangeText =
+          'For the Period ${DateFormat('MMM d, yyyy').format(request.startDate)} to ${DateFormat('MMM d, yyyy').format(request.endDate)}';
+
+      var row = 0;
+      writeHeaderPairRow(
+        row,
+        excel_lib.TextCellValue(orgName),
+        titleStyle,
+        excel_lib.TextCellValue('Profit & Loss Statement'),
+        statementBannerStyle,
+        32,
       );
-      setCell(
-        1,
-        1,
-        excel_lib.TextCellValue('Date Prepared: ${DateFormat('MM/dd/yyyy').format(DateTime.now())}'),
-        metaRightStyle,
+      row++;
+
+      writeHeaderPairRow(
+        row,
+        excel_lib.TextCellValue(line1),
+        metaStyle,
+        excel_lib.TextCellValue(periodRangeText),
+        periodBannerStyle,
+        22,
       );
-      sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 1),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: labels.length, rowIndex: 1),
+      row++;
+
+      writeHeaderPairRow(
+        row,
+        excel_lib.TextCellValue(line2.isNotEmpty ? line2 : ''),
+        metaStyle,
+        excel_lib.TextCellValue(
+          'Date Prepared: ${DateFormat('MM/dd/yyyy').format(DateTime.now())}',
+        ),
+        metaDatePreparedStyle,
+        20,
       );
-      final asOfText = DateFormat('MMMM dd, yyyy').format(request.endDate);
-      setCell(1, 2, excel_lib.TextCellValue('As of $asOfText'), asOfStyle);
-      sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: 2),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: labels.length, rowIndex: 2),
-      );
-      int row = 5;
+      row++;
+
+      sheet.setRowHeight(row, 14);
+      row++;
       void writeSection(
         String title,
         List<PnlPdfRowData> rows, {
@@ -1096,9 +1134,14 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
               isTotal ? valueTotalStyle : valueStyle,
             );
           }
-          sheet.setRowHeight(row, isTotal ? 20 : 18);
-          row++;
+        sheet.setRowHeight(row, isTotal ? 21 : 19);
+        row++;
         }
+        for (int c = 0; c <= labels.length; c++) {
+          setCell(c, row, excel_lib.TextCellValue(''), labelStyle);
+        }
+        sheet.setRowHeight(row, 14);
+        row++;
       }
 
       for (int i = 0; i < exportData.sections.length; i++) {
@@ -1118,7 +1161,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         ],
       );
 
-      final rawBytes = excel.save();
+      final rawBytes = excel.encode();
       if (rawBytes == null) throw Exception('Unable to generate Excel file.');
       final bytes = _disableExcelGridlines(rawBytes);
       await downloadFile(
@@ -1236,11 +1279,6 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       }
 
       final companyTitleStyle = baseStyle(fontSize: 22, fontColor: kTextDark);
-      final reportTitleStyle = baseStyle(
-        fontSize: 26,
-        fontColor: kTextDark,
-        hAlign: excel_lib.HorizontalAlign.Right,
-      );
       final addressStyle = baseStyle(fontSize: 11, fontColor: kTextDark);
       final datePreparedStyle = baseStyle(
         fontSize: 11,
@@ -1317,37 +1355,61 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         if (s != null) cell.cellStyle = s;
       }
 
-      // Header block (rows 0..4 — i.e. spreadsheet rows 1..5).
-      sheet.setRowHeight(0, 33);
-      setCell(colLabel, 0, excel_lib.TextCellValue(orgName), companyTitleStyle);
-      setCell(
-        colYearStart,
-        0,
-        excel_lib.TextCellValue('Profit & Loss Statement'),
-        reportTitleStyle,
+      // Header: statement title first row (full width), then org / meta / years.
+      final statementTopStyle = baseStyle(
+        bold: true,
+        fontSize: 18,
+        fontColor: kTextDark,
+        hAlign: excel_lib.HorizontalAlign.Center,
       );
+      sheet.setRowHeight(0, 36);
+      for (int c = 0; c <= lastCol; c++) {
+        setCell(c, 0, excel_lib.TextCellValue(''), baseStyle());
+      }
       sheet.merge(
         excel_lib.CellIndex.indexByColumnRow(
-          columnIndex: colYearStart,
+          columnIndex: colGutter,
           rowIndex: 0,
         ),
         excel_lib.CellIndex.indexByColumnRow(
-          columnIndex: colYearEnd,
+          columnIndex: lastCol,
           rowIndex: 0,
         ),
       );
+      setCell(
+        colGutter,
+        0,
+        excel_lib.TextCellValue('Profit & Loss Statement'),
+        statementTopStyle,
+      );
 
-      setCell(colLabel, 1, excel_lib.TextCellValue('1234 Anytown St.'),
+      sheet.setRowHeight(1, 30);
+      for (int c = 0; c <= lastCol; c++) {
+        setCell(c, 1, excel_lib.TextCellValue(''), baseStyle());
+      }
+      sheet.merge(
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: colLabel,
+          rowIndex: 1,
+        ),
+        excel_lib.CellIndex.indexByColumnRow(
+          columnIndex: lastCol,
+          rowIndex: 1,
+        ),
+      );
+      setCell(colLabel, 1, excel_lib.TextCellValue(orgName), companyTitleStyle);
+
+      setCell(colLabel, 2, excel_lib.TextCellValue('1234 Anytown St.'),
           addressStyle);
       setCell(
         colYearEnd - 1,
-        1,
+        2,
         excel_lib.TextCellValue('Date Prepared:'),
         datePreparedStyle,
       );
       setCell(
         colYearEnd,
-        1,
+        2,
         excel_lib.TextCellValue(DateFormat('MM/dd/yyyy').format(DateTime.now())),
         baseStyle(
           fontSize: 11,
@@ -1358,43 +1420,43 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
       setCell(
         colLabel,
-        2,
+        3,
         excel_lib.TextCellValue('City, State  12345'),
         addressStyle,
       );
 
-      sheet.setRowHeight(3, 17.25);
+      sheet.setRowHeight(4, 17.25);
       final asOfDate = DateTime(end.year, 12, 31);
       setCell(
         colYearStart,
-        3,
+        4,
         excel_lib.TextCellValue(
-          'As of ${DateFormat('MMMM dd,').format(asOfDate)}',
+          'As of ${DateFormat('MMMM d, yyyy').format(asOfDate)}',
         ),
         asOfStyle,
       );
       sheet.merge(
         excel_lib.CellIndex.indexByColumnRow(
           columnIndex: colYearStart,
-          rowIndex: 3,
+          rowIndex: 4,
         ),
         excel_lib.CellIndex.indexByColumnRow(
           columnIndex: colYearEnd,
-          rowIndex: 3,
+          rowIndex: 4,
         ),
       );
 
-      sheet.setRowHeight(4, 17.25);
+      sheet.setRowHeight(5, 17.25);
       for (int y = 0; y < 5; y++) {
         setCell(
           colYearStart + y,
-          4,
+          5,
           excel_lib.TextCellValue('${years[y]}'),
           yearHeaderStyle,
         );
       }
 
-      int row = 5;
+      int row = 6;
 
       void writeSectionBar(String title, {bool isNet = false}) {
         final lblStyle = isNet ? netIncomeLabelStyle : sectionLabelStyle;
@@ -1578,9 +1640,6 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       writeLineRow('Travel', (i) => exp(i, kTravel));
       writeLineRow('Utilities', (i) => exp(i, kUtilities));
       writeLineRow('Delivery/Freight Expenses', (i) => exp(i, kFreight));
-      writeLineRow('Travel', (i) => 0);
-      writeLineRow('Rent/Lease', (i) => 0);
-      writeLineRow('Utilities', (i) => 0);
       writeLineRow('Insurance', (i) => exp(i, kInsurance));
       writeLineRow('Office Supplies', (i) => exp(i, kOffice));
       writeLineRow('Operating Expenses', opex, total: true, indent: false);
@@ -1602,7 +1661,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       writeLineRow('Amortization', amort, total: true, indent: false);
       writeLineRow('EBITDA', ebitda, total: true, indent: false);
 
-      final bytes = excel.save();
+      final bytes = excel.encode();
       if (bytes == null) {
         throw Exception('Unable to generate Excel file.');
       }
@@ -1716,6 +1775,15 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         horizontalAlign: excel_lib.HorizontalAlign.Right,
         verticalAlign: excel_lib.VerticalAlign.Center,
       );
+      final statementTopLegacyStyle = excel_lib.CellStyle(
+        bold: true,
+        fontSize: 18,
+        fontFamily: excel_lib.getFontFamily(excel_lib.FontFamily.Calibri),
+        fontColorHex: excel_lib.ExcelColor.fromHexString('FF111111'),
+        backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
+        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
       final datePreparedStyle = excel_lib.CellStyle(
         fontSize: 11,
         fontFamily: excel_lib.getFontFamily(excel_lib.FontFamily.Calibri),
@@ -1815,43 +1883,55 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         setCell(c, 1, excel_lib.TextCellValue(''), metaInfoStyle);
         setCell(c, 2, excel_lib.TextCellValue(''), metaInfoStyle);
         setCell(c, 3, excel_lib.TextCellValue(''), metaInfoStyle);
+        setCell(c, 4, excel_lib.TextCellValue(''), metaInfoStyle);
+        setCell(c, 5, excel_lib.TextCellValue(''), metaInfoStyle);
       }
-      setCell(0, 0, excel_lib.TextCellValue(orgName), companyTitleStyle);
-      setCell(0, 1, excel_lib.TextCellValue('1234 Anytown St.'), metaInfoStyle);
-      setCell(0, 2, excel_lib.TextCellValue('City, State  12345'), metaInfoStyle);
+      sheet.merge(
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: 0),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: lastCol, rowIndex: 0),
+      );
+      setCell(
+        0,
+        0,
+        excel_lib.TextCellValue('Profit & Loss Statement'),
+        statementTopLegacyStyle,
+      );
+      setCell(0, 1, excel_lib.TextCellValue(orgName), companyTitleStyle);
+      setCell(0, 2, excel_lib.TextCellValue('1234 Anytown St.'), metaInfoStyle);
+      setCell(0, 3, excel_lib.TextCellValue('City, State  12345'), metaInfoStyle);
       final rightStart = (lastCol - 4).clamp(0, lastCol);
-      setCell(rightStart, 0, excel_lib.TextCellValue('Profit & Loss Statement'), reportTitleStyle);
-        setCell(
+      setCell(
         rightStart,
-        1,
-        excel_lib.TextCellValue('Date Prepared: ${DateFormat('MM/dd/yyyy').format(DateTime.now())}'),
+        2,
+        excel_lib.TextCellValue(
+          'Date Prepared: ${DateFormat('MM/dd/yyyy').format(DateTime.now())}',
+        ),
         datePreparedStyle,
-        );
-        setCell(
+      );
+      setCell(
         rightStart,
-        3,
-        excel_lib.TextCellValue('As of ${DateFormat('MMMM dd,').format(DateTime(end.year, 12, 31))}'),
+        4,
+        excel_lib.TextCellValue(
+          'As of ${DateFormat('MMMM d, yyyy').format(DateTime(end.year, 12, 31))}',
+        ),
         asOfStyle,
       );
       sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: rightStart, rowIndex: 0),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: lastCol, rowIndex: 0),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: rightStart, rowIndex: 2),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: lastCol, rowIndex: 2),
       );
       sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: rightStart, rowIndex: 1),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: lastCol, rowIndex: 1),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: rightStart, rowIndex: 4),
+        excel_lib.CellIndex.indexByColumnRow(columnIndex: lastCol, rowIndex: 4),
       );
-      sheet.merge(
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: rightStart, rowIndex: 3),
-        excel_lib.CellIndex.indexByColumnRow(columnIndex: lastCol, rowIndex: 3),
-      );
-      sheet.setRowHeight(0, 33);
-      sheet.setRowHeight(1, 17.25);
+      sheet.setRowHeight(0, 36);
+      sheet.setRowHeight(1, 28);
       sheet.setRowHeight(2, 18);
-      sheet.setRowHeight(3, 17.25);
-      sheet.setRowHeight(4, 17.25);
+      sheet.setRowHeight(3, 18);
+      sheet.setRowHeight(4, 18);
+      sheet.setRowHeight(5, 17.25);
 
-      int row = 5;
+      int row = 6;
       setCell(0, row, excel_lib.TextCellValue(''), subHeaderStyle);
       for (final b in yearBlocks) {
         setCell(b.totalCol, row, excel_lib.TextCellValue('${b.year}'), subHeaderStyle);
@@ -2113,7 +2193,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       }
       sheet.setRowHeight(row, 22);
 
-      final rawBytes = excel.save();
+      final rawBytes = excel.encode();
       if (rawBytes == null) {
         throw Exception('Unable to generate Excel file.');
       }
@@ -2463,32 +2543,38 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       request.startDate,
       request.endDate,
     );
-    final years = <int>[
-      for (int y = request.startDate.year; y <= request.endDate.year; y++) y,
-    ];
-    if (years.length > 5) {
-      throw ArgumentError('Profit & Loss export supports max 5 years.');
+    final pdfSvc = PdfExportService();
+    final labels = pdfSvc.buildBucketLabels(
+      request.startDate,
+      request.endDate,
+      request.viewType,
+    );
+    if (labels.isEmpty || labels.length > PdfExportService.maxColumns) {
+      throw ArgumentError(
+        'Profit & Loss export supports 1–${PdfExportService.maxColumns} period columns.',
+      );
     }
+    final n = labels.length;
 
-    List<double> byYear(
-      Map<String, Map<String, double>> periodicMap,
-      String category,
-    ) {
-      return years.map((year) {
-        double total = 0;
-      periodicMap.forEach((monthKey, values) {
-          if (monthKey.startsWith('$year-')) {
-            total += values[category] ?? 0;
-          }
-        });
-        return total;
-      }).toList();
-    }
+    List<double> aggInc(String cat) => pdfSvc.aggregatePeriodicCategoryForPl(
+          exportData.periodicIncomeBreakdown,
+          cat,
+          request.startDate,
+          request.endDate,
+          request.viewType,
+        );
+    List<double> aggExp(String cat) => pdfSvc.aggregatePeriodicCategoryForPl(
+          exportData.periodicExpenseBreakdown,
+          cat,
+          request.startDate,
+          request.endDate,
+          request.viewType,
+        );
 
     List<double> addSeries(List<List<double>> series) {
-      final out = List<double>.filled(years.length, 0);
+      final out = List<double>.filled(n, 0);
       for (final values in series) {
-        for (int i = 0; i < out.length; i++) {
+        for (int i = 0; i < n; i++) {
           out[i] += values[i];
         }
       }
@@ -2496,7 +2582,13 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     }
 
     List<double> subtractSeries(List<double> a, List<double> b) =>
-        List<double>.generate(a.length, (i) => a[i] - b[i]);
+        List<double>.generate(n, (i) => a[i] - b[i]);
+
+    List<double> sumExpenseCategories(Iterable<String> cats) {
+      final lists = cats.map(aggExp).toList();
+      if (lists.isEmpty) return List<double>.filled(n, 0);
+      return addSeries(lists);
+    }
 
     final revenueCategories = exportData.incomeBreakdown.keys
         .where(
@@ -2517,6 +2609,18 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
               !_isOtherExpenseCategory(c),
         )
         .toList();
+    final depCategories = operatingCategories
+        .where(_isDepreciationExportLabel)
+        .toList();
+    final amortCategories = operatingCategories
+        .where(_isAmortizationExportLabel)
+        .toList();
+    final opexDetailCategories = operatingCategories
+        .where(
+          (c) =>
+              !_isDepreciationExportLabel(c) && !_isAmortizationExportLabel(c),
+        )
+        .toList();
     final otherIncomeCategories = exportData.incomeBreakdown.keys
         .where((c) => c.trim().isNotEmpty && _isOtherIncomeCategory(c))
         .toList();
@@ -2524,11 +2628,18 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         .where((c) => c.trim().isNotEmpty && _isOtherExpenseCategory(c))
         .toList();
 
+    final interestExpenseCategories = exportData.expenseBreakdown.keys
+        .where((c) => c.trim().isNotEmpty && _isInterestExpenseExportLabel(c))
+        .toList();
+    final taxCategories = exportData.expenseBreakdown.keys
+        .where((c) => c.trim().isNotEmpty && _isTaxExpenseExportLabel(c))
+        .toList();
+
     final revenueRows = revenueCategories
         .map(
           (category) => PnlPdfRowData(
             label: category,
-            values: byYear(exportData.periodicIncomeBreakdown, category),
+            values: aggInc(category),
           ),
         )
         .toList();
@@ -2536,50 +2647,71 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         .map(
           (category) => PnlPdfRowData(
             label: category,
-            values: byYear(exportData.periodicExpenseBreakdown, category),
+            values: aggExp(category),
           ),
         )
         .toList();
-    final opexRows = operatingCategories
-        .map(
-          (category) => PnlPdfRowData(
-            label: category,
-            values: byYear(exportData.periodicExpenseBreakdown, category),
-          ),
-        )
-        .toList();
+    final opexRows = <PnlPdfRowData>[
+      ...opexDetailCategories.map(
+        (category) => PnlPdfRowData(
+          label: category,
+          values: aggExp(category),
+        ),
+      ),
+      PnlPdfRowData(
+        label: 'Depreciation',
+        values: sumExpenseCategories(depCategories),
+      ),
+      PnlPdfRowData(
+        label: 'Amortization',
+        values: sumExpenseCategories(amortCategories),
+      ),
+    ];
 
     final otherRows = <PnlPdfRowData>[
       ...otherIncomeCategories.map(
         (category) => PnlPdfRowData(
           label: category,
-          values: byYear(exportData.periodicIncomeBreakdown, category),
+          values: aggInc(category),
         ),
       ),
       ...otherExpenseCategories.map(
         (category) => PnlPdfRowData(
           label: category,
-          values: byYear(
-            exportData.periodicExpenseBreakdown,
-            category,
-          ).map((v) => -v).toList(),
+          values: aggExp(category).map((v) => -v).toList(),
         ),
       ),
     ];
 
     final totalRevenue = addSeries(revenueRows.map((e) => e.values).toList());
-    final totalCogs = addSeries(cogsRows.map((e) => e.values).toList());
+    final totalCogs = addSeries(
+      cogsRows.map((e) => e.values).toList(),
+    );
     final grossProfit = subtractSeries(totalRevenue, totalCogs);
-    final totalOpex = addSeries(opexRows.map((e) => e.values).toList());
+
+    final totalOpex = sumExpenseCategories(operatingCategories);
     final operatingIncome = subtractSeries(grossProfit, totalOpex);
     final totalOther = addSeries(otherRows.map((e) => e.values).toList());
     final netIncome = List<double>.generate(
-      years.length,
+      n,
       (i) => operatingIncome[i] + totalOther[i],
     );
 
+    final depreciationTotal = sumExpenseCategories(depCategories);
+    final amortizationTotal = sumExpenseCategories(amortCategories);
+    final interestExpenseTotal = sumExpenseCategories(interestExpenseCategories);
+    final taxExpenseTotal = sumExpenseCategories(taxCategories);
+
+    final ebitda = List<double>.generate(n, (i) {
+      return netIncome[i] +
+          interestExpenseTotal[i] +
+          taxExpenseTotal[i] +
+          depreciationTotal[i] +
+          amortizationTotal[i];
+    });
+
     revenueRows.add(
-      PnlPdfRowData(label: 'Net Sales', values: totalRevenue, isBold: true),
+      PnlPdfRowData(label: 'Total Revenue', values: totalRevenue, isBold: true),
     );
     cogsRows.add(
       PnlPdfRowData(
@@ -2629,9 +2761,39 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
           ],
         ),
         PnlPdfSectionData(title: 'Other Income / Expenses', rows: otherRows),
+        PnlPdfSectionData(
+          title: 'EBITDA (Reconciliation)',
+          rows: [
+            PnlPdfRowData(label: 'EBITDA', values: ebitda, isBold: true),
+          ],
+        ),
       ],
       netProfit: netIncome,
     );
+  }
+
+  bool _isDepreciationExportLabel(String label) {
+    final n = label.toLowerCase();
+    return n.contains('depreciat');
+  }
+
+  bool _isAmortizationExportLabel(String label) {
+    final n = label.toLowerCase();
+    return n.contains('amortiz');
+  }
+
+  bool _isInterestExpenseExportLabel(String label) {
+    final n = label.toLowerCase();
+    if (!n.contains('interest')) return false;
+    if (n.contains('income')) return false;
+    return true;
+  }
+
+  bool _isTaxExpenseExportLabel(String label) {
+    final n = label.toLowerCase();
+    return n.contains('tax') ||
+        n.contains('irs') ||
+        n.contains('excise');
   }
 
   String _bucketLabelForMonth(DateTime month, PdfViewType viewType) {
@@ -3083,7 +3245,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
                 const SizedBox(height: 32),
 
-                /// 🔹 Bottom Section: Revenue vs Expenses Growth & COGS %
+                /// 🔹 Bottom Section: Revenue vs Expenses Growth & COGS vs Revenue growth
                 isNarrow
                     ? Column(
                         children: [
@@ -3437,7 +3599,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                   )
                 : LayoutBuilder(
                     builder: (context, constraints) {
-                      const leftAxis = 50.0;
+                      const leftAxis = 56.0;
                       final usableW = (constraints.maxWidth - leftAxis).clamp(
                         1.0,
                         double.infinity,
@@ -3620,6 +3782,27 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     return rodW * 2 + 6;
   }
 
+  String _pnlTrendTooltipDateText(Map<String, dynamic> row) {
+    final dateStr = row['tooltipDate']?.toString() ?? '';
+    final bucketStart = row['bucketStart'];
+    final bucketDate = bucketStart is DateTime
+        ? bucketStart
+        : DateTime.tryParse(bucketStart?.toString() ?? '');
+    final hasSpecificDay = RegExp(
+      r'\b[A-Za-z]{3,9}\s+\d{1,2}\b',
+    ).hasMatch(dateStr);
+    if (dateStr.isNotEmpty) {
+      if (hasSpecificDay || bucketDate == null) {
+        return dateStr;
+      }
+      return DateFormat('MMMM dd, yyyy').format(bucketDate);
+    }
+    if (bucketDate != null) {
+      return DateFormat('MMM dd, yyyy').format(bucketDate);
+    }
+    return '';
+  }
+
   Widget _buildPnLTrendBarChart(
     List<Map<String, dynamic>> series,
     bool isDark,
@@ -3629,6 +3812,9 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     final n = series.length;
     // Show every bucket on the x-axis (daily, weekly, monthly, quarterly) — user prefers full labels.
     final bool compactXAxis = n > 6;
+    final ySpan = (maxY - minY).abs();
+    final yInterval = ySpan < 1e-9 ? 1.0 : _niceAxisInterval(ySpan);
+    final bool rotateXLabels = compactXAxis && n > 8;
 
     return BarChart(
       BarChartData(
@@ -3636,8 +3822,87 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         alignment: BarChartAlignment.spaceAround,
         minY: minY,
         maxY: maxY,
-        // Tooltips are shown from the profit line overlay (near dots only).
-        barTouchData: const BarTouchData(enabled: false),
+        // Values use clean shorthand; shown on hover / tap (not on the bar surface).
+        barTouchData: BarTouchData(
+          enabled: true,
+          handleBuiltInTouches: true,
+          touchTooltipData: BarTouchTooltipData(
+            fitInsideHorizontally: true,
+            fitInsideVertically: true,
+            getTooltipColor: (_) => isDark
+                ? const Color(0xFF1E293B)
+                : const Color(0xFF0F1E37),
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              final barCount = group.barRods.length;
+              if (barCount > 1 && rodIndex > 0) {
+                return null;
+              }
+              final i = group.x.toInt();
+              if (i < 0 || i >= n) return null;
+              final row = series[i];
+              final tooltipDateText = _pnlTrendTooltipDateText(row);
+              final inc = (row['income'] as num?)?.toDouble() ?? 0;
+              final exp = (row['expense'] as num?)?.toDouble() ?? 0;
+              final net = (row['net'] as num?)?.toDouble() ?? 0;
+              const baseStyle = TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+              );
+              final children = <TextSpan>[
+                TextSpan(
+                  text: '$tooltipDateText\n',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ];
+              if (_showRevenue) {
+                children.add(
+                  TextSpan(
+                    text:
+                        'Revenue: ${_formatWholeCurrencyShorthand(inc)}\n',
+                    style: const TextStyle(
+                      color: Color(0xFF19C37D),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                );
+              }
+              if (_showExpenses) {
+                children.add(
+                  TextSpan(
+                    text:
+                        'Expenses: ${_formatWholeCurrencyShorthand(exp)}\n',
+                    style: const TextStyle(
+                      color: Color(0xFF2B7FFF),
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      height: 1.35,
+                    ),
+                  ),
+                );
+              }
+              if (_showProfit) {
+                children.add(
+                  TextSpan(
+                    text: 'Profit: ${_formatWholeCurrencyShorthand(net)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                    ),
+                  ),
+                );
+              }
+              return BarTooltipItem('', baseStyle, children: children);
+            },
+          ),
+        ),
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
@@ -3653,19 +3918,12 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 50,
-              interval: (maxY - minY) / 4,
+              reservedSize: 56,
+              interval: yInterval,
               getTitlesWidget: (value, meta) {
                 if ((value - meta.max).abs() < 0.01)
                   return const SizedBox.shrink();
-                String text;
-                if (value == 0) {
-                  text = "\$0";
-                } else if (value.abs() >= 1000) {
-                  text = "\$${(value / 1000).toInt()}K";
-                } else {
-                  text = "\$${value.toInt()}";
-                }
+                final text = _formatWholeCurrencyShorthand(value);
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: AppText(
@@ -3681,19 +3939,39 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: compactXAxis ? 48 : 36,
+              reservedSize: rotateXLabels ? 52 : (compactXAxis ? 48 : 36),
               interval: 1,
               getTitlesWidget: (value, _) {
                 final i = value.toInt();
                 if (i < 0 || i >= n) return const SizedBox.shrink();
+                final label = series[i]['label']?.toString() ?? '';
+                final child = AppText(
+                  label,
+                  fontSize: compactXAxis ? 8 : 10,
+                  color: isDark ? Colors.white54 : Colors.black54,
+                  fontWeight: FontWeight.bold,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                );
                 return Padding(
-                  padding: EdgeInsets.only(top: compactXAxis ? 6.0 : 12.0),
-                  child: AppText(
-                    series[i]['label']?.toString() ?? '',
-                    fontSize: compactXAxis ? 8 : 10,
-                    color: isDark ? Colors.white54 : Colors.black54,
-                    fontWeight: FontWeight.bold,
+                  padding: EdgeInsets.only(
+                    top: rotateXLabels
+                        ? 2.0
+                        : (compactXAxis ? 6.0 : 12.0),
                   ),
+                  child: rotateXLabels
+                      ? Transform.rotate(
+                          angle: -0.45,
+                          alignment: Alignment.topCenter,
+                          child: SizedBox(
+                            width: 72,
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: child,
+                            ),
+                          ),
+                        )
+                      : child,
                 );
               },
             ),
@@ -3768,10 +4046,6 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     required List<double> spotXN,
     required bool compactXAxis,
   }) {
-    final currencyFormat = NumberFormat.currency(
-      symbol: '\$',
-      decimalDigits: 2,
-    );
     final minY = _trendMinY(series);
     final maxY = _trendMaxY(series);
     final n = series.length;
@@ -3779,7 +4053,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     final prev = controller.prevTrendChartSeries;
     final prevN = prev.length;
     final compareLen = prevN < n ? prevN : n;
-    final bottomReserved = compactXAxis ? 48.0 : 36.0;
+    final rotateXLabels = compactXAxis && n > 8;
+    final bottomReserved = rotateXLabels ? 52.0 : (compactXAxis ? 48.0 : 36.0);
 
     final lineBars = <LineChartBarData>[];
     if (_showProfit) {
@@ -3838,109 +4113,21 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       );
     }
 
-    final tooltipEnabled = _showProfit && lineBars.isNotEmpty;
-
-    return LineChart(
-      LineChartData(
-        baselineY: 0,
-        minX: 0,
-        maxX: 1,
-        minY: minY,
-        maxY: maxY,
-        lineTouchData: LineTouchData(
-          enabled: tooltipEnabled,
-          handleBuiltInTouches: tooltipEnabled,
-          touchSpotThreshold: 18,
-          distanceCalculator: (touch, spotPixel) =>
-              (touch - spotPixel).distance,
-          getTouchedSpotIndicator: (barData, spotIndexes) {
-            return spotIndexes
-                .map(
-                  (_) => TouchedSpotIndicatorData(
-                    FlLine(color: Colors.transparent, strokeWidth: 0),
-                    const FlDotData(show: false),
-                  ),
-                )
-                .toList();
-          },
-          touchTooltipData: LineTouchTooltipData(
-            maxContentWidth: 240,
-            fitInsideHorizontally: true,
-            fitInsideVertically: true,
-            getTooltipColor: (_) =>
-                isDark ? const Color(0xFF1E293B) : const Color(0xFF0F1E37),
-            getTooltipItems: (touchedSpots) {
-              return touchedSpots.map((s) {
-                if (s.barIndex != 0) return null;
-                final idx = s.spotIndex;
-                if (idx < 0 || idx >= series.length) return null;
-                final row = series[idx];
-                final dateStr = row['tooltipDate']?.toString() ?? '';
-                final bucketStart = row['bucketStart'];
-                final bucketDate = bucketStart is DateTime
-                    ? bucketStart
-                    : DateTime.tryParse(bucketStart?.toString() ?? '');
-                final hasSpecificDay = RegExp(
-                  r'\b[A-Za-z]{3,9}\s+\d{1,2}\b',
-                ).hasMatch(dateStr);
-                final tooltipDateText = dateStr.isNotEmpty
-                    ? (hasSpecificDay || bucketDate == null
-                          ? dateStr
-                          : DateFormat('MMMM dd, yyyy').format(bucketDate))
-                    : (bucketDate != null
-                          ? DateFormat('MMM dd, yyyy').format(bucketDate)
-                          : '');
-                final inc = (row['income'] as num?)?.toDouble() ?? 0;
-                final exp = (row['expense'] as num?)?.toDouble() ?? 0;
-                final net = (row['net'] as num?)?.toDouble() ?? 0;
-                return LineTooltipItem(
-                  '',
-                  const TextStyle(color: Colors.white, fontSize: 12),
-                  children: [
-                    TextSpan(
-                      text: '$tooltipDateText\n',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                        height: 1.35,
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'Revenue: ${currencyFormat.format(inc)}\n',
-                      style: const TextStyle(
-                        color: Color(0xFF19C37D),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                        height: 1.35,
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'Expenses: ${currencyFormat.format(exp)}\n',
-                      style: const TextStyle(
-                        color: Color(0xFF2B7FFF),
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12,
-                        height: 1.35,
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'Profit: ${currencyFormat.format(net)}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                );
-              }).toList();
-            },
-          ),
-        ),
-        gridData: const FlGridData(show: false),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
+    // Let pointer events hit the bar chart below so period values show on hover /
+    // tap (clean shorthand); the line layer stays visible only.
+    return IgnorePointer(
+      ignoring: true,
+      child: LineChart(
+        LineChartData(
+          baselineY: 0,
+          minX: 0,
+          maxX: 1,
+          minY: minY,
+          maxY: maxY,
+          lineTouchData: const LineTouchData(enabled: false),
+          gridData: const FlGridData(show: false),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -3961,15 +4148,16 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
           topTitles: const AxisTitles(
             sideTitles: SideTitles(showTitles: false),
           ),
+          ),
+          lineBarsData: lineBars.isEmpty
+              ? [
+                  LineChartBarData(
+                    spots: const [FlSpot(0, 0)],
+                    dotData: const FlDotData(show: false),
+                  ),
+                ]
+              : lineBars,
         ),
-        lineBarsData: lineBars.isEmpty
-            ? [
-                LineChartBarData(
-                  spots: const [FlSpot(0, 0)],
-                  dotData: const FlDotData(show: false),
-                ),
-              ]
-            : lineBars,
       ),
     );
   }
@@ -4260,30 +4448,38 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     );
   }
 
+  /// COGS growth % vs revenue growth % (same prior-period logic as other P&L charts).
   Widget _buildCogsRevenueChart(FinancialReportController controller) {
-    final isDark = Get.isDarkMode;
-    final compactFormat = NumberFormat.compactCurrency(symbol: '\$');
-    final fullFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final cogsSeries = controller.chartData;
     final xAxisStep = _chartXAxisStep(cogsSeries.length);
     final hideDenseDots = cogsSeries.length > 18;
-    final maxRevenue = _getMaxRevenue(controller);
-    final revenueAxisMax = ((maxRevenue * 1.2) / 200).ceil() * 200;
-    final leftAxisInterval = _niceAxisInterval(revenueAxisMax.toDouble());
-    final cogsValues = cogsSeries
-        .map((e) => (e['cogsPct'] as num?)?.toDouble() ?? 0)
+    final negativeAreaColor = const Color(0xFFE57373).withValues(alpha: 0.25);
+    final negativeAreaSpots = cogsSeries.asMap().entries.map((e) {
+      final revenueGrowth =
+          (e.value['revenueGrowth'] as num?)?.toDouble() ?? 0;
+      final cogsGrowth = (e.value['cogsGrowth'] as num?)?.toDouble() ?? 0;
+      final minGrowth =
+          revenueGrowth < cogsGrowth ? revenueGrowth : cogsGrowth;
+      return FlSpot(e.key.toDouble(), minGrowth < 0 ? minGrowth : 0);
+    }).toList();
+    final allValues = cogsSeries
+        .expand(
+          (e) => [
+            (e['revenueGrowth'] as num?)?.toDouble() ?? 0,
+            (e['cogsGrowth'] as num?)?.toDouble() ?? 0,
+          ],
+        )
         .toList();
-    final maxCogs = cogsValues.isEmpty
-        ? 0.0
-        : cogsValues.reduce((a, b) => a > b ? a : b);
-    final minCogs = cogsValues.isEmpty
-        ? 0.0
-        : cogsValues.reduce((a, b) => a < b ? a : b);
-    final cogsAxisMax =
-        (((maxCogs > 0 ? maxCogs : 100) * 1.15) / 10).ceil() * 10.0;
-    final cogsAxisMin = minCogs < 0
-        ? (((minCogs * 1.15) - 10) / 10).floor() * 10.0
-        : 0.0;
+    final maxV = allValues.isEmpty
+        ? 10.0
+        : allValues.reduce((a, b) => a > b ? a : b);
+    final minV = allValues.isEmpty
+        ? -10.0
+        : allValues.reduce((a, b) => a < b ? a : b);
+    final maxY = ((maxV + 10) / 10).ceil() * 10.0;
+    final minY = ((minV - 10) / 10).floor() * 10.0;
+    final yInterval = _growthYAxisInterval(minY, maxY);
 
     return Container(
       height: 380,
@@ -4306,7 +4502,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppText(
-            "COGS % of Revenue",
+            "COGS Growth vs Revenue Growth",
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: isDark ? Colors.white : Colors.black87,
@@ -4327,333 +4523,199 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                       color: isDark ? Colors.white38 : Colors.black45,
                     ),
                   )
-                : Stack(
-                    children: [
-                      BarChart(
-                        BarChartData(
-                          alignment: BarChartAlignment.spaceAround,
-                          maxY: revenueAxisMax.toDouble(),
-                          barTouchData: BarTouchData(
-                            touchTooltipData: BarTouchTooltipData(
-                              getTooltipColor: (_) => Get.isDarkMode
-                                  ? const Color(0xFF1E293B)
-                                  : Colors.white,
-                              getTooltipItem: (group, groupIdx, rod, rodIdx) {
-                                final data = cogsSeries[groupIdx];
-                                final cogsPct =
-                                    (data['cogsPct'] as num?)?.toDouble() ?? 0;
-                                return BarTooltipItem(
-                                  "Revenue: ",
-                                  const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                : LineChart(
+                    LineChartData(
+                      baselineY: 0,
+                      minY: minY,
+                      maxY: maxY,
+                      lineTouchData: LineTouchData(
+                        touchTooltipData: LineTouchTooltipData(
+                          getTooltipColor: (_) => isDark
+                              ? const Color(0xFF1E293B)
+                              : const Color(0xFF0F1E37),
+                          getTooltipItems: (touchedSpots) {
+                            return touchedSpots.map((spot) {
+                              if (spot.barIndex == 0) return null;
+                              final label = spot.barIndex == 1
+                                  ? "Revenue Growth"
+                                  : "COGS Growth";
+                              final isRevenue = spot.barIndex == 1;
+                              final color = isRevenue
+                                  ? const Color(0xFF19C37D)
+                                  : orangeColor;
+                              return LineTooltipItem(
+                                "$label: ",
+                                TextStyle(
+                                  color: isDark
+                                      ? Colors.white70
+                                      : Colors.black87,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: _formatSignedPercent(spot.y),
+                                    style: TextStyle(
+                                      color: color,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w900,
+                                    ),
                                   ),
-                                  children: [
-                                    TextSpan(
-                                      text:
-                                          "${fullFormat.format((data['revenue'] as num?)?.toDouble() ?? 0)}\n",
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: "COGS % of Revenue: ",
-                                      style: TextStyle(
-                                        color: orangeColor.withValues(
-                                          alpha: 0.8,
+                                ],
+                              );
+                            }).toList();
+                          },
+                          fitInsideHorizontally: true,
+                          fitInsideVertically: true,
+                        ),
+                        getTouchedSpotIndicator:
+                            (LineChartBarData barData, List<int> spotIndexes) {
+                              return spotIndexes.map((index) {
+                                return TouchedSpotIndicatorData(
+                                  const FlLine(color: Colors.transparent),
+                                  FlDotData(
+                                    show: true,
+                                    getDotPainter:
+                                        (
+                                          spot,
+                                          percent,
+                                          barData,
+                                          index,
+                                        ) => FlDotCirclePainter(
+                                          radius: 4,
+                                          color: barData.color ?? Colors.white,
+                                          strokeWidth: 1.5,
+                                          strokeColor: const Color(0xFF0F1E37),
                                         ),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    TextSpan(
-                                      text: "${cogsPct.toStringAsFixed(1)}%",
-                                      style: const TextStyle(
-                                        color: orangeColor,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 );
-                              },
-                            ),
+                              }).toList();
+                            },
+                      ),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        getDrawingHorizontalLine: (value) => FlLine(
+                          color: (Get.isDarkMode ? Colors.white : Colors.black)
+                              .withValues(alpha: 0.05),
+                          strokeWidth: 1,
+                        ),
+                      ),
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 45,
+                            interval: yInterval,
+                            getTitlesWidget: (value, meta) {
+                              if (value == meta.max || value == meta.min) {
+                                return const SizedBox.shrink();
+                              }
+                              return AppText(
+                                _formatPercentAxis(value),
+                                fontSize: 10,
+                                color: Get.isDarkMode
+                                    ? Colors.white38
+                                    : Colors.black45,
+                                fontWeight: FontWeight.bold,
+                              );
+                            },
                           ),
-                          titlesData: FlTitlesData(
-                            leftTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 45,
-                                interval: leftAxisInterval,
-                                getTitlesWidget: (value, _) {
-                                  if (value > revenueAxisMax + 0.001)
-                                    return const SizedBox.shrink();
-                                  return AppText(
-                                    compactFormat.format(value),
-                                    fontSize: 10,
-                                    color: Get.isDarkMode
-                                        ? Colors.white38
-                                        : Colors.black45,
-                                    fontWeight: FontWeight.bold,
-                                  );
-                                },
-                              ),
-                            ),
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 36,
-                                interval: 1,
-                                getTitlesWidget: (value, _) {
-                                  int idx = value.toInt();
-                                  if (idx < 0 || idx >= cogsSeries.length)
-                                    return const SizedBox.shrink();
-                                  if (!_shouldShowXAxisLabel(
-                                    idx,
-                                    cogsSeries.length,
-                                    xAxisStep,
-                                  )) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return Padding(
-                                    padding: const EdgeInsets.only(top: 12.0),
-                                    child: AppText(
-                                      cogsSeries[idx]['name'] ?? "",
-                                      fontSize: 10,
-                                      color: Get.isDarkMode
-                                          ? Colors.white38
-                                          : Colors.black45,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                            rightTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 45,
-                                interval: revenueAxisMax / 4,
-                                getTitlesWidget: (value, _) {
-                                  final pct = (value / revenueAxisMax) * 100;
-                                  if (pct > 105 || pct < -5)
-                                    return const SizedBox.shrink();
-                                  return AppText(
-                                    "${pct.toInt()}%",
-                                    fontSize: 10,
-                                    color: orangeColor.withValues(alpha: 0.7),
-                                    fontWeight: FontWeight.bold,
-                                  );
-                                },
-                              ),
-                            ),
-                            topTitles: const AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
-                            ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 36,
+                            interval: 1,
+                            getTitlesWidget: (value, _) {
+                              final idx = value.toInt();
+                              if (idx < 0 || idx >= cogsSeries.length) {
+                                return const SizedBox.shrink();
+                              }
+                              if (!_shouldShowXAxisLabel(
+                                idx,
+                                cogsSeries.length,
+                                xAxisStep,
+                              )) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 12.0),
+                                child: AppText(
+                                  cogsSeries[idx]['name'] ?? "",
+                                  fontSize: 10,
+                                  color: Get.isDarkMode
+                                      ? Colors.white38
+                                      : Colors.black45,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              );
+                            },
                           ),
-                          gridData: FlGridData(
+                        ),
+                        rightTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        topTitles: const AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: negativeAreaSpots,
+                          isCurved: true,
+                          preventCurveOverShooting: true,
+                          color: Colors.transparent,
+                          barWidth: 0,
+                          dotData: const FlDotData(show: false),
+                          aboveBarData: BarAreaData(
                             show: true,
-                            drawVerticalLine: false,
-                            getDrawingHorizontalLine: (v) => FlLine(
-                              color:
-                                  (Get.isDarkMode ? Colors.white : Colors.black)
-                                      .withValues(alpha: 0.05),
-                            ),
+                            applyCutOffY: true,
+                            cutOffY: 0,
+                            color: negativeAreaColor,
                           ),
-                          borderData: FlBorderData(show: false),
-                          barGroups: cogsSeries.asMap().entries.map((e) {
-                            return BarChartGroupData(
-                              x: e.key,
-                              barRods: [
-                                BarChartRodData(
-                                  toY:
-                                      (e.value['revenue'] as num?)
+                        ),
+                        LineChartBarData(
+                          spots: cogsSeries
+                              .asMap()
+                              .entries
+                              .map(
+                                (e) => FlSpot(
+                                  e.key.toDouble(),
+                                  (e.value['revenueGrowth'] as num?)
                                           ?.toDouble() ??
                                       0,
-                                  color: const Color(
-                                    0xFF19C37D,
-                                  ).withValues(alpha: 0.6),
-                                  width: 20,
-                                  borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(6),
-                                  ),
                                 ),
-                              ],
-                            );
-                          }).toList(),
+                              )
+                              .toList(),
+                          isCurved: true,
+                          preventCurveOverShooting: true,
+                          color: const Color(0xFF19C37D),
+                          barWidth: 3,
+                          dotData: FlDotData(show: !hideDenseDots),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 45, right: 45),
-                        child: LineChart(
-                          LineChartData(
-                            minY: cogsAxisMin,
-                            maxY: cogsAxisMax,
-                            baselineY: 0,
-                            lineTouchData: LineTouchData(
-                              enabled: true,
-                              handleBuiltInTouches: true,
-                              touchSpotThreshold: 18,
-                              getTouchedSpotIndicator:
-                                  (
-                                    LineChartBarData barData,
-                                    List<int> spotIndexes,
-                                  ) {
-                                    return spotIndexes
-                                        .map(
-                                          (_) => TouchedSpotIndicatorData(
-                                            FlLine(
-                                              color: Colors.transparent,
-                                              strokeWidth: 0,
-                                            ),
-                                            FlDotData(
-                                              show: true,
-                                              getDotPainter:
-                                                  (spot, percent, bar, index) =>
-                                                      FlDotCirclePainter(
-                                                        radius: 4.5,
-                                                        color: orangeColor,
-                                                        strokeWidth: 1.5,
-                                                        strokeColor:
-                                                            const Color(
-                                                              0xFF0F1E37,
-                                                            ),
-                                                      ),
-                                            ),
-                                          ),
-                                        )
-                                        .toList();
-                                  },
-                              touchTooltipData: LineTouchTooltipData(
-                                fitInsideHorizontally: true,
-                                fitInsideVertically: true,
-                                getTooltipColor: (_) => Get.isDarkMode
-                                    ? const Color(0xFF1E293B)
-                                    : const Color(0xFF0F1E37),
-                                getTooltipItems: (touchedSpots) {
-                                  return touchedSpots.map((spot) {
-                                    final idx = spot.spotIndex;
-                                    if (idx < 0 || idx >= cogsSeries.length) {
-                                      return null;
-                                    }
-                                    final row = cogsSeries[idx];
-                                    final tooltipDate =
-                                        row['tooltipDate']?.toString() ??
-                                        row['name']?.toString() ??
-                                        '';
-                                    final revenue =
-                                        (row['revenue'] as num?)?.toDouble() ??
-                                        0;
-                                    final cogsPct =
-                                        (row['cogsPct'] as num?)?.toDouble() ??
-                                        0;
-                                    return LineTooltipItem(
-                                      '',
-                                      const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                      ),
-                                      children: [
-                                        TextSpan(
-                                          text: '$tooltipDate\n',
-                                          style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12,
-                                            height: 1.35,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text:
-                                              'Revenue: ${fullFormat.format(revenue)}\n',
-                                          style: const TextStyle(
-                                            color: Color(0xFF19C37D),
-                                            fontWeight: FontWeight.w800,
-                                            fontSize: 12,
-                                            height: 1.35,
-                                          ),
-                                        ),
-                                        TextSpan(
-                                          text:
-                                              'COGS % of Revenue: ${cogsPct.toStringAsFixed(1)}%',
-                                          style: const TextStyle(
-                                            color: orangeColor,
-                                            fontWeight: FontWeight.w900,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  }).toList();
-                                },
-                              ),
-                            ),
-                            titlesData: FlTitlesData(
-                              leftTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  reservedSize: 45,
-                                  getTitlesWidget: (_, __) =>
-                                      const SizedBox.shrink(),
+                        LineChartBarData(
+                          spots: cogsSeries
+                              .asMap()
+                              .entries
+                              .map(
+                                (e) => FlSpot(
+                                  e.key.toDouble(),
+                                  (e.value['cogsGrowth'] as num?)
+                                          ?.toDouble() ??
+                                      0,
                                 ),
-                              ),
-                              rightTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  reservedSize: 45,
-                                  getTitlesWidget: (_, __) =>
-                                      const SizedBox.shrink(),
-                                ),
-                              ),
-                              bottomTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  reservedSize: 36,
-                                  getTitlesWidget: (_, __) =>
-                                      const SizedBox.shrink(),
-                                ),
-                              ),
-                              topTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                            ),
-                            gridData: const FlGridData(show: false),
-                            borderData: FlBorderData(show: false),
-                            lineBarsData: [
-                              LineChartBarData(
-                                spots: cogsSeries
-                                    .asMap()
-                                    .entries
-                                    .map(
-                                      (e) => FlSpot(
-                                        e.key.toDouble(),
-                                        (e.value['cogsPct'] as num?)
-                                                ?.toDouble() ??
-                                            0,
-                                      ),
-                                    )
-                                    .toList(),
-                                isCurved: false,
-                                color: orangeColor,
-                                barWidth: 3,
-                                dotData: FlDotData(show: !hideDenseDots),
-                                aboveBarData: BarAreaData(
-                                  show: true,
-                                  applyCutOffY: true,
-                                  cutOffY: 0,
-                                  color: const Color(
-                                    0xFFE57373,
-                                  ).withValues(alpha: 0.25),
-                                ),
-                              ),
-                            ],
-                          ),
+                              )
+                              .toList(),
+                          isCurved: true,
+                          preventCurveOverShooting: true,
+                          color: orangeColor,
+                          barWidth: 3,
+                          dotData: FlDotData(show: !hideDenseDots),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
           ),
           const SizedBox(height: 24),
@@ -4661,12 +4723,12 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _legendItem(
-                const Color(0xFF19C37D).withValues(alpha: 0.6),
-                "Revenue",
-                isBar: true,
+                const Color(0xFF19C37D),
+                "Revenue Growth",
+                isLine: true,
               ),
               const SizedBox(width: 24),
-              _legendItem(orangeColor, "COGS % of Revenue", isLine: true),
+              _legendItem(orangeColor, "COGS Growth", isLine: true),
             ],
           ),
         ],
@@ -4731,12 +4793,27 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     );
   }
 
-  double _getMaxRevenue(FinancialReportController controller) {
-    double maxVal = 0;
-    for (var d in controller.chartData) {
-      if ((d['revenue'] ?? 0) > maxVal) maxVal = d['revenue'];
+  /// Whole-dollar shorthand for chart axes: `$4`, `$10K`, `$100K`, `$1M` (no fractional K/M).
+  String _formatWholeCurrencyShorthand(double value) {
+    final sign = value < 0 ? '-' : '';
+    final r = value.abs().round();
+    if (r >= 1000000000) {
+      final b = (r / 1000000000).round();
+      return '${sign}\$${b}B';
     }
-    return maxVal == 0 ? 100 : maxVal;
+    if (r >= 1000000) {
+      final m = (r / 1000000).round();
+      return '${sign}\$${m}M';
+    }
+    if (r >= 1000) {
+      final k = (r / 1000).round();
+      if (k >= 1000) {
+        final m = (r / 1000000).round();
+        return '${sign}\$${m}M';
+      }
+      return '${sign}\$${k}K';
+    }
+    return '${sign}\$${r}';
   }
 
   double _niceAxisInterval(double maxY) {
