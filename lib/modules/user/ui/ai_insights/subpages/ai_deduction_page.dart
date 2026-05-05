@@ -26,8 +26,7 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
   String _search = '';
 
   DateTimeRange _activeRange = DateTimeRange(
-    // start: DateTime(DateTime.now().year, 1, 1),
-    start: DateTime.now().subtract(const Duration(days: 365)),
+    start: DateTime(DateTime.now().year, 1, 1),
     end: DateTime.now(),
   );
 
@@ -93,7 +92,9 @@ class _AIDeductionPageState extends State<AIDeductionPage> {
     } catch (e) {
       dev.log("Error loading AI Deduction data: $e");
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
