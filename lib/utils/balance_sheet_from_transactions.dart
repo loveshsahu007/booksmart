@@ -328,8 +328,13 @@ class BalanceSheetLineMetrics {
         operatingCashFlow + investingCashFlow + financingCashFlow;
     final endingCashBalance = openingCash + netChangeInCash;
 
-    final computedCashForBs =
+    final computedCashForBsRaw =
         cashTotal.abs() > 0.0001 ? cashTotal : endingCashBalance;
+    // Keep cash non-negative on the balance sheet; route negative cash to a
+    // short-term overdraft liability line instead.
+    final overdraftLiability =
+        computedCashForBsRaw < 0 ? computedCashForBsRaw.abs() : 0.0;
+    final computedCashForBs = computedCashForBsRaw < 0 ? 0.0 : computedCashForBsRaw;
     final retainedEarnings = netIncome;
 
     final currentAssetsBreakdown = <String, double>{
@@ -342,6 +347,7 @@ class BalanceSheetLineMetrics {
     final otherAssetsBreakdown = <String, double>{'Other Assets': otherAssetsTotal};
     final currentLiabilitiesBreakdown = <String, double>{
       'Current Liabilities': curLiabTotal,
+      if (overdraftLiability > 0) 'Bank Overdraft': overdraftLiability,
     };
     final longTermLiabilitiesBreakdown = <String, double>{
       'Long-Term Liabilities': longTermLiabTotal,
@@ -356,7 +362,8 @@ class BalanceSheetLineMetrics {
         inventoryTotal +
         fixedAssetsTotal +
         otherAssetsTotal;
-    final totalLiabilities = curLiabTotal + longTermLiabTotal;
+    final totalLiabilities =
+        curLiabTotal + longTermLiabTotal + overdraftLiability;
 
     return BalanceSheetLineMetrics(
       totalAssets: totalAssets,

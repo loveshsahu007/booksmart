@@ -48,7 +48,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
   bool _showMoneyOut = true;
   bool _showNetCash = true;
   bool _comparePriorPeriod = false;
-  bool _isSyncingControllerRange = false;
+  bool _didInitialControllerSync = false;
 
   final Map<String, bool> _expandedCards = {
     "Operating Activities": false,
@@ -63,6 +63,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
     final today = DateTime(now.year, now.month, now.day);
     _startDate = today.subtract(const Duration(days: 89));
     _endDate = today;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureInitialControllerSync();
+    });
   }
 
   bool _isSameDate(DateTime? a, DateTime? b) {
@@ -78,24 +81,21 @@ class _CashFlowTabState extends State<CashFlowTab> {
         _dateOnly(_endDate!) == _dateOnly(end);
   }
 
-  void _syncRangeIfNeeded(FinancialReportController controller) {
-    if (!TickerMode.of(context)) return;
-    if (_isSyncingControllerRange || _startDate == null || _endDate == null) return;
+  Future<void> _ensureInitialControllerSync() async {
+    if (!mounted || _didInitialControllerSync) return;
+    _didInitialControllerSync = true;
+    if (_startDate == null || _endDate == null) return;
+    final orgId = getCurrentOrganization?.id;
+    if (orgId == null) return;
+    final controller = Get.find<FinancialReportController>(tag: orgId.toString());
     if (_isSameDate(controller.lastStartDate, _startDate) &&
         _isSameDate(controller.lastEndDate, _endDate)) {
       return;
     }
-    _isSyncingControllerRange = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await controller.fetchAndAggregateData(
-        startDate: _startDate,
-        endDate: _endDate,
-      );
-      if (mounted) {
-        _isSyncingControllerRange = false;
-      }
-    });
+    await controller.fetchAndAggregateData(
+      startDate: _startDate,
+      endDate: _endDate,
+    );
   }
 
   void _exportCSV(FinancialReportController controller) async {
@@ -1591,7 +1591,6 @@ class _CashFlowTabState extends State<CashFlowTab> {
           if (controller.isLoading.value) {
             return const Center(child: CircularProgressIndicator());
           }
-          _syncRangeIfNeeded(controller);
 
           final trendSeries = controller.trendChartSeries;
           final operatingCash = controller.operatingCashFlow.value;
@@ -1993,7 +1992,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                         ),
                                         const SizedBox(width: 6),
                                         AppText(
-                                          "vs prior period",
+                                          "vs prior month",
                                           fontSize: 11,
                                           color: isDark ? Colors.white54 : Colors.black45,
                                           disableFormat: true,
@@ -2144,7 +2143,11 @@ class _CashFlowTabState extends State<CashFlowTab> {
                       ],
                     ),
                   ),
-                  const RecentDocumentsWidget(type: 'cf'),
+                  const RecentDocumentsWidget(
+                    type: 'cf',
+                    showViewAllAction: false,
+                    showDeleteAction: true,
+                  ),
                   const SizedBox(height: 80),
                 ],
               ),
@@ -2751,13 +2754,27 @@ class _CashFlowTabState extends State<CashFlowTab> {
                       getTitlesWidget: (v, meta) {
                         final idx = v.toInt();
                         if (idx < 0 || idx >= n) return const SizedBox.shrink();
-                        return Padding(
-                          padding: EdgeInsets.only(top: compactXAxis ? 6.0 : 12.0),
-                          child: AppText(
-                            series[idx]['label']?.toString() ?? '',
-                            fontSize: compactXAxis ? 8 : 10,
-                            color: isDark ? Colors.white54 : Colors.black54,
-                            fontWeight: FontWeight.bold,
+                        return SideTitleWidget(
+                          meta: meta,
+                          angle: 0,
+                          space: compactXAxis ? 6.0 : 10.0,
+                          child: SizedBox(
+                            width: compactXAxis ? 38 : 52,
+                            child: Transform.rotate(
+                              angle: 0,
+                              child: Text(
+                                series[idx]['label']?.toString() ?? '',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: compactXAxis ? 8 : 10,
+                                  color: isDark ? Colors.white54 : Colors.black54,
+                                  fontWeight: FontWeight.w500,
+                                  fontStyle: FontStyle.normal,
+                                  fontFamily: 'Roboto',
+                                  height: 1.0,
+                                ),
+                              ),
+                            ),
                           ),
                         );
                       },

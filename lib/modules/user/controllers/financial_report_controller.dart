@@ -1150,15 +1150,16 @@ class FinancialReportController extends GetxController {
   DateTime _balanceSheetComparisonBaselineDate(DateTime asOf) {
     final a = _dateOnly(asOf);
     switch (balanceSheetComparisonMode) {
-      case 1:
-        return _dateOnly(a.subtract(const Duration(days: 7)));
-      case 2:
-        return _dateOnly(a.subtract(const Duration(days: 30)));
-      case 3:
-        return _subtractCalendarMonths(a, 6);
       case 0:
+        return _dateOnly(a.subtract(const Duration(days: 7)));
+      case 1:
+        return _dateOnly(a.subtract(const Duration(days: 30)));
+      case 2:
+        return _subtractCalendarMonths(a, 3);
+      case 3:
+        return _subtractCalendarMonths(a, 12);
       default:
-        return _sameDayPreviousMonth(a);
+        return _subtractCalendarMonths(a, 3);
     }
   }
 

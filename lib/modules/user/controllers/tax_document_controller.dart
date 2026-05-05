@@ -1773,8 +1773,8 @@ class TaxDocumentController extends GetxController {
       );
     }
 
-    bool confirmed = false;
-    await Get.dialog(
+    final confirmed =
+        await Get.dialog<bool>(
       StatefulBuilder(
         builder: (context, setLocalState) {
           void recalcCashFlow(String fieldKey) {
@@ -1999,13 +1999,7 @@ class TaxDocumentController extends GetxController {
                   } else {
                   _applyControllersToExtractedData(type, controllers);
                   }
-                  if (type == 'bs') {
-                    showSnackBar(
-                      'Please review and confirm differences before updating your balance sheet.',
-                    );
-                  }
-                  confirmed = true;
-                  Get.back();
+                  Get.back(result: true);
                 },
                 child: const Text(
                   'Confirm & Save',
@@ -2017,7 +2011,8 @@ class TaxDocumentController extends GetxController {
         },
       ),
       barrierDismissible: false,
-    );
+    ) ??
+            false;
 
     for (final c in controllers.values) {
       c.dispose();

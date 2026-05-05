@@ -1973,11 +1973,14 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         {bool negate = false}
       ) {
         for (final category in categories) {
-          if (category.trim().isEmpty ||
-              category.toLowerCase() == 'uncategorized') {
+          if (category.trim().isEmpty) {
             continue;
           }
-          setCell(0, row, excel_lib.TextCellValue('     $category'), labelStyle);
+          final normalized = category.trim().toLowerCase();
+          final label = normalized == 'uncategorized'
+              ? 'Uncategorized Income'
+              : category;
+          setCell(0, row, excel_lib.TextCellValue('     $label'), labelStyle);
           for (final b in yearBlocks) {
             final yVal = yearValue(periodicMap, b.year, category) * (negate ? -1 : 1);
             setCell(b.totalCol, row, excel_lib.DoubleCellValue(yVal), currencyStyle);
@@ -2020,7 +2023,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
       List<String> filtered(Iterable<String> source, bool Function(String) test) {
         return source
-            .where((c) => c.trim().isNotEmpty && c.toLowerCase() != 'uncategorized' && test(c))
+            .where((c) => c.trim().isNotEmpty && test(c))
             .toList();
       }
 
@@ -2594,7 +2597,6 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         .where(
           (c) =>
               c.trim().isNotEmpty &&
-              c.toLowerCase() != 'uncategorized' &&
               !_isOtherIncomeCategory(c),
         )
         .toList();
@@ -2636,12 +2638,16 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         .toList();
 
     final revenueRows = revenueCategories
-        .map(
-          (category) => PnlPdfRowData(
-            label: category,
+        .map((category) {
+          final normalized = category.trim().toLowerCase();
+          final label = normalized == 'uncategorized'
+              ? 'Uncategorized Income'
+              : category;
+          return PnlPdfRowData(
+            label: label,
             values: aggInc(category),
-          ),
-        )
+          );
+        })
         .toList();
     final cogsRows = cogsCategories
         .map(
@@ -2840,6 +2846,10 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     return ((current - previous) / previous.abs()) * 100;
   }
 
+  bool _isComparisonUnavailable(double current, double previous) {
+    return previous.abs() < 0.000001 && current.abs() >= 0.000001;
+  }
+
   final numFormat = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
 
   @override
@@ -2881,6 +2891,22 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
         final double netProfit = controller.netIncome.value;
         final double prevNetProfit = controller.prevPeriodNetIncome.value;
         final double netProfitChange = _percentChange(netProfit, prevNetProfit);
+        final bool incomeComparisonUnavailable = _isComparisonUnavailable(
+          income,
+          prevIncome,
+        );
+        final bool expensesComparisonUnavailable = _isComparisonUnavailable(
+          expenses,
+          prevExpenses,
+        );
+        final bool grossProfitComparisonUnavailable = _isComparisonUnavailable(
+          grossProfit,
+          prevGrossProfit,
+        );
+        final bool marginComparisonUnavailable = _isComparisonUnavailable(
+          margin,
+          prevMargin,
+        );
 
         final String totalIncomeStr = numFormat.format(income);
         final String grossProfitStr = numFormat.format(grossProfit);
@@ -3155,6 +3181,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                               title: "Income",
                               value: numFormat.format(income),
                               change: incomeChange,
+                              comparisonUnavailable: incomeComparisonUnavailable,
                               isCurrency: true,
                               timeframe: _getTimeframeLabel(),
                             ),
@@ -3165,6 +3192,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                               title: "Expenses",
                               value: numFormat.format(expenses),
                               change: expensesChange,
+                              comparisonUnavailable: expensesComparisonUnavailable,
                               isCurrency: true,
                               timeframe: _getTimeframeLabel(),
                             ),
@@ -3175,6 +3203,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                               title: "Gross Profit",
                               value: numFormat.format(grossProfit),
                               change: grossProfitChange,
+                              comparisonUnavailable:
+                                  grossProfitComparisonUnavailable,
                               isCurrency: true,
                               timeframe: _getTimeframeLabel(),
                             ),
@@ -3185,6 +3215,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                               title: "% Margin",
                               value: "${margin.toStringAsFixed(1)}%",
                               change: marginChange,
+                              comparisonUnavailable:
+                                  marginComparisonUnavailable,
                               isCurrency: false,
                               timeframe: _getTimeframeLabel(),
                             ),
@@ -3200,6 +3232,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                 title: "Income",
                                 value: numFormat.format(income),
                                 change: incomeChange,
+                                comparisonUnavailable:
+                                    incomeComparisonUnavailable,
                                 isCurrency: true,
                                 timeframe: _getTimeframeLabel(),
                               ),
@@ -3210,6 +3244,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                 title: "Expenses",
                                 value: numFormat.format(expenses),
                                 change: expensesChange,
+                                comparisonUnavailable:
+                                    expensesComparisonUnavailable,
                                 isCurrency: true,
                                 timeframe: _getTimeframeLabel(),
                               ),
@@ -3220,6 +3256,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                 title: "Gross Profit",
                                 value: numFormat.format(grossProfit),
                                 change: grossProfitChange,
+                                comparisonUnavailable:
+                                    grossProfitComparisonUnavailable,
                                 isCurrency: true,
                                 timeframe: _getTimeframeLabel(),
                               ),
@@ -3230,6 +3268,8 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                                 title: "% Margin",
                                 value: "${margin.toStringAsFixed(1)}%",
                                 change: marginChange,
+                                comparisonUnavailable:
+                                    marginComparisonUnavailable,
                                 isCurrency: false,
                                 timeframe: _getTimeframeLabel(),
                               ),
@@ -3264,7 +3304,11 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                           Expanded(child: _buildCogsRevenueChart(controller)),
                         ],
                       ),
-                const RecentDocumentsWidget(type: 'pl'),
+                const RecentDocumentsWidget(
+                  type: 'pl',
+                  showViewAllAction: false,
+                  showDeleteAction: true,
+                ),
                 const SizedBox(height: 24),
               ],
             ),
@@ -3301,13 +3345,17 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     required double change,
     required bool isCurrency,
     String? timeframe,
+    bool comparisonUnavailable = false,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bool isPositive = change >= 0;
+    final bool isFlat = change.abs() < 0.000001;
+    final bool isPositive = change > 0;
     final tooltipText = kpiTooltipTextForTitle(title);
     // Soft red color instead of harsh bright red
     final Color softRed = const Color(0xFFE57373);
-    final Color changeColor = isPositive ? const Color(0xFF19C37D) : softRed;
+    final Color changeColor = isFlat
+        ? (isDark ? Colors.white54 : Colors.black45)
+        : (isPositive ? const Color(0xFF19C37D) : softRed);
     final IconData changeIcon = isPositive
         ? Icons.arrow_upward
         : Icons.arrow_downward;
@@ -3376,21 +3424,27 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: isPositive
-                          ? changeColor.withValues(alpha: 0.15)
-                          : softRed.withValues(alpha: 0.15),
+                      color: comparisonUnavailable
+                          ? Colors.grey.withValues(alpha: 0.15)
+                          : changeColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(changeIcon, size: 12, color: changeColor),
-                        const SizedBox(width: 4),
+                        if (!comparisonUnavailable && !isFlat) ...[
+                          Icon(changeIcon, size: 12, color: changeColor),
+                          const SizedBox(width: 4),
+                        ],
                         AppText(
-                          "${change.abs().toStringAsFixed(1)}%",
+                          comparisonUnavailable
+                              ? "New"
+                              : "${change.abs().toStringAsFixed(1)}%",
                           fontSize: 12,
                           fontWeight: FontWeight.w900,
-                          color: changeColor,
+                          color: comparisonUnavailable
+                              ? (isDark ? Colors.white70 : Colors.black54)
+                              : changeColor,
                           disableFormat: true,
                         ),
                       ],
@@ -3574,7 +3628,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                           ),
                           const SizedBox(width: 6),
                           AppText(
-                            "vs prior period",
+                            "vs prior month",
                             fontSize: 11,
                             color: isDark ? Colors.white54 : Colors.black45,
                             disableFormat: true,
@@ -3814,7 +3868,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     final bool compactXAxis = n > 6;
     final ySpan = (maxY - minY).abs();
     final yInterval = ySpan < 1e-9 ? 1.0 : _niceAxisInterval(ySpan);
-    final bool rotateXLabels = compactXAxis && n > 8;
+    const bool rotateXLabels = false;
 
     return BarChart(
       BarChartData(
@@ -4053,7 +4107,7 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     final prev = controller.prevTrendChartSeries;
     final prevN = prev.length;
     final compareLen = prevN < n ? prevN : n;
-    final rotateXLabels = compactXAxis && n > 8;
+    const bool rotateXLabels = false;
     final bottomReserved = rotateXLabels ? 52.0 : (compactXAxis ? 48.0 : 36.0);
 
     final lineBars = <LineChartBarData>[];

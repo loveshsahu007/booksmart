@@ -217,6 +217,24 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
       setState(() {});
       return;
     }
+    final labels = _isBalanceSheetAdvanced
+        ? PdfExportService.buildBalanceSheetSnapshotColumnLabels(
+            PdfExportService.buildBalanceSheetSnapshotColumnEnds(
+              asOf: _endDate,
+              viewType: _viewType,
+              periodCount: _periodCount,
+            ),
+            _viewType,
+            _endDate,
+          )
+        : _service.buildBucketLabels(_startDate, _endDate, _viewType);
+    if (labels.length > PdfExportService.maxColumns) {
+      setState(() {
+        _validationError =
+            'Too many columns selected. Reduce range to ${PdfExportService.maxColumns} or less.';
+      });
+      return;
+    }
 
     setState(() => _isExporting = true);
     try {
@@ -478,7 +496,11 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: _isExporting ? null : _runExport,
+                    onPressed: (_isExporting ||
+                            hasError ||
+                            labels.length > PdfExportService.maxColumns)
+                        ? null
+                        : _runExport,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(
                         0xFF1E3A8A,

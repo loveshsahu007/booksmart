@@ -33,51 +33,51 @@ class BalanceSheetTab extends StatefulWidget {
 
 class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderStateMixin {
   late DateTime _asOfDate;
+  bool _didInitialControllerSync = false;
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _asOfDate = DateTime(now.year, now.month, now.day);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureInitialControllerSync();
+    });
   }
-
-  bool _isSyncingControllerRange = false;
 
   bool _isSameDate(DateTime? a, DateTime? b) {
     if (a == null || b == null) return false;
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  void _syncAsOfIfNeeded(FinancialReportController controller) {
-    if (!TickerMode.of(context)) return;
-    if (_isSyncingControllerRange) return;
-    final needsFetch = !controller.lastFetchBalanceSheetSnapshot ||
+  Future<void> _ensureInitialControllerSync() async {
+    if (!mounted || _didInitialControllerSync) return;
+    _didInitialControllerSync = true;
+    final orgId = getCurrentOrganization?.id;
+    if (orgId == null) return;
+    final controller = Get.find<FinancialReportController>(tag: orgId.toString());
+    final needsFetch =
+        !controller.lastFetchBalanceSheetSnapshot ||
         !_isSameDate(controller.lastEndDate, _asOfDate);
     if (!needsFetch) return;
-    _isSyncingControllerRange = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await controller.fetchAndAggregateData(
-        endDate: _asOfDate,
-        balanceSheetAsOfSnapshot: true,
-      );
-      if (mounted) {
-        _isSyncingControllerRange = false;
-      }
-    });
+    await controller.fetchAndAggregateData(
+      endDate: _asOfDate,
+      balanceSheetAsOfSnapshot: true,
+    );
   }
 
   String _balanceSheetComparisonCaption(FinancialReportController c) {
     switch (c.balanceSheetComparisonMode) {
-      case 1:
-        return 'vs 7 days earlier';
-      case 2:
-        return 'vs 30 days earlier';
-      case 3:
-        return 'vs 6 months earlier';
       case 0:
+        return 'vs 7 days earlier';
+      case 1:
+        return 'vs 30 days earlier';
+      case 2:
+        return 'vs 3 months earlier';
+      case 3:
+        return 'vs 12 months earlier';
       default:
-        return 'vs same day prior month';
+        return 'vs 3 months earlier';
     }
   }
 
@@ -131,87 +131,13 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         const SizedBox(height: 6),
         Wrap(
           children: [
-            chip('Prior month', 0),
-            chip('7 days', 1),
-            chip('30 days', 2),
-            chip('6 months', 3),
+            chip('7 days', 0),
+            chip('30 days', 1),
+            chip('3 months', 2),
+            chip('12 months', 3),
           ],
         ),
       ],
-    );
-  }
-
-  Future<void> _pickAsOfDate(
-    BuildContext context,
-    FinancialReportController controller,
-  ) async {
-    final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _asOfDate,
-      firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
-      builder: (context, child) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Theme(
-          data: ThemeData.dark().copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: orangeColor,
-              onPrimary: Colors.black,
-              surface: isDark ? const Color(0xFF0F1E37) : Colors.white,
-              onSurface: isDark ? Colors.white : Colors.black87,
-            ),
-            scaffoldBackgroundColor: isDark ? const Color(0xFF0F1E37) : Colors.white,
-          ),
-          child: child!,
-        );
-      },
-    );
-    if (picked == null) return;
-    final asOf = DateTime(picked.year, picked.month, picked.day);
-    if (_isSameDate(asOf, _asOfDate)) return;
-    setState(() => _asOfDate = asOf);
-    await controller.fetchAndAggregateData(
-      endDate: asOf,
-      balanceSheetAsOfSnapshot: true,
-    );
-  }
-
-  Widget _buildAsOfDateControl(FinancialReportController controller) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _pickAsOfDate(context, controller),
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AppText(
-                'As Of Date',
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white38 : Colors.black45,
-              ),
-              const SizedBox(width: 10),
-              AppText(
-                DateFormat('MMM dd, yyyy').format(_asOfDate),
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-              const SizedBox(width: 6),
-              const Icon(Icons.calendar_today_outlined, size: 16, color: orangeColor),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -282,6 +208,12 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       final int yearCount = displayBucketLabels.length;
       if (yearCount == 0) {
         throw Exception('No Excel columns available for selected range.');
+      }
+      if (yearCount > PdfExportService.maxColumns) {
+        throw Exception(
+          'Balance Sheet export supports a maximum of '
+          '${PdfExportService.maxColumns} periods.',
+        );
       }
       final excel = excel_lib.Excel.createExcel();
       final sheet = excel['Balance Sheet'];
@@ -1263,8 +1195,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     addCsvSection('Current Liabilities', controller.currentLiabilitiesBreakdown, currentLiab);
     addCsvSection('Long-Term Liabilities', controller.longTermLiabilitiesBreakdown, longTermLiab);
 
-    final equityMap = {
-      "Net Income (Retained Earnings)": controller.netIncome.value,
+    final equityMap = <String, double>{
       ...controller.ownerEquityBreakdown,
     };
     final totalEquity = totalAssets - totalLiab;
@@ -1417,7 +1348,6 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         if (controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator(color: orangeColor));
         }
-        _syncAsOfIfNeeded(controller);
 
         final totalAssets = controller.totalAssets.value;
         final totalLiabilities = controller.totalLiabilities.value;
@@ -1483,8 +1413,6 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           ),
                           const SizedBox(height: 8),
                           _buildBalanceSheetComparisonChips(controller, isDark),
-                          const SizedBox(height: 12),
-                          _buildAsOfDateControl(controller),
                         ],
                       )
                     : Row(
@@ -1510,7 +1438,6 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                               _buildBalanceSheetComparisonChips(controller, isDark),
                             ],
                           ),
-                          _buildAsOfDateControl(controller),
                         ],
                       ),
                 const SizedBox(height: 24),
@@ -1857,10 +1784,12 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           sections: [
                             _BreakdownSection(title: "Current Liabilities", items: controller.currentLiabilitiesBreakdown),
                             _BreakdownSection(title: "Long Term Liabilities", items: controller.longTermLiabilitiesBreakdown),
-                            _BreakdownSection(title: "Equity", items: {
-                               "Net Income (Retained Earnings)": controller.netIncome.value,
-                               ...controller.ownerEquityBreakdown,
-                            }),
+                            _BreakdownSection(
+                              title: "Equity",
+                              items: <String, double>{
+                                ...controller.ownerEquityBreakdown,
+                              },
+                            ),
                           ],
                           total: totalLiabilities + totalEquity,
                         ),
@@ -1887,10 +1816,12 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                           sections: [
                             _BreakdownSection(title: "Current Liabilities", items: controller.currentLiabilitiesBreakdown),
                             _BreakdownSection(title: "Long Term Liabilities", items: controller.longTermLiabilitiesBreakdown),
-                            _BreakdownSection(title: "Equity", items: {
-                               "Net Income (Retained Earnings)": controller.netIncome.value,
-                               ...controller.ownerEquityBreakdown,
-                            }),
+                            _BreakdownSection(
+                              title: "Equity",
+                              items: <String, double>{
+                                ...controller.ownerEquityBreakdown,
+                              },
+                            ),
                           ],
                           total: totalLiabilities + totalEquity,
                         ),
@@ -1900,11 +1831,11 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                 ),
                 const RecentDocumentsWidget(
                   type: 'bs',
-                  sectionTitle: 'Recently Added',
+                  sectionTitle: 'Recently Uploaded',
                   showUploadDateInSubtitle: true,
                   useImageThumbnailWhenPossible: true,
                   showDeleteAction: true,
-                  showExportTemplateAction: false,
+                  showViewAllAction: false,
                 ),
                 const SizedBox(height: 24),
               ],
@@ -2199,6 +2130,12 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       final int yearCount = displayLabels.length;
       if (yearCount == 0) {
         throw Exception('No PDF columns available for selected range.');
+      }
+      if (yearCount > PdfExportService.maxColumns) {
+        throw Exception(
+          'Balance Sheet export supports a maximum of '
+          '${PdfExportService.maxColumns} periods.',
+        );
       }
 
       double pickByKeywords(Map<String, double> map, List<String> keywords) {
@@ -2593,7 +2530,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
       final grid = pdf_gen.PdfGrid();
       final colCount = 1 + yearCount;
       grid.columns.add(count: colCount);
-      grid.columns[0].width = contentWidth * 0.46;
+      grid.columns[0].width = contentWidth * 0.38;
       final amountWidth = (contentWidth - grid.columns[0].width) / yearCount;
       for (int i = 0; i < yearCount; i++) {
         grid.columns[1 + i].width = amountWidth;
@@ -2931,7 +2868,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         shaded: true,
       );
       grid.style = pdf_gen.PdfGridStyle(
-        cellPadding: pdf_gen.PdfPaddings(left: 2, right: 2, top: 3.6, bottom: 3.6),
+        cellPadding: pdf_gen.PdfPaddings(left: 1, right: 1, top: 3.6, bottom: 3.6),
       );
       grid.draw(
         page: page,
