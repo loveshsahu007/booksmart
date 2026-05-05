@@ -130,14 +130,14 @@ class BalanceSheetExcelService {
     );
     final currencyStyle = excel_lib.CellStyle(
       numberFormat: const excel_lib.CustomNumericNumFormat(
-        formatCode: r'$#,##0.00;[Red]-$#,##0.00',
+        formatCode: r'$#,##0.00;[Red]($#,##0.00)',
       ),
       horizontalAlign: excel_lib.HorizontalAlign.Right,
     );
     final negativeCurrencyStyle = excel_lib.CellStyle(
       fontColorHex: excel_lib.ExcelColor.fromHexString('FFBE4141'),
       numberFormat: const excel_lib.CustomNumericNumFormat(
-        formatCode: r'$#,##0.00;[Red]-$#,##0.00',
+        formatCode: r'$#,##0.00;[Red]($#,##0.00)',
       ),
       horizontalAlign: excel_lib.HorizontalAlign.Right,
     );
@@ -159,7 +159,7 @@ class BalanceSheetExcelService {
       bold: true,
       backgroundColorHex: excel_lib.ExcelColor.fromHexString('FFE7F1FC'),
       numberFormat: const excel_lib.CustomNumericNumFormat(
-        formatCode: r'$#,##0.00;[Red]-$#,##0.00',
+        formatCode: r'$#,##0.00;[Red]($#,##0.00)',
       ),
       horizontalAlign: excel_lib.HorizontalAlign.Right,
     );
@@ -168,7 +168,7 @@ class BalanceSheetExcelService {
       fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
       backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF133E6E'),
       numberFormat: const excel_lib.CustomNumericNumFormat(
-        formatCode: r'$#,##0.00;[Red]-$#,##0.00',
+        formatCode: r'$#,##0.00;[Red]($#,##0.00)',
       ),
       horizontalAlign: excel_lib.HorizontalAlign.Right,
     );

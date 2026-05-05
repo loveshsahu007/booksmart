@@ -493,6 +493,84 @@ class FinancialReportController extends GetxController {
     required DateTime prevEnd,
     required double openingCash,
   }) {
+    double normalizeCashFlowAmount(
+      String lowerTitle,
+      double rawAmount, {
+      required String section,
+    }) {
+      final abs = rawAmount.abs();
+      if (abs < 0.0000001) return 0.0;
+
+      bool hasAny(List<String> keys) => keys.any(lowerTitle.contains);
+
+      if (section == 'operating') {
+        // Working capital directional rules.
+        if (lowerTitle.contains('receivable')) {
+          if (hasAny(const ['decrease', 'decreased', 'decline'])) return abs;
+          if (hasAny(const ['increase', 'increased', 'growth'])) return -abs;
+        }
+        if (lowerTitle.contains('payable')) {
+          if (hasAny(const ['increase', 'increased', 'growth'])) return abs;
+          if (hasAny(const ['decrease', 'decreased', 'decline'])) return -abs;
+        }
+        if (lowerTitle.contains('inventory')) {
+          if (hasAny(const ['decrease', 'decreased', 'decline'])) return abs;
+          if (hasAny(const ['increase', 'increased', 'growth'])) return -abs;
+        }
+
+        if (hasAny(const [
+          'cash received',
+          'received from customer',
+          'interest received',
+          'refund received',
+        ])) {
+          return abs;
+        }
+        if (hasAny(const [
+          'cash paid',
+          'paid to vendor',
+          'payroll',
+          'rent',
+          'utilities',
+          'insurance',
+          'vendor payment',
+        ])) {
+          return -abs;
+        }
+      } else if (section == 'investing') {
+        if (hasAny(const ['sale', 'sold', 'disposal', 'proceeds'])) return abs;
+        if (hasAny(const ['purchase', 'purchased', 'buy', 'acquire', 'capex'])) {
+          return -abs;
+        }
+      } else if (section == 'financing') {
+        if (hasAny(const [
+          'loan proceeds',
+          'proceeds from loan',
+          'owner investment',
+          'capital contribution',
+          'stock issuance',
+          'share issuance',
+          'equity injection',
+          '[cf:contribution]',
+        ])) {
+          return abs;
+        }
+        if (hasAny(const [
+          'loan principal',
+          'principal payment',
+          'owner draw',
+          'dividend',
+          'debt repayment',
+          'repayment',
+          '[cf:distributions]',
+        ])) {
+          return -abs;
+        }
+      }
+
+      return rawAmount;
+    }
+
     Map<String, double> getCashTotals(List<TransactionModel> txs) {
       double inflow = 0.0;
       double outflow = 0.0;
@@ -609,6 +687,8 @@ class FinancialReportController extends GetxController {
         ownCont = 0,
         dist = 0,
         finOther = 0;
+    double projectedInflow = 0;
+    double projectedOutflow = 0;
     Map<String, double> incBreakdown = {};
     Map<String, double> expBreakdown = {};
 
@@ -639,7 +719,8 @@ class FinancialReportController extends GetxController {
     for (var tx in transactions) {
       double absAmt = tx.amount.abs();
       // Use yyyy-MM as key to differentiate months across years
-      String mKey = intl.DateFormat('yyyy-MM').format(tx.dateTime);
+      final txLocalDate = _localDateOnly(tx.dateTime);
+      String mKey = intl.DateFormat('yyyy-MM').format(txLocalDate);
       if (!monthlyMap.containsKey(mKey))
         monthlyMap[mKey] = {
           'income': 0,
@@ -664,6 +745,24 @@ class FinancialReportController extends GetxController {
       pNetInc[mKey] ??= 0.0;
 
       String title = tx.title.toLowerCase();
+      final bool looksUnrealized =
+          title.contains('receivable') ||
+          title.contains('unpaid') ||
+          title.contains('pending invoice') ||
+          title.contains('pending payment') ||
+          title.contains('scheduled') ||
+          title.contains('expected deposit') ||
+          title.contains('expected payment') ||
+          title.contains('bill due') ||
+          title.contains('accounts payable');
+      if (looksUnrealized) {
+        if (tx.amount >= 0) {
+          projectedInflow += tx.amount.abs();
+        } else {
+          projectedOutflow += tx.amount.abs();
+        }
+      }
+      final double realizedCfAmount = looksUnrealized ? 0.0 : tx.amount;
       bool isAL =
           title.contains('[asset') ||
           title.contains('[liab') ||
@@ -783,73 +882,128 @@ class FinancialReportController extends GetxController {
         // Working Capital Changes
         if (title.contains('[cf:manual:operating]') ||
             title.contains('[cf:manual:other]')) {
-          opOther += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'operating',
+          );
+          opOther += signed;
           pOpAct[mKey]![cleanTitle] =
-              (pOpAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pOpAct[mKey]![cleanTitle] ?? 0) + signed;
         } else if (title.contains('receivable') ||
             title.contains('inventory') ||
             title.contains('payable') ||
             title.contains('[cf:workingcapital]')) {
-          wcChg += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'operating',
+          );
+          wcChg += signed;
           pOpAct[mKey]![cleanTitle] =
-              (pOpAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pOpAct[mKey]![cleanTitle] ?? 0) + signed;
         } else if (title.contains('[cf:op:other]') ||
             title.contains('[cf:operating]') ||
             title.contains('other operating')) {
-          opOther += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'operating',
+          );
+          opOther += signed;
           pOpAct[mKey]![cleanTitle] =
-              (pOpAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pOpAct[mKey]![cleanTitle] ?? 0) + signed;
         }
 
         // Investing Activities
         if (title.contains('[cf:manual:investing]') ||
             title.contains('[cf:invest:other]') ||
             title.contains('other investing')) {
-          invAct += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'investing',
+          );
+          invAct += signed;
           pInvAct[mKey]![cleanTitle] =
-              (pInvAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pInvAct[mKey]![cleanTitle] ?? 0) + signed;
         } else if (title.contains('equipment') ||
             title.contains('property') ||
             title.contains('[cf:investing]') ||
             title.contains('asset purchase')) {
-          astPur += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'investing',
+          );
+          astPur += signed;
           pInvAct[mKey]![cleanTitle] =
-              (pInvAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pInvAct[mKey]![cleanTitle] ?? 0) + signed;
         } else if (title.contains('investment')) {
-          invAct += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'investing',
+          );
+          invAct += signed;
           pInvAct[mKey]![cleanTitle] =
-              (pInvAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pInvAct[mKey]![cleanTitle] ?? 0) + signed;
         }
 
         // Financing Activities
         if (title.contains('[cf:manual:financing]')) {
-          finOther += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'financing',
+          );
+          finOther += signed;
           pFinAct[mKey]![cleanTitle] =
-              (pFinAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pFinAct[mKey]![cleanTitle] ?? 0) + signed;
         } else if (title.contains('loan') ||
             title.contains('debt') ||
             title.contains('[cf:financing]') ||
             title.contains('loan activities')) {
-          loanAct += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'financing',
+          );
+          loanAct += signed;
           pFinAct[mKey]![cleanTitle] =
-              (pFinAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pFinAct[mKey]![cleanTitle] ?? 0) + signed;
         } else if (title.contains('contribution') ||
             title.contains('[cf:contribution]')) {
-          ownCont += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'financing',
+          );
+          ownCont += signed;
           pFinAct[mKey]![cleanTitle] =
-              (pFinAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pFinAct[mKey]![cleanTitle] ?? 0) + signed;
         } else if (title.contains('distribution') ||
             title.contains('dividend') ||
             title.contains('owner draw') ||
             title.contains('[cf:distributions]')) {
-          dist += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'financing',
+          );
+          dist += signed;
           pFinAct[mKey]![cleanTitle] =
-              (pFinAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pFinAct[mKey]![cleanTitle] ?? 0) + signed;
         } else if (title.contains('[cf:finance:other]') ||
             title.contains('other financing')) {
-          finOther += tx.amount;
+          final signed = normalizeCashFlowAmount(
+            title,
+            realizedCfAmount,
+            section: 'financing',
+          );
+          finOther += signed;
           pFinAct[mKey]![cleanTitle] =
-              (pFinAct[mKey]![cleanTitle] ?? 0) + tx.amount;
+              (pFinAct[mKey]![cleanTitle] ?? 0) + signed;
         }
 
         // --- Balance Sheet Periodic Bucketing ---
@@ -1058,6 +1212,8 @@ class FinancialReportController extends GetxController {
         otherAssetsTotal;
     totalLiabilities.value = curLiabTotal + longTermLiabTotal;
     totalTaxDeductions.value = taxDeductions;
+    upcomingReceivables.value = projectedInflow;
+    upcomingPayables.value = projectedOutflow;
 
     incomeBreakdown.assignAll(incBreakdown);
     expenseBreakdown.assignAll(expBreakdown);
@@ -1120,6 +1276,10 @@ class FinancialReportController extends GetxController {
   }
 
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+  DateTime _localDateOnly(DateTime d) {
+    final local = d.toLocal();
+    return DateTime(local.year, local.month, local.day);
+  }
 
   /// Calendar day in the previous month, clamped (e.g. Mar 31 → Feb 28/29).
   DateTime _sameDayPreviousMonth(DateTime date) {
@@ -1150,16 +1310,15 @@ class FinancialReportController extends GetxController {
   DateTime _balanceSheetComparisonBaselineDate(DateTime asOf) {
     final a = _dateOnly(asOf);
     switch (balanceSheetComparisonMode) {
-      case 0:
-        return _dateOnly(a.subtract(const Duration(days: 7)));
       case 1:
-        return _dateOnly(a.subtract(const Duration(days: 30)));
+        return _dateOnly(a.subtract(const Duration(days: 7)));
       case 2:
-        return _subtractCalendarMonths(a, 3);
+        return _dateOnly(a.subtract(const Duration(days: 30)));
       case 3:
-        return _subtractCalendarMonths(a, 12);
+        return _subtractCalendarMonths(a, 6);
+      case 0:
       default:
-        return _subtractCalendarMonths(a, 3);
+        return _sameDayPreviousMonth(a);
     }
   }
 
@@ -1408,6 +1567,20 @@ class FinancialReportController extends GetxController {
     return (0.0, 0.0);
   }
 
+  bool _isUnrealizedCashFlowTx(TransactionModel tx) {
+    final t = tx.title.toLowerCase();
+    return t.contains('receivable') ||
+        t.contains('accounts receivable') ||
+        t.contains('accounts payable') ||
+        t.contains('unpaid') ||
+        t.contains('pending invoice') ||
+        t.contains('pending payment') ||
+        t.contains('scheduled') ||
+        t.contains('expected deposit') ||
+        t.contains('expected payment') ||
+        t.contains('bill due');
+  }
+
   List<Map<String, dynamic>> _buildTrendSeries(
     List<TransactionModel> txs,
     DateTime rangeStart,
@@ -1426,9 +1599,15 @@ class FinancialReportController extends GetxController {
     final cogs = <String, double>{
       for (final b in buckets) _trendBucketKey(b, g): 0.0,
     };
+    final unrealizedInc = <String, double>{
+      for (final b in buckets) _trendBucketKey(b, g): 0.0,
+    };
+    final unrealizedExp = <String, double>{
+      for (final b in buckets) _trendBucketKey(b, g): 0.0,
+    };
 
     for (final tx in txs) {
-      final d = _dateOnly(tx.dateTime);
+      final d = _localDateOnly(tx.dateTime);
       if (d.isBefore(rs) || d.isAfter(re)) continue;
       final b = _trendBucketStartForDate(d, g);
       final key = _trendBucketKey(b, g);
@@ -1436,6 +1615,13 @@ class FinancialReportController extends GetxController {
       final pair = _plIncomeExpenseForTx(tx);
       inc[key] = inc[key]! + pair.$1;
       exp[key] = exp[key]! + pair.$2;
+      if (_isUnrealizedCashFlowTx(tx)) {
+        if (tx.amount >= 0) {
+          unrealizedInc[key] = unrealizedInc[key]! + tx.amount.abs();
+        } else {
+          unrealizedExp[key] = unrealizedExp[key]! + tx.amount.abs();
+        }
+      }
       final title = tx.title.toLowerCase();
       if (title.startsWith('[cogs]') || title.contains('cost of goods')) {
         cogs[key] = cogs[key]! + tx.amount.abs();
@@ -1447,14 +1633,22 @@ class FinancialReportController extends GetxController {
       final i = inc[key] ?? 0.0;
       final e = exp[key] ?? 0.0;
       final cg = cogs[key] ?? 0.0;
+      final ui = unrealizedInc[key] ?? 0.0;
+      final ue = unrealizedExp[key] ?? 0.0;
       return <String, dynamic>{
         'bucketStart': b,
         'label': _formatTrendAxisLabel(b, g, rs, re),
         'tooltipDate': _formatTrendTooltipDate(b, g),
         'income': i,
         'expense': e,
+        'realizedIncome': i,
+        'realizedExpense': e,
+        'unrealizedIncome': ui,
+        'unrealizedExpense': ue,
         'cogs': cg,
         'net': i - e,
+        'realizedNet': i - e,
+        'unrealizedNet': ui - ue,
         'sortKey': key,
       };
     }).toList();

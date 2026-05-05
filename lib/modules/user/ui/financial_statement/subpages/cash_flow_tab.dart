@@ -26,6 +26,7 @@ import 'dart:ui' as ui;
 import 'package:booksmart/utils/downloader.dart';
 import 'package:xml/xml.dart';
 import 'package:booksmart/models/cash_flow_manual_entry_model.dart';
+import 'dart:math';
 
 class CashFlowTab extends StatefulWidget {
   const CashFlowTab({super.key});
@@ -987,7 +988,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
         fontSize: 9,
         fontColorHex: excel_lib.ExcelColor.fromHexString('FFFFFFFF'),
         backgroundColorHex: excel_lib.ExcelColor.fromHexString('FF7A94B3'),
-        horizontalAlign: excel_lib.HorizontalAlign.Center,
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
         verticalAlign: excel_lib.VerticalAlign.Center,
       );
       /// Section banner label (Operating / Investing / Financing) — left-aligned in column A.
@@ -1261,6 +1262,16 @@ class _CashFlowTabState extends State<CashFlowTab> {
         row++;
       }
 
+      void writeSectionSpacer() {
+        setCell(labelCol, row, excel_lib.TextCellValue(' '), dividerStyle);
+        for (int i = 0; i < keys.length; i++) {
+          setCell(symbolCol(i), row, excel_lib.TextCellValue(' '), dividerStyle);
+          setCell(amountCol(i), row, excel_lib.TextCellValue(' '), dividerStyle);
+        }
+        sheet.setRowHeight(row, 7);
+        row++;
+      }
+
       writePeriodHeader('Operating Activities', includePeriods: true);
       writeRow('Net income', netIncomeMap, indent: true);
       writeRow('Adjustments for Non-Cash Items', zeroMap(), indent: true);
@@ -1284,8 +1295,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
         total: true,
         darkTotal: true,
       );
+      writeSectionSpacer();
 
-      writePeriodHeader('Investing Activities', includePeriods: false);
+      writePeriodHeader('Investing Activities', includePeriods: true);
       writeRow('Proceeds from sales of long-term assets', proceedsSaleMap, indent: true);
       writeRow('Purchases of property, plant and equipment', ppePurchasesMap, indent: true);
       writeRow('Purchases of intangible assets', intangiblePurchasesMap, indent: true);
@@ -1296,8 +1308,9 @@ class _CashFlowTabState extends State<CashFlowTab> {
         total: true,
         darkTotal: true,
       );
+      writeSectionSpacer();
 
-      writePeriodHeader('Financing Activities', includePeriods: false);
+      writePeriodHeader('Financing Activities', includePeriods: true);
       writeRow('Issue of share capital', issueShareCapitalMap, indent: true);
       writeRow('Stock issuance', stockIssuanceMap, indent: true);
       writeRow('Interest paid', interestPaidMap, indent: true);
@@ -1311,6 +1324,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
         total: true,
         darkTotal: true,
       );
+      writeSectionSpacer();
 
       writeRow('Beginning Cash Balance', beginningCashMap, cashBand: true);
       writeRow('Change in Cash & Cash Equivalents', netChangeMap, cashBand: false);
@@ -1573,6 +1587,39 @@ class _CashFlowTabState extends State<CashFlowTab> {
     return previous.abs() < 0.000001 && current.abs() >= 0.000001;
   }
 
+  ({double moneyIn, double moneyOut}) _cashFlowDirectionTotals({
+    required double operatingCash,
+    required double investingCash,
+    required double financingCash,
+  }) {
+    final sections = <double>[operatingCash, investingCash, financingCash];
+    double moneyIn = 0;
+    double moneyOut = 0;
+    for (final sectionTotal in sections) {
+      if (sectionTotal >= 0) {
+        moneyIn += sectionTotal;
+      } else {
+        moneyOut += sectionTotal.abs();
+      }
+    }
+    return (moneyIn: moneyIn, moneyOut: moneyOut);
+  }
+
+  double _niceAxisStep(double span) {
+    if (span <= 0) return 1000;
+    final rough = span / 5;
+    final magnitude = pow(10, (log(rough) / ln10).floor()).toDouble();
+    final normalized = rough / magnitude;
+    final nice = normalized <= 1
+        ? 1
+        : normalized <= 2
+            ? 2
+            : normalized <= 5
+                ? 5
+                : 10;
+    return nice * magnitude;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1596,11 +1643,28 @@ class _CashFlowTabState extends State<CashFlowTab> {
           final operatingCash = controller.operatingCashFlow.value;
           final investingCash = controller.investingCashFlow.value;
           final financingCash = controller.financingCashFlow.value;
-
-          final totalIn = controller.cashInflow.value;
-          final totalOut = controller.cashOutflow.value;
+          final unrealizedIn = controller.upcomingReceivables.value;
+          final unrealizedOut = controller.upcomingPayables.value;
+          final unrealizedNet = unrealizedIn - unrealizedOut;
+          final includeUnrealized = !controller.isRealizedView.value;
+          final adjustedOperatingCash = includeUnrealized
+              ? operatingCash + unrealizedNet
+              : operatingCash;
+          final statementNetCash =
+              adjustedOperatingCash + investingCash + financingCash;
+          final topTotals = includeUnrealized
+              ? (
+                  moneyIn: controller.cashInflow.value + unrealizedIn,
+                  moneyOut: controller.cashOutflow.value + unrealizedOut,
+                )
+              : _cashFlowDirectionTotals(
+                  operatingCash: operatingCash,
+                  investingCash: investingCash,
+                  financingCash: financingCash,
+                );
+          final totalIn = topTotals.moneyIn;
+          final totalOut = topTotals.moneyOut;
           final netCash = totalIn - totalOut;
-          final statementNetCash = operatingCash + investingCash + financingCash;
 
           final prevIn = controller.prevPeriodCashInflow.value;
           final prevOut = controller.prevPeriodCashOutflow.value;
@@ -1623,7 +1687,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         AppText(
-                          "Cash Flow Dashboard",
+                          "Cash Flow",
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
                           color: isDark ? Colors.white : Colors.black87,
@@ -1647,7 +1711,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           AppText(
-                            "Cash Flow Dashboard",
+                            "Cash Flow",
                             fontSize: 28,
                             fontWeight: FontWeight.w900,
                             color: isDark ? Colors.white : Colors.black87,
@@ -1845,6 +1909,37 @@ class _CashFlowTabState extends State<CashFlowTab> {
                             ),
                           ),
                         ),
+                        const SizedBox(width: 10),
+                        Obx(
+                          () => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.04)
+                                  : Colors.black.withValues(alpha: 0.02),
+                              border: Border.all(
+                                color: isDark ? Colors.white12 : Colors.black12,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AppText(
+                                  "Paid / Unpaid",
+                                  fontSize: 11,
+                                  color: isDark ? Colors.white70 : Colors.black54,
+                                ),
+                                const SizedBox(width: 6),
+                                Switch(
+                                  value: controller.isRealizedView.value,
+                                  activeColor: orangeColor,
+                                  onChanged: (v) => controller.toggleRealizedView(v),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -2036,6 +2131,13 @@ class _CashFlowTabState extends State<CashFlowTab> {
                               if (_showMoneyIn) _LegendItem(color: moneyInColor, label: "Money In"),
                               if (_showMoneyOut) _LegendItem(color: moneyOutColor, label: "Money Out"),
                               if (_showNetCash) _LegendItem(color: netCashColor, label: "Net Cash", isLine: true),
+                              if (!controller.isRealizedView.value)
+                                _LegendItem(
+                                  color: isDark ? Colors.white60 : Colors.black45,
+                                  label: "Unrealized (Projected)",
+                                  isLine: true,
+                                  isDashed: true,
+                                ),
                               if (_comparePriorPeriod)
                                 _LegendItem(
                                   color: isDark ? Colors.white54 : Colors.black45,
@@ -2088,7 +2190,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                     child: Row(
                                       crossAxisAlignment: CrossAxisAlignment.stretch,
                                       children: [
-                                        Expanded(child: _buildStatementCard("Operating Activities", opItems, controller.operatingCashFlow.value, const Color(0xFF19C37D), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: true)),
+                                        Expanded(child: _buildStatementCard("Operating Activities", opItems, adjustedOperatingCash, const Color(0xFF19C37D), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: true)),
                                         const SizedBox(width: 16),
                                         Expanded(child: _buildStatementCard("Investing Activities", investItems, controller.investingCashFlow.value, const Color(0xFF2B7FFF), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: true)),
                                         const SizedBox(width: 16),
@@ -2099,7 +2201,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                                 } else {
                                   return Column(
                                     children: [
-                                      _buildStatementCard("Operating Activities", opItems, controller.operatingCashFlow.value, const Color(0xFF19C37D), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: false),
+                                      _buildStatementCard("Operating Activities", opItems, adjustedOperatingCash, const Color(0xFF19C37D), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: false),
                                       const SizedBox(height: 16),
                                       _buildStatementCard("Investing Activities", investItems, controller.investingCashFlow.value, const Color(0xFF2B7FFF), statementCardFill, textPrimary, textSecondary, equalHeightWithNeighbors: false),
                                       const SizedBox(height: 16),
@@ -2178,12 +2280,12 @@ class _CashFlowTabState extends State<CashFlowTab> {
         : (isGoodTrend ? cashGreen : softRed);
     final IconData changeIcon = isPositive ? Icons.arrow_upward : Icons.arrow_downward;
     
-    final bool isNegativeValue = value.contains('-') || (isCurrency && value.startsWith('-\$'));
+    final bool isNegativeValue = value.contains('(');
     
     // Explicit value color rules as per reqs
     Color displayValueColor = valueColor ?? Colors.white;
     if (isNetCash) {
-      displayValueColor = cashGreen; // ✅ Consistently Green as per req
+      displayValueColor = isNegativeValue ? softRed : cashGreen;
     }
     final tooltipText = kpiTooltipTextForTitle(title);
 
@@ -2312,6 +2414,36 @@ class _CashFlowTabState extends State<CashFlowTab> {
     }
   }
 
+  String _manualSectionStatementLabel(CashFlowManualSection section) {
+    switch (section) {
+      case CashFlowManualSection.operating:
+        return 'Operating Activities';
+      case CashFlowManualSection.investing:
+        return 'Investing Activities';
+      case CashFlowManualSection.financing:
+        return 'Financing Activities';
+      case CashFlowManualSection.other:
+        return 'Other Activities';
+    }
+  }
+
+  String _formatManualPeriod(DateTime day) {
+    final start = _startDate;
+    final end = _endDate;
+    if (start != null && end != null) {
+      return '${DateFormat('MMM dd, yyyy').format(start)} to ${DateFormat('MMM dd, yyyy').format(end)}';
+    }
+    return DateFormat('MMMM yyyy').format(day);
+  }
+
+  bool _isWithinActiveRange(DateTime day) {
+    if (_startDate == null || _endDate == null) return false;
+    final selected = DateTime(day.year, day.month, day.day);
+    final s = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
+    final e = DateTime(_endDate!.year, _endDate!.month, _endDate!.day);
+    return !selected.isBefore(s) && !selected.isAfter(e);
+  }
+
   Future<void> _showManualCashFlowDialog(
     FinancialReportController controller,
   ) async {
@@ -2325,6 +2457,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
       return;
     }
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final categoryCtrl = TextEditingController();
     final notesCtrl = TextEditingController();
     final amountCtrl = TextEditingController();
@@ -2334,6 +2467,25 @@ class _CashFlowTabState extends State<CashFlowTab> {
     bool isNonCash = false;
     String suggestionMessage = '';
     bool suggestionIsError = false;
+    String suggestionImpactType = 'Realized';
+
+    InputDecoration inputDecoration(String label) => InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(
+        color: isDark ? Colors.white70 : Colors.black54,
+        fontSize: 12,
+      ),
+      filled: true,
+      fillColor: const Color(0xFF0F1E37),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Color(0xFF2B7FFF)),
+      ),
+    );
 
     await showDialog(
       context: context,
@@ -2358,21 +2510,31 @@ class _CashFlowTabState extends State<CashFlowTab> {
                   '${categoryCtrl.text} ${notesCtrl.text} ${amountCtrl.text}';
               if (combined.trim().isEmpty) {
                 setDialogState(() {
-                  suggestionMessage =
-                      'Add category or notes first to get a suggestion.';
+                  suggestionMessage = 'BookSmart AI needs category/notes before suggesting a section.';
                   suggestionIsError = true;
                 });
                 return;
               }
               final suggested = _manualEntryService.suggestSection(combined);
+              final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+              final period = _formatManualPeriod(selectedDate);
+              final reason = (notesCtrl.text.trim().isNotEmpty
+                      ? notesCtrl.text.trim()
+                      : categoryCtrl.text.trim())
+                  .toLowerCase();
+              final why = reason.isEmpty
+                  ? 'based on your entry metadata'
+                  : 'because "${reason.length > 70 ? '${reason.substring(0, 70)}...' : reason}" matches cash-flow rules';
               setDialogState(() {
                 selectedSection = suggested;
+                suggestionImpactType = isNonCash ? 'Unrealized' : 'Realized';
                 suggestionMessage =
-                    'Suggested: ${_manualSectionLabel(suggested)}';
+                    'BookSmart found ${_formatCurrencyExact(amount)} for ${_manualSectionStatementLabel(suggested)} for $period ($suggestionImpactType cash flow), $why.';
                 suggestionIsError = false;
                 if (combined.toLowerCase().contains('depreciation') ||
                     combined.toLowerCase().contains('amortization')) {
                   isNonCash = true;
+                  suggestionImpactType = 'Unrealized';
                 }
               });
             }
@@ -2380,9 +2542,16 @@ class _CashFlowTabState extends State<CashFlowTab> {
             Future<void> save() async {
               try {
                 final amount = double.tryParse(amountCtrl.text.trim());
+                if (_startDate == null || _endDate == null) {
+                  setDialogState(() {
+                    suggestionMessage = 'This adjustment cannot save because no date range was selected.';
+                    suggestionIsError = true;
+                  });
+                  return;
+                }
                 if (categoryCtrl.text.trim().isEmpty || amount == null) {
                   setDialogState(() {
-                    suggestionMessage = 'Category and valid amount are required.';
+                    suggestionMessage = 'This adjustment cannot save because category and a valid amount are required.';
                     suggestionIsError = true;
                   });
                   return;
@@ -2406,18 +2575,41 @@ class _CashFlowTabState extends State<CashFlowTab> {
                   endDate: _endDate,
                 );
                 if (mounted) Navigator.of(context).pop();
-                showSnackBar('Manual cash flow entry added.');
+                final targetSection =
+                    _manualSectionStatementLabel(selectedSection);
+                final monthLabel = DateFormat('MMMM yyyy').format(selectedDate);
+                showSnackBar(
+                  'Your cash flow adjustment was saved to $targetSection for $monthLabel.',
+                );
+                if (_isWithinActiveRange(selectedDate)) {
+                  showSnackBar(
+                    'This adjustment updated your Cash Flow Statement and dashboard.',
+                  );
+                } else {
+                  showSnackBar(
+                    'This adjustment requires reconciliation before updating your Cash Flow Statement.',
+                  );
+                }
               } catch (e) {
                 setDialogState(() {
-                  suggestionMessage = 'Unable to save adjustment. Please try again.';
+                  suggestionMessage =
+                      'This adjustment cannot save because ${e.toString()}.';
                   suggestionIsError = true;
                 });
-                showSnackBar('Unable to save manual cash flow entry.', isError: true);
+                showSnackBar(
+                  'This adjustment cannot save because ${e.toString()}.',
+                  isError: true,
+                );
               }
             }
 
             return AlertDialog(
-              title: const Text('Adjust Cash Flow'),
+              backgroundColor: const Color(0xFF0A192F),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text(
+                'Adjust Cash Flow',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+              ),
               content: SizedBox(
                 width: 420,
                 child: SingleChildScrollView(
@@ -2427,12 +2619,25 @@ class _CashFlowTabState extends State<CashFlowTab> {
                     children: [
                       DropdownButtonFormField<CashFlowManualSection>(
                         value: selectedSection,
-                        decoration: const InputDecoration(labelText: 'Section'),
+                        dropdownColor: const Color(0xFF0F1E37),
+                        decoration: inputDecoration('Section'),
+                        borderRadius: BorderRadius.circular(12),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontFamily: 'Outfit',
+                        ),
                         items: CashFlowManualSection.values
                             .map(
                               (s) => DropdownMenuItem(
                                 value: s,
-                                child: Text(_manualSectionLabel(s)),
+                                child: Text(
+                                  _manualSectionLabel(s),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontFamily: 'Outfit',
+                                  ),
+                                ),
                               ),
                             )
                             .toList(),
@@ -2445,9 +2650,8 @@ class _CashFlowTabState extends State<CashFlowTab> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: categoryCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Category / Adjustment Name',
-                        ),
+                        style: const TextStyle(color: Colors.white),
+                        decoration: inputDecoration('Category / Adjustment Name'),
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -2456,44 +2660,59 @@ class _CashFlowTabState extends State<CashFlowTab> {
                           decimal: true,
                           signed: true,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: 'Amount',
-                        ),
+                        style: const TextStyle(color: Colors.white),
+                        decoration: inputDecoration('Amount'),
                       ),
                       const SizedBox(height: 12),
                       InkWell(
                         onTap: pickDate,
                         child: InputDecorator(
-                          decoration: const InputDecoration(labelText: 'Date'),
-                          child: Text(DateFormat('MMM dd, yyyy').format(selectedDate)),
+                          decoration: inputDecoration('Date'),
+                          child: Text(
+                            DateFormat('MMM dd, yyyy').format(selectedDate),
+                            style: const TextStyle(color: Colors.white),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: notesCtrl,
                         maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Notes',
-                        ),
+                        style: const TextStyle(color: Colors.white),
+                        decoration: inputDecoration('Notes'),
                       ),
                       const SizedBox(height: 8),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Non-cash adjustment'),
+                        title: const Text(
+                          'Non-cash adjustment',
+                          style: TextStyle(color: Colors.white),
+                        ),
                         value: isNonCash,
                         onChanged: (v) =>
                             setDialogState(() => isNonCash = v ?? false),
+                        activeColor: const Color(0xFF2B7FFF),
+                        checkColor: Colors.white,
                       ),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: OutlinedButton(
                           onPressed: useSuggestion,
                           style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: BorderSide(
+                              color: const Color(0xFF2B7FFF).withValues(alpha: 0.7),
+                            ),
+                            backgroundColor: const Color(0x0D2B7FFF),
+                            overlayColor: const Color(0x332B7FFF),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                          child: const Text('Use AI Suggestion'),
+                          child: const Text(
+                            'Use AI Suggestion',
+                            style: TextStyle(fontFamily: 'Outfit'),
+                          ),
                         ),
                       ),
                       if (suggestionMessage.isNotEmpty)
@@ -2521,20 +2740,23 @@ class _CashFlowTabState extends State<CashFlowTab> {
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: TextButton.styleFrom(
+                    foregroundColor: Colors.white70,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text('Close'),
+                  child: const Text('Close', style: TextStyle(fontFamily: 'Outfit')),
                 ),
                 ElevatedButton(
                   onPressed: save,
                   style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2B7FFF),
+                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text('Save'),
+                  child: const Text('Save', style: TextStyle(fontFamily: 'Outfit')),
                 ),
               ],
             );
@@ -2671,11 +2893,48 @@ class _CashFlowTabState extends State<CashFlowTab> {
   ) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final includeUnrealized = !controller.isRealizedView.value;
+        final effectiveSeries = series
+            .map((row) {
+              final realizedIncome =
+                  (row['realizedIncome'] as num?)?.toDouble() ??
+                      (row['income'] as num?)?.toDouble() ??
+                      0.0;
+              final realizedExpense =
+                  (row['realizedExpense'] as num?)?.toDouble() ??
+                      (row['expense'] as num?)?.toDouble() ??
+                      0.0;
+              final unrealizedIncome =
+                  (row['unrealizedIncome'] as num?)?.toDouble() ?? 0.0;
+              final unrealizedExpense =
+                  (row['unrealizedExpense'] as num?)?.toDouble() ?? 0.0;
+              final income = includeUnrealized
+                  ? realizedIncome + unrealizedIncome
+                  : realizedIncome;
+              final expense = includeUnrealized
+                  ? realizedExpense + unrealizedExpense
+                  : realizedExpense;
+              final net = income - expense;
+              return {
+                ...row,
+                'income': income,
+                'expense': expense,
+                'net': net,
+                'realizedIncome': realizedIncome,
+                'realizedExpense': realizedExpense,
+                'realizedNet': realizedIncome - realizedExpense,
+              };
+            })
+            .toList();
         const leftAxis = 50.0;
         final usableW = (constraints.maxWidth - leftAxis).clamp(1.0, double.infinity);
-        final minY = _cfTrendMinY(series);
-        final maxY = _cfTrendMaxY(series);
-        final n = series.length;
+        final minYRaw = _cfTrendMinY(effectiveSeries);
+        final maxYRaw = _cfTrendMaxY(effectiveSeries);
+        final span = (maxYRaw - minYRaw).abs();
+        final step = _niceAxisStep(span == 0 ? 1000 : span);
+        final minY = (minYRaw / step).floorToDouble() * step;
+        final maxY = (maxYRaw / step).ceilToDouble() * step;
+        final n = effectiveSeries.length;
         final bool compactXAxis = n > 6;
         final prev = controller.prevTrendChartSeries;
         final compareLen = prev.length < n ? prev.length : n;
@@ -2690,13 +2949,15 @@ class _CashFlowTabState extends State<CashFlowTab> {
             LineChartBarData(
               spots: List.generate(n, (i) {
                 final net = (series[i]['net'] as num?)?.toDouble() ?? 0;
+                final projectedNet = (effectiveSeries[i]['net'] as num?)?.toDouble() ?? 0;
                 final xn = i < spotXN.length ? spotXN[i] : 0.5;
-                return FlSpot(xn, net);
+                return FlSpot(xn, includeUnrealized ? projectedNet : net);
               }),
               isCurved: true,
               curveSmoothness: 0.35,
               color: netColor,
               barWidth: 1.5,
+              dashArray: includeUnrealized ? [6, 4] : null,
               isStrokeCapRound: true,
               dotData: FlDotData(
                 show: true,
@@ -2763,7 +3024,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                             child: Transform.rotate(
                               angle: 0,
                               child: Text(
-                                series[idx]['label']?.toString() ?? '',
+                                effectiveSeries[idx]['label']?.toString() ?? '',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: compactXAxis ? 8 : 10,
@@ -2786,7 +3047,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 50,
-                      interval: (maxY - minY) / 4,
+                      interval: step,
                       getTitlesWidget: (v, meta) {
                         if ((v - meta.max).abs() < 0.01) return const SizedBox.shrink();
                         return Padding(
@@ -2814,14 +3075,16 @@ class _CashFlowTabState extends State<CashFlowTab> {
                 ),
                 borderData: FlBorderData(show: false),
                 barGroups: List.generate(n, (i) {
-                  final data = series[i];
+                  final data = effectiveSeries[i];
                   final inc = (data['income'] as num?)?.toDouble() ?? 0;
                   final exp = (data['expense'] as num?)?.toDouble() ?? 0;
+                  final realizedInc = (data['realizedIncome'] as num?)?.toDouble() ?? inc;
+                  final realizedExp = (data['realizedExpense'] as num?)?.toDouble() ?? exp;
                   final rods = <BarChartRodData>[];
                   if (_showMoneyIn) {
                     rods.add(
                       BarChartRodData(
-                        toY: inc,
+                        toY: includeUnrealized ? realizedInc : inc,
                         color: inColor,
                         width: (320 / n).clamp(4.0, 16.0),
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
@@ -2835,11 +3098,22 @@ class _CashFlowTabState extends State<CashFlowTab> {
                         ),
                       ),
                     );
+                    if (includeUnrealized && inc > realizedInc) {
+                      rods.add(
+                        BarChartRodData(
+                          toY: inc,
+                          fromY: realizedInc,
+                          color: inColor.withValues(alpha: 0.35),
+                          width: (320 / n).clamp(4.0, 16.0),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                        ),
+                      );
+                    }
                   }
                   if (_showMoneyOut) {
                     rods.add(
                       BarChartRodData(
-                        toY: exp,
+                        toY: includeUnrealized ? realizedExp : exp,
                         color: outColor,
                         width: (320 / n).clamp(4.0, 16.0),
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
@@ -2853,6 +3127,17 @@ class _CashFlowTabState extends State<CashFlowTab> {
                         ),
                       ),
                     );
+                    if (includeUnrealized && exp > realizedExp) {
+                      rods.add(
+                        BarChartRodData(
+                          toY: exp,
+                          fromY: realizedExp,
+                          color: outColor.withValues(alpha: 0.35),
+                          width: (320 / n).clamp(4.0, 16.0),
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                        ),
+                      );
+                    }
                   }
                   if (rods.isEmpty) {
                     rods.add(BarChartRodData(toY: 0.001, color: Colors.transparent, width: 1));
@@ -2892,8 +3177,8 @@ class _CashFlowTabState extends State<CashFlowTab> {
                       return touchedSpots.map((s) {
                         if (s.barIndex != 0) return null;
                         final idx = s.spotIndex;
-                        if (idx < 0 || idx >= series.length) return null;
-                        final row = series[idx];
+                        if (idx < 0 || idx >= effectiveSeries.length) return null;
+                        final row = effectiveSeries[idx];
                         final dateStr = row['tooltipDate']?.toString() ?? '';
                         final bucketStart = row['bucketStart'];
                         final bucketDate = bucketStart is DateTime ? bucketStart : DateTime.tryParse(bucketStart?.toString() ?? '');
@@ -3110,11 +3395,22 @@ class _CashFlowTabState extends State<CashFlowTab> {
   }
 
   List<Map<String, dynamic>> _getOperatingItems(FinancialReportController controller) {
+    final includeUnrealized = !controller.isRealizedView.value;
     return [
       {"label": "Net Income", "value": controller.netIncome.value},
       {"label": "Adjustments", "value": controller.operatingAdjustments.value},
       {"label": "Working Capital", "value": controller.workingCapitalChanges.value},
       {"label": "Other Operating", "value": controller.operatingOther.value},
+      if (includeUnrealized)
+        {
+          "label": "Unrealized Receivables",
+          "value": controller.upcomingReceivables.value,
+        },
+      if (includeUnrealized)
+        {
+          "label": "Unrealized Payables",
+          "value": -controller.upcomingPayables.value,
+        },
     ];
   }
 
@@ -3137,7 +3433,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
 
   String _formatCurrency(double value) {
     final formatted = NumberFormat("#,##0.00").format(value.abs());
-    return value < 0 ? '-\$$formatted' : '\$$formatted';
+    return value < 0 ? '(\$$formatted)' : '\$$formatted';
   }
 
   String _formatCompact(double value) {
@@ -3146,18 +3442,20 @@ class _CashFlowTabState extends State<CashFlowTab> {
     final absVal = value.abs();
     String formatted;
     if (absVal >= 1000000) {
-      formatted = "\$${(absVal / 1000000).toStringAsFixed(1)}M";
+      final m = absVal / 1000000;
+      formatted = "\$${m.truncateToDouble() == m ? m.toStringAsFixed(0) : m.toStringAsFixed(1)}M";
     } else if (absVal >= 1000) {
-      formatted = "\$${(absVal / 1000).toStringAsFixed(0)}k";
+      final k = absVal / 1000;
+      formatted = "\$${k.truncateToDouble() == k ? k.toStringAsFixed(0) : k.toStringAsFixed(1)}K";
     } else {
       formatted = "\$${absVal.toInt()}";
     }
-    return isNegative ? "-$formatted" : formatted;
+    return isNegative ? "($formatted)" : formatted;
   }
 
   String _formatCurrencyExact(double value) {
     final formatted = NumberFormat("#,##0.00").format(value.abs());
-    return value < 0 ? '-\$$formatted' : '\$$formatted';
+    return value < 0 ? '(\$$formatted)' : '\$$formatted';
   }
 }
 

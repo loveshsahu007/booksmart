@@ -54,6 +54,8 @@ class _ManualPeriodColumn {
   String? displayLabel;
 }
 
+enum _ManualCfFrequency { monthly, quarterly, yearly, custom }
+
 class TaxDocumentController extends GetxController {
   // ── Reactive state ────────────────────────────────────────────────────────
 
@@ -75,6 +77,8 @@ class TaxDocumentController extends GetxController {
   DateTime _dialogBsAsOf = DateTime.now();
   int _dialogBsPeriodCount = 1;
   PdfViewType _dialogBsFreq = PdfViewType.yearly;
+  int _dialogCfPeriodCount = 1;
+  _ManualCfFrequency _dialogCfFreq = _ManualCfFrequency.yearly;
 
   /// When true, [UploadTaxDocWidget] should not show the generic success snackbar
   /// (P&L uploads show a reconciliation-specific message instead).
@@ -230,7 +234,10 @@ class TaxDocumentController extends GetxController {
       );
 
       if (fileUrl == null || fileUrl.isEmpty) {
-        showSnackBar('Upload failed. Try again.', isError: true);
+        showSnackBar(
+          'This adjustment cannot save because the document upload failed. Please re-upload the file and try again.',
+          isError: true,
+        );
         return null;
       }
 
@@ -630,18 +637,18 @@ class TaxDocumentController extends GetxController {
       case BsReconciliationOutcome.overrideWithUploaded:
         showSnackBar(
           savedTransactions
-              ? 'Reconciliation confirmed. Uploaded balance sheet totals were written to your transactions; refresh the balance sheet to see updates.'
-              : 'Reconciliation closed without saving transactions. Your balance sheet was not changed — adjust data and try again if needed.',
+              ? 'Your cash flow update was saved successfully.'
+              : 'Reconciliation Required. Your uploaded cash flow statement does not match BookSmart\'s current data. Please reconcile the differences before applying changes.',
         );
         return;
       case BsReconciliationOutcome.keepBookSmart:
         showSnackBar(
-          'You kept BookSmart values. The file is saved for reference; your balance sheet totals were not overwritten.',
+          'Missing Transactions Required. BookSmart found a difference between your uploaded statement and existing transactions. Please add or update the missing transactions.',
         );
         return;
       case BsReconciliationOutcome.investigateDifference:
         showSnackBar(
-          'Reconciliation paused. The file is saved; no balance sheet transactions were added. Update transactions or adjustments, then reconcile again.',
+          'Reconciliation Required. Your uploaded cash flow statement does not match BookSmart\'s current data. Please reconcile the differences before applying changes.',
         );
         return;
     }
@@ -683,6 +690,101 @@ class TaxDocumentController extends GetxController {
     }
     for (var i = 0; i < periodColumns.length; i++) {
       _seedManualColumnControllers('bs', controllers, i);
+    }
+  }
+
+  void _syncCfManualPeriodColumns({
+    required List<_ManualPeriodColumn> periodColumns,
+    required Map<String, TextEditingController> controllers,
+    required int periodCount,
+    required _ManualCfFrequency frequency,
+  }) {
+    for (var i = periodColumns.length - 1; i >= 0; i--) {
+      _disposeControllersForColumn('cf', controllers, i);
+    }
+    periodColumns.clear();
+    _dialogCfPeriodCount = periodCount.clamp(1, 8);
+    _dialogCfFreq = frequency;
+
+    final now = DateTime.now();
+    final startAnchor = DateTime(
+      (_uploadPeriodStart ?? now).year,
+      (_uploadPeriodStart ?? now).month,
+      (_uploadPeriodStart ?? now).day,
+    );
+    final endAnchor = DateTime(
+      (_uploadPeriodEnd ?? now).year,
+      (_uploadPeriodEnd ?? now).month,
+      (_uploadPeriodEnd ?? now).day,
+    );
+
+    List<_ManualPeriodColumn> generated;
+    if (frequency == _ManualCfFrequency.custom) {
+      final spanDays = endAnchor.isBefore(startAnchor)
+          ? 0
+          : endAnchor.difference(startAnchor).inDays;
+      generated = List<_ManualPeriodColumn>.generate(_dialogCfPeriodCount, (idx) {
+        final start = DateTime(
+          startAnchor.year,
+          startAnchor.month,
+          startAnchor.day,
+        ).add(Duration(days: (spanDays + 1) * idx));
+        final end = start.add(Duration(days: spanDays));
+        return _ManualPeriodColumn(year: start.year, start: start, end: end);
+      });
+    } else {
+      final out = <_ManualPeriodColumn>[];
+      if (frequency == _ManualCfFrequency.monthly) {
+        final anchor = DateTime(endAnchor.year, endAnchor.month, 1);
+        for (var i = _dialogCfPeriodCount - 1; i >= 0; i--) {
+          final periodMonth = DateTime(anchor.year, anchor.month - i, 1);
+          final end = DateTime(periodMonth.year, periodMonth.month + 1, 0);
+          out.add(
+            _ManualPeriodColumn(
+              year: periodMonth.year,
+              start: periodMonth,
+              end: end,
+            ),
+          );
+        }
+      } else if (frequency == _ManualCfFrequency.quarterly) {
+        final qStartMonth = (((endAnchor.month - 1) ~/ 3) * 3) + 1;
+        final anchor = DateTime(endAnchor.year, qStartMonth, 1);
+        for (var i = _dialogCfPeriodCount - 1; i >= 0; i--) {
+          final quarterStart = DateTime(anchor.year, anchor.month - (i * 3), 1);
+          final quarterEnd = DateTime(
+            quarterStart.year,
+            quarterStart.month + 3,
+            0,
+          );
+          out.add(
+            _ManualPeriodColumn(
+              year: quarterStart.year,
+              start: quarterStart,
+              end: quarterEnd,
+            ),
+          );
+        }
+      } else {
+        final anchorYear = endAnchor.year;
+        for (var i = _dialogCfPeriodCount - 1; i >= 0; i--) {
+          final y = anchorYear - i;
+          out.add(
+            _ManualPeriodColumn(
+              year: y,
+              start: DateTime(y, 1, 1),
+              end: DateTime(y, 12, 31),
+            ),
+          );
+        }
+      }
+      generated = out;
+    }
+
+    periodColumns.addAll(generated);
+    for (var i = 0; i < periodColumns.length; i++) {
+      _seedManualColumnControllers('cf', controllers, i);
+      _recalcCashFlowColumnFull(controllers, i);
     }
   }
 
@@ -768,22 +870,25 @@ class TaxDocumentController extends GetxController {
       case PlReconciliationOutcome.saveTransactions:
         showSnackBar(
           savedTransactions
-              ? 'Document uploaded. Your P&L values were saved to your transaction register.'
-              : 'Document uploaded.',
+              ? 'Your cash flow update was saved successfully.'
+              : 'Reconciliation Required. Your uploaded cash flow statement does not match BookSmart\'s current data. Please reconcile the differences before applying changes.',
         );
+        return;
       case PlReconciliationOutcome.keepBookSmart:
         showSnackBar(
-          'Document uploaded. No P&L changes were made — BookSmart amounts were kept.',
+          'Missing Transactions Required. BookSmart found a difference between your uploaded statement and existing transactions. Please add or update the missing transactions.',
         );
+        return;
       case PlReconciliationOutcome.addMissingTransactions:
         showSnackBar(
-          'Your uploaded statement does not match your current BookSmart records. '
-          'Please update or add missing transactions before finalizing.',
+          'Missing Transactions Required. BookSmart found a difference between your uploaded statement and existing transactions. Please add or update the missing transactions.',
         );
+        return;
       case PlReconciliationOutcome.reviewLater:
         showSnackBar(
-          'Document uploaded. Reconciliation was deferred — P&L transactions were not added.',
+          'Reconciliation Required. Your uploaded cash flow statement does not match BookSmart\'s current data. Please reconcile the differences before applying changes.',
         );
+        return;
     }
   }
 
@@ -974,13 +1079,13 @@ class TaxDocumentController extends GetxController {
     final investmentActivities =
         _parseMoney(c['investmentActivities$s']?.text ?? '0');
     c['investingActivities$s']?.text =
-        _formatMoneyInput(assetPurchases + investmentActivities);
+        _formatMoneyInput((-assetPurchases.abs()) + investmentActivities);
     final loanActivities = _parseMoney(c['loanActivities$s']?.text ?? '0');
     final ownerContributions =
         _parseMoney(c['ownerContributions$s']?.text ?? '0');
     final distributions = _parseMoney(c['distributions$s']?.text ?? '0');
     c['financingActivities$s']?.text = _formatMoneyInput(
-      loanActivities + ownerContributions + distributions,
+      loanActivities + ownerContributions - distributions.abs(),
     );
   }
 
@@ -1021,9 +1126,10 @@ class TaxDocumentController extends GetxController {
         equity: v('equity'),
       );
     }
-    final investingByParts = v('assetPurchases') + v('investmentActivities');
+    final investingByParts =
+        (-v('assetPurchases').abs()) + v('investmentActivities');
     final financingByParts =
-        v('loanActivities') + v('ownerContributions') + v('distributions');
+        v('loanActivities') + v('ownerContributions') - v('distributions').abs();
     final hasInvestingBreakdown =
         v('assetPurchases') != 0 || v('investmentActivities') != 0;
     final hasFinancingBreakdown =
@@ -1057,9 +1163,10 @@ class TaxDocumentController extends GetxController {
 
   double _summaryCfColumn(Map<String, TextEditingController> c, int i) {
     double v(String k) => _parseMoney(c['${k}__$i']?.text ?? '0');
-    final investingByParts = v('assetPurchases') + v('investmentActivities');
+    final investingByParts =
+        (-v('assetPurchases').abs()) + v('investmentActivities');
     final financingByParts =
-        v('loanActivities') + v('ownerContributions') + v('distributions');
+        v('loanActivities') + v('ownerContributions') - v('distributions').abs();
     final hasInvestingBreakdown =
         v('assetPurchases') != 0 || v('investmentActivities') != 0;
     final hasFinancingBreakdown =
@@ -1539,7 +1646,109 @@ class TaxDocumentController extends GetxController {
           ),
           const SizedBox(height: 12),
         ],
-        if (type != 'bs') ...[
+        if (type == 'cf') ...[
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Set statement metadata, then edit each period values below.',
+              style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.3),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 210,
+                child: DropdownButtonFormField<String>(
+                  value: 'Cash Flow Statement',
+                  dropdownColor: const Color(0xFF1a2942),
+                  decoration: const InputDecoration(
+                    labelText: 'Statement type',
+                    labelStyle: TextStyle(color: Colors.white54, fontSize: 11),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Cash Flow Statement',
+                      child: Text('Cash Flow Statement'),
+                    ),
+                  ],
+                  onChanged: null,
+                ),
+              ),
+              SizedBox(
+                width: 120,
+                child: DropdownButtonFormField<int>(
+                  value: _dialogCfPeriodCount,
+                  dropdownColor: const Color(0xFF1a2942),
+                  decoration: const InputDecoration(
+                    labelText: 'Periods',
+                    labelStyle: TextStyle(color: Colors.white54, fontSize: 11),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  items: [for (var n = 1; n <= 8; n++) DropdownMenuItem(value: n, child: Text('$n'))],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    _syncCfManualPeriodColumns(
+                      periodColumns: periodColumns,
+                      controllers: controllers,
+                      periodCount: v,
+                      frequency: _dialogCfFreq,
+                    );
+                    setLocalState(() {});
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 180,
+                child: DropdownButtonFormField<_ManualCfFrequency>(
+                  value: _dialogCfFreq,
+                  dropdownColor: const Color(0xFF1a2942),
+                  decoration: const InputDecoration(
+                    labelText: 'Frequency',
+                    labelStyle: TextStyle(color: Colors.white54, fontSize: 11),
+                    isDense: true,
+                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  items: const [
+                    DropdownMenuItem(
+                      value: _ManualCfFrequency.monthly,
+                      child: Text('Monthly'),
+                    ),
+                    DropdownMenuItem(
+                      value: _ManualCfFrequency.quarterly,
+                      child: Text('Quarterly'),
+                    ),
+                    DropdownMenuItem(
+                      value: _ManualCfFrequency.yearly,
+                      child: Text('Yearly'),
+                    ),
+                    DropdownMenuItem(
+                      value: _ManualCfFrequency.custom,
+                      child: Text('Custom'),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    _syncCfManualPeriodColumns(
+                      periodColumns: periodColumns,
+                      controllers: controllers,
+                      periodCount: _dialogCfPeriodCount,
+                      frequency: v,
+                    );
+                    setLocalState(() {});
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ] else if (type != 'bs') ...[
           Row(
             children: [
               TextButton.icon(
@@ -1693,6 +1902,9 @@ class TaxDocumentController extends GetxController {
         _dialogBsAsOf = _uploadBalanceSheetAsOf ?? DateTime.now();
         _dialogBsPeriodCount = 1;
         _dialogBsFreq = PdfViewType.yearly;
+      } else if (type == 'cf') {
+        _dialogCfPeriodCount = 1;
+        _dialogCfFreq = _ManualCfFrequency.yearly;
       }
       periodColumns = _initialManualPeriodColumns(type);
     }
@@ -1792,7 +2004,7 @@ class TaxDocumentController extends GetxController {
 
             if (fieldKey == 'assetPurchases' ||
                 fieldKey == 'investmentActivities') {
-              final investing = assetPurchases + investmentActivities;
+              final investing = (-assetPurchases.abs()) + investmentActivities;
               controllers['investingActivities']?.text =
                   _formatMoneyInput(investing);
             }
@@ -1800,7 +2012,7 @@ class TaxDocumentController extends GetxController {
                 fieldKey == 'ownerContributions' ||
                 fieldKey == 'distributions') {
               final financing =
-                  loanActivities + ownerContributions + distributions;
+                  loanActivities + ownerContributions - distributions.abs();
               controllers['financingActivities']?.text =
                   _formatMoneyInput(financing);
             }
@@ -1965,7 +2177,8 @@ class TaxDocumentController extends GetxController {
             ),
             actions: [
               TextButton(
-                onPressed: () => Get.back(),
+                onPressed: () =>
+                    Navigator.of(context, rootNavigator: true).pop(false),
                 child: const Text(
                   'Close',
                   style: TextStyle(color: Colors.white70),
@@ -1999,7 +2212,7 @@ class TaxDocumentController extends GetxController {
                   } else {
                   _applyControllersToExtractedData(type, controllers);
                   }
-                  Get.back(result: true);
+                  Navigator.of(context, rootNavigator: true).pop(true);
                 },
                 child: const Text(
                   'Confirm & Save',
@@ -2061,9 +2274,10 @@ class TaxDocumentController extends GetxController {
       return (v('currentAssets') + v('nonCurrentAssets')) -
           (v('currentLiabilities') + v('longTermLiabilities') + v('equity'));
     }
-    final investingByParts = v('assetPurchases') + v('investmentActivities');
+    final investingByParts =
+        (-v('assetPurchases').abs()) + v('investmentActivities');
     final financingByParts =
-        v('loanActivities') + v('ownerContributions') + v('distributions');
+        v('loanActivities') + v('ownerContributions') - v('distributions').abs();
     final hasInvestingBreakdown =
         v('assetPurchases') != 0 ||
         v('investmentActivities') != 0;
@@ -2300,9 +2514,10 @@ class TaxDocumentController extends GetxController {
         equity: eq,
       );
     } else {
-      final investingByParts = v('assetPurchases') + v('investmentActivities');
+      final investingByParts =
+          (-v('assetPurchases').abs()) + v('investmentActivities');
       final financingByParts =
-          v('loanActivities') + v('ownerContributions') + v('distributions');
+          v('loanActivities') + v('ownerContributions') - v('distributions').abs();
       final hasInvestingBreakdown =
           v('assetPurchases') != 0 || v('investmentActivities') != 0;
       final hasFinancingBreakdown =

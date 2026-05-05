@@ -34,6 +34,7 @@ class BalanceSheetTab extends StatefulWidget {
 class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderStateMixin {
   late DateTime _asOfDate;
   bool _didInitialControllerSync = false;
+  bool _isAsOfResyncInProgress = false;
 
   @override
   void initState() {
@@ -56,6 +57,13 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     final orgId = getCurrentOrganization?.id;
     if (orgId == null) return;
     final controller = Get.find<FinancialReportController>(tag: orgId.toString());
+    final DateTime? selectedEnd = controller.lastEndDate;
+    if (selectedEnd != null) {
+      _asOfDate = DateTime(selectedEnd.year, selectedEnd.month, selectedEnd.day);
+    }
+    if (controller.balanceSheetComparisonMode != 0) {
+      controller.setBalanceSheetComparisonMode(0);
+    }
     final needsFetch =
         !controller.lastFetchBalanceSheetSnapshot ||
         !_isSameDate(controller.lastEndDate, _asOfDate);
@@ -66,78 +74,101 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     );
   }
 
-  String _balanceSheetComparisonCaption(FinancialReportController c) {
-    switch (c.balanceSheetComparisonMode) {
-      case 0:
-        return 'vs 7 days earlier';
-      case 1:
-        return 'vs 30 days earlier';
-      case 2:
-        return 'vs 3 months earlier';
-      case 3:
-        return 'vs 12 months earlier';
-      default:
-        return 'vs 3 months earlier';
-    }
+  void _syncAsOfFromSelectedRange(FinancialReportController controller) {
+    if (_isAsOfResyncInProgress) return;
+    if (controller.lastFetchBalanceSheetSnapshot) return;
+    final DateTime? selectedEnd = controller.lastEndDate;
+    if (selectedEnd == null) return;
+    final asOf = DateTime(selectedEnd.year, selectedEnd.month, selectedEnd.day);
+    if (_isSameDate(asOf, _asOfDate)) return;
+    _isAsOfResyncInProgress = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _isAsOfResyncInProgress = false;
+        return;
+      }
+      setState(() => _asOfDate = asOf);
+      await controller.fetchAndAggregateData(
+        endDate: asOf,
+        balanceSheetAsOfSnapshot: true,
+      );
+      _isAsOfResyncInProgress = false;
+    });
   }
 
-  Widget _buildBalanceSheetComparisonChips(
+  static const String _balanceSheetComparisonCaption = 'vs previous month';
+
+  Future<void> _pickAsOfDate(
+    BuildContext context,
     FinancialReportController controller,
-    bool isDark,
-  ) {
-    Widget chip(String label, int mode) {
-      final selected = controller.balanceSheetComparisonMode == mode;
-      return Padding(
-        padding: const EdgeInsets.only(right: 6, bottom: 4),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: () => controller.setBalanceSheetComparisonMode(mode),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: selected
-                    ? orangeColor.withValues(alpha: 0.18)
-                    : (isDark ? Colors.white10 : Colors.grey.shade200),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: selected
-                      ? orangeColor
-                      : (isDark ? Colors.white24 : Colors.black12),
-                ),
-              ),
-              child: AppText(
-                label,
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: isDark ? Colors.white70 : Colors.black87,
-                disableFormat: true,
-              ),
+  ) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _asOfDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: ColorScheme.dark(
+              primary: orangeColor,
+              onPrimary: Colors.black,
+              surface: isDark ? const Color(0xFF0F1E37) : Colors.white,
+              onSurface: isDark ? Colors.white : Colors.black87,
             ),
+            scaffoldBackgroundColor: isDark ? const Color(0xFF0F1E37) : Colors.white,
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked == null) return;
+    final asOf = DateTime(picked.year, picked.month, picked.day);
+    if (_isSameDate(asOf, _asOfDate)) return;
+    setState(() => _asOfDate = asOf);
+    await controller.fetchAndAggregateData(
+      endDate: asOf,
+      balanceSheetAsOfSnapshot: true,
+    );
+  }
+
+  Widget _buildAsOfDateControl(FinancialReportController controller) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _pickAsOfDate(context, controller),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: isDark ? Colors.white12 : Colors.black12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppText(
+                'As Of Date',
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white38 : Colors.black45,
+              ),
+              const SizedBox(width: 10),
+              AppText(
+                DateFormat('MMM dd, yyyy').format(_asOfDate),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : Colors.black87,
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.calendar_today_outlined, size: 16, color: orangeColor),
+            ],
           ),
         ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        AppText(
-          'Compare % change only — snapshot totals stay on the As Of date',
-          fontSize: 11,
-          color: isDark ? Colors.white38 : Colors.black45,
-        ),
-        const SizedBox(height: 6),
-        Wrap(
-          children: [
-            chip('7 days', 0),
-            chip('30 days', 1),
-            chip('3 months', 2),
-            chip('12 months', 3),
-          ],
-        ),
-      ],
+      ),
     );
   }
 
@@ -1345,6 +1376,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
     return GetBuilder<FinancialReportController>(
       tag: getCurrentOrganization!.id.toString(),
       builder: (controller) {
+        _syncAsOfFromSelectedRange(controller);
         if (controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator(color: orangeColor));
         }
@@ -1381,7 +1413,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
         final roeValue = equityBase.abs() < 0.000001
             ? "N/A"
             : "${controller.returnOnEquity.toStringAsFixed(1)}%";
-        final compareCap = _balanceSheetComparisonCaption(controller);
+        final compareCap = _balanceSheetComparisonCaption;
 
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final screenWidth = MediaQuery.sizeOf(context).width;
@@ -1411,8 +1443,8 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                             fontSize: 12,
                             color: isDark ? Colors.white38 : Colors.black45,
                           ),
-                          const SizedBox(height: 8),
-                          _buildBalanceSheetComparisonChips(controller, isDark),
+                          const SizedBox(height: 12),
+                          _buildAsOfDateControl(controller),
                         ],
                       )
                     : Row(
@@ -1434,10 +1466,9 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
                                 fontSize: 12,
                                 color: isDark ? Colors.white38 : Colors.black45,
                               ),
-                              const SizedBox(height: 8),
-                              _buildBalanceSheetComparisonChips(controller, isDark),
                             ],
                           ),
+                          _buildAsOfDateControl(controller),
                         ],
                       ),
                 const SizedBox(height: 24),
@@ -2890,7 +2921,7 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
 
   String _formatCurrency(double value) {
     final formatted = NumberFormat("#,##0.00").format(value.abs());
-    return value < 0 ? '-\$$formatted' : '\$$formatted';
+    return value < 0 ? '(\$$formatted)' : '\$$formatted';
   }
 }
 

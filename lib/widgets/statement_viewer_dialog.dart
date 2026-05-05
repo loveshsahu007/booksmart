@@ -134,7 +134,7 @@ class StatementViewerCard extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: () => Get.back(),
+            onPressed: () => Navigator.of(context, rootNavigator: true).maybePop(),
             icon: const Icon(Icons.close, color: Colors.white70),
           ),
         ],
@@ -388,7 +388,7 @@ class StatementViewerCard extends StatelessWidget {
                 : (isMajor ? Colors.black : Colors.black54),
           ),
           AppText(
-            fmtCurrency(value.abs()),
+            fmtCurrency(value),
             fontSize: isMajor ? 15 : 14,
             fontWeight: isMajor || isTotal ? FontWeight.w900 : FontWeight.w500,
             color:

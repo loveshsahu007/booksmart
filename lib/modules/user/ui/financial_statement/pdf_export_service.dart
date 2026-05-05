@@ -695,7 +695,7 @@ class PdfExportService {
         ),
         format: i == 0
             ? pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.left)
-            : pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.center),
+            : pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
       );
     }
     grid.style = pdf_gen.PdfGridStyle(
@@ -906,7 +906,7 @@ class PdfExportService {
           final v = row.values[i];
           dataRow.cells[1 + (i * 2)].value = '\$';
           dataRow.cells[1 + (i * 2)].style = pdf_gen.PdfGridCellStyle(
-            format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.center),
+            format: pdf_gen.PdfStringFormat(alignment: pdf_gen.PdfTextAlignment.right),
             borders: pdf_gen.PdfBorders(
               bottom: pdf_gen.PdfPens.transparent,
               left: pdf_gen.PdfPens.transparent,
@@ -915,15 +915,13 @@ class PdfExportService {
             ),
           );
           dataRow.cells[2 + (i * 2)].value = amountOnly(v);
-          if (singlePeriod) {
-            dataRow.cells[2 + (i * 2)].value = '  ${amountOnly(v)}';
-          }
           dataRow.cells[2 + (i * 2)].style = pdf_gen.PdfGridCellStyle(
             format: pdf_gen.PdfStringFormat(
-              alignment: singlePeriod
-                  ? pdf_gen.PdfTextAlignment.left
-                  : pdf_gen.PdfTextAlignment.right,
+              alignment: pdf_gen.PdfTextAlignment.right,
             ),
+            textBrush: v < 0
+                ? pdf_gen.PdfSolidBrush(pdf_gen.PdfColor(190, 65, 65))
+                : null,
             borders: pdf_gen.PdfBorders(
               bottom: pdf_gen.PdfPens.transparent,
               left: pdf_gen.PdfPens.transparent,
@@ -950,6 +948,21 @@ class PdfExportService {
               ? pdf_gen.PdfSolidBrush(totalHighlight)
               : null,
         );
+
+        if (row.isTotal) {
+          final spacerRow = grid.rows.add();
+          spacerRow.cells[0].value = ' ';
+          spacerRow.cells[0].columnSpan = colCount;
+          spacerRow.height = 5;
+          spacerRow.cells[0].style = pdf_gen.PdfGridCellStyle(
+            borders: pdf_gen.PdfBorders(
+              bottom: pdf_gen.PdfPens.transparent,
+              left: pdf_gen.PdfPens.transparent,
+              right: pdf_gen.PdfPens.transparent,
+              top: pdf_gen.PdfPens.transparent,
+            ),
+          );
+        }
       }
     }
 
@@ -1381,7 +1394,7 @@ class PdfExportService {
   String _money(double value) {
     if (value.abs() < 0.000001) return '\$ -';
     final core = NumberFormat('#,##0.00').format(value.abs());
-    return value < 0 ? '\$($core)' : '\$$core';
+    return value < 0 ? '(\$$core)' : '\$$core';
   }
 
   String _moneyAmountOnly(double value) {

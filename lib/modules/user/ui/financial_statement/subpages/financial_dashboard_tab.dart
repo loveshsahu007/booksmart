@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:booksmart/constant/exports.dart';
 import 'package:get/get.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
@@ -6,7 +8,7 @@ import 'package:booksmart/modules/user/controllers/organization_controller.dart'
 import 'package:booksmart/modules/user/controllers/financial_report_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:booksmart/modules/user/utils/plaid_connect_utils.dart';
+import 'package:booksmart/modules/user/ui/bank/bank_list_screen.dart';
 import 'package:syncfusion_flutter_datepicker/datepicker.dart';
 
 import '../financial_statement.dart';
@@ -22,6 +24,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
   /// 0: 7d, 1: 30d, 2: 3mo, 3: 12mo, 4: Yearly, 5: Custom — mirrors Profit & Loss filters.
   int _dashFilterIdx = 2;
   int? _dashSelectedYear;
+  bool _didSyncFilterWithController = false;
 
   static const Color _bg = Color(0xFF020E2C);
   static const Color _cardStart = Color(0xFF071F4A);
@@ -34,6 +37,12 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
   static const Color _red = Color(0xFFFF6A6A);
   static const Color _yellow = Color(0xFFFFC52C);
 
+  static String _money(double value, {int decimals = 2}) {
+    final fmt = NumberFormat.currency(symbol: '\$', decimalDigits: decimals);
+    final core = fmt.format(value.abs()).replaceFirst('\$', '');
+    return value < 0 ? '(\$$core)' : '\$$core';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -41,6 +50,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
       child: GetBuilder<FinancialReportController>(
         tag: getCurrentOrganization!.id.toString(),
         builder: (controller) {
+          _syncFilterFromControllerRange(controller);
           if (controller.isLoading.value) {
             return const Center(child: CircularProgressIndicator());
           }
@@ -131,18 +141,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Spacer(),
-                        Flexible(
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: _dashboardTimeFilter(controller),
-                          ),
-                        ),
-                      ],
-                    ),
+                    _dashboardHeader(controller),
                     const SizedBox(height: 12),
                     _topBand(
                       score: healthScore,
@@ -178,6 +177,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                       cashOut: cashOut, pCashOut: pCashOut,
                       netCashChange: netCashChange,
                       taxDeduction: controller.totalTaxDeductions.value,
+                      aiInsights: controller.aiInsights,
                     ),
                     const SizedBox(height: 12),
                     if (isDesktop)
@@ -234,7 +234,6 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required double cashFlow,
     required double pCashFlow,
   }) {
-    final money = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
     return SizedBox(
       height: 224,
       child: Row(
@@ -245,7 +244,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
           Expanded(
             child: _metricCard(
               title: 'Net Income (Profit)',
-              value: money.format(netIncome),
+              value: _money(netIncome),
               deltaPct: _pctChange(netIncome, pNetIncome),
               valueIsNegative: netIncome < 0,
             ),
@@ -254,7 +253,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
           Expanded(
             child: _metricCard(
               title: 'Total Assets',
-              value: money.format(assets),
+              value: _money(assets),
               deltaPct: _pctChange(assets, pAssets),
               valueIsNegative: assets < 0,
             ),
@@ -263,7 +262,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
           Expanded(
             child: _metricCard(
               title: 'Cash Flow (Net Cash)',
-              value: money.format(cashFlow),
+              value: _money(cashFlow),
               deltaPct: _pctChange(cashFlow, pCashFlow),
               valueIsNegative: cashFlow < 0,
             ),
@@ -274,11 +273,13 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
   }
 
   Widget _healthCard(double score) {
-    final status = score <= 40
-        ? 'Weak'
-        : score <= 70
-            ? 'Moderate'
-            : 'Good';
+    final status = score >= 81
+        ? 'Excellent'
+        : score >= 61
+            ? 'Good'
+            : score >= 41
+                ? 'Fair'
+                : 'Weak';
     final statusColor = score >= 60
         ? _green
         : score >= 40
@@ -346,8 +347,9 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required double? deltaPct,
     required bool valueIsNegative,
   }) {
+    final isFlat = deltaPct == null || deltaPct.abs() < 0.0001;
     final positive = (deltaPct ?? 0) >= 0;
-    final deltaColor = positive ? _green : _red;
+    final deltaColor = isFlat ? _muted : (positive ? _green : _red);
     return _glassCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(
@@ -387,16 +389,10 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                     color: deltaColor.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(6),
                   ),
-                  child: AppText(
-                    _formatDelta(deltaPct),
-                    fontSize: 10,
-                    color: deltaColor,
-                    fontWeight: FontWeight.w700,
-                    disableFormat: true,
-                  ),
+                  child: _deltaBadge(deltaPct, deltaColor),
                 ),
                 const AppText(
-                  'vs previous 3 months',
+                  'vs previous period',
                   fontSize: 10,
                   color: _muted,
                   disableFormat: true,
@@ -423,6 +419,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required double cashOut, required double pCashOut,
     required double netCashChange,
     required double taxDeduction,
+    required List<String> aiInsights,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -447,7 +444,12 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
             cashOut: cashOut, pCashOut: pCashOut,
             netCashChange: netCashChange,
           ),
-          _aiDeductionCard(taxDeduction: taxDeduction, income: income, expenses: expenses),
+          _aiDeductionCard(
+            taxDeduction: taxDeduction,
+            income: income,
+            expenses: expenses,
+            aiInsights: aiInsights,
+          ),
         ];
         if (!compact) {
           return IntrinsicHeight(
@@ -500,7 +502,6 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required double expenses, required double pExpenses,
     required double netIncome, required double pNetIncome,
   }) {
-    final money = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
     final marginCur = income <= 0 ? 0.0 : (netIncome / income) * 100;
     final marginPrev = pIncome <= 0 ? 0.0 : (pNetIncome / pIncome) * 100;
     return _glassCard(
@@ -512,9 +513,9 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
           const AppText('Profit & Loss Overview', fontSize: 13, color: _title, fontWeight: FontWeight.w600),
           AppText(dateRange, fontSize: 10, color: _muted),
           const SizedBox(height: 8),
-          _overviewLine('Income', money.format(income), _pctChange(income, pIncome), positiveIsGood: true),
-          _overviewLine('Expenses', money.format(expenses), _pctChange(expenses, pExpenses), positiveIsGood: false),
-          _overviewLine('Gross Profit', money.format(netIncome), _pctChange(netIncome, pNetIncome), positiveIsGood: true),
+          _overviewLine('Income', _money(income), _pctChange(income, pIncome), positiveIsGood: true),
+          _overviewLine('Expenses', _money(expenses), _pctChange(expenses, pExpenses), positiveIsGood: false),
+          _overviewLine('Net Income', _money(netIncome), _pctChange(netIncome, pNetIncome), positiveIsGood: true),
           _overviewLine('% Margin', '${marginCur.toStringAsFixed(1)}%', _absDiff(marginCur, marginPrev), positiveIsGood: true, isPctPoint: true),
           const SizedBox(height: 4),
           _viewLink('View Profit & Loss', () => _goToTab(2)),
@@ -530,7 +531,6 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required double equity, required double pEquity,
     required double debtToEquity, required double pDebtToEquity,
   }) {
-    final money = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
     return _glassCard(
       padding: const EdgeInsets.all(14),
       child: Column(
@@ -544,9 +544,9 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
             color: _muted,
           ),
           const SizedBox(height: 8),
-          _overviewLine('Total Assets', money.format(assets), _pctChange(assets, pAssets), positiveIsGood: true),
-          _overviewLine('Total Liabilities', money.format(liabilities), _pctChange(liabilities, pLiabilities), positiveIsGood: false),
-          _overviewLine('Equity', money.format(equity), _pctChange(equity, pEquity), positiveIsGood: true),
+          _overviewLine('Total Assets', _money(assets), _pctChange(assets, pAssets), positiveIsGood: true),
+          _overviewLine('Total Liabilities', _money(liabilities), _pctChange(liabilities, pLiabilities), positiveIsGood: false),
+          _overviewLine('Equity', _money(equity), _pctChange(equity, pEquity), positiveIsGood: true),
           _overviewLine(
             'Debt-to-Equity',
             equity.abs() < 0.0001 ? 'N/A' : debtToEquity.toStringAsFixed(2),
@@ -566,7 +566,6 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required double cashOut, required double pCashOut,
     required double netCashChange,
   }) {
-    final money = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
     final pNetCash = pCashIn - pCashOut;
     return _glassCard(
       padding: const EdgeInsets.all(14),
@@ -577,9 +576,9 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
           const AppText('Cash Flow Overview', fontSize: 13, color: _title, fontWeight: FontWeight.w600),
           AppText(dateRange, fontSize: 10, color: _muted),
           const SizedBox(height: 8),
-          _overviewLine('Money In', money.format(cashIn), _pctChange(cashIn, pCashIn), positiveIsGood: true),
-          _overviewLine('Money Out', money.format(cashOut), _pctChange(cashOut, pCashOut), positiveIsGood: false),
-          _overviewLine('Net Cash', money.format(netCashChange), _pctChange(netCashChange, pNetCash), positiveIsGood: true),
+          _overviewLine('Money In', _money(cashIn), _pctChange(cashIn, pCashIn), positiveIsGood: true),
+          _overviewLine('Money Out', _money(cashOut), _pctChange(cashOut, pCashOut), positiveIsGood: false),
+          _overviewLine('Net Cash', _money(netCashChange), _pctChange(netCashChange, pNetCash), positiveIsGood: true),
           _overviewLineText('Cash Flow Trend', netCashChange >= 0 ? 'Positive' : 'Negative', positive: netCashChange >= 0),
           const SizedBox(height: 4),
           _viewLink('View Cash Flow', () => _goToTab(4)),
@@ -592,6 +591,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required double taxDeduction,
     required double income,
     required double expenses,
+    List<String> aiInsights = const <String>[],
   }) {
     final base = expenses > 0 ? expenses : income;
     final optimizationPct = base <= 0
@@ -689,8 +689,18 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
             color: _muted,
             textAlign: TextAlign.center,
           ),
+          if (aiInsights.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            AppText(
+              aiInsights.first,
+              fontSize: 9,
+              color: _muted,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+            ),
+          ],
           const SizedBox(height: 4),
-          _viewLink('View AI Strategy', () => Get.toNamed(Routes.aiStrategy)),
+          _viewLink('View AI Activity', () => Get.toNamed(Routes.aiChat)),
         ],
       ),
     );
@@ -706,9 +716,6 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     final isFlat = deltaPct == null || deltaPct.abs() < 0.0001;
     final up = (deltaPct ?? 0) > 0;
     final color = isFlat ? _muted : (up == positiveIsGood ? _green : _red);
-    final deltaText = isPctPoint
-        ? _formatPctPoint(deltaPct)
-        : _formatDelta(deltaPct);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -745,13 +752,10 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                   color: color.withValues(alpha: isFlat ? 0.12 : 0.2),
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: AppText(
-                  deltaText,
-                  fontSize: 9,
-                  color: color,
-                  fontWeight: FontWeight.w700,
-                  textAlign: TextAlign.center,
-                  disableFormat: true,
+                child: _deltaBadge(
+                  deltaPct,
+                  color,
+                  isPctPoint: isPctPoint,
                 ),
               ),
             ),
@@ -783,7 +787,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
             ),
           ),
           const SizedBox(width: 6),
-          const SizedBox(width: 56),
+          const SizedBox(width: 64),
         ],
       ),
     );
@@ -806,6 +810,94 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     if (Get.isRegistered<FinincialTabController>()) {
       Get.find<FinincialTabController>().changeTab(idx);
     }
+  }
+
+  Widget _dashboardHeader(FinancialReportController controller) {
+    final rangeText = _formatRange(controller.lastStartDate, controller.lastEndDate);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth <= 1024;
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const AppText(
+                'Financial Dashboard',
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                color: _text,
+              ),
+              if (rangeText.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                AppText(rangeText, fontSize: 12, color: _muted),
+              ],
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: _dashboardTimeFilter(controller),
+              ),
+            ],
+          );
+        }
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const AppText(
+                  'Financial Dashboard',
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: _text,
+                ),
+                if (rangeText.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  AppText(rangeText, fontSize: 12, color: _muted),
+                ],
+              ],
+            ),
+            _dashboardTimeFilter(controller),
+          ],
+        );
+      },
+    );
+  }
+
+  void _syncFilterFromControllerRange(FinancialReportController controller) {
+    if (_didSyncFilterWithController) return;
+    final start = controller.lastStartDate;
+    final end = controller.lastEndDate;
+    if (start == null || end == null) return;
+    final normalizedStart = DateTime(start.year, start.month, start.day);
+    final normalizedEnd = DateTime(end.year, end.month, end.day);
+    final days = normalizedEnd.difference(normalizedStart).inDays + 1;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    _didSyncFilterWithController = true;
+    if (normalizedStart == DateTime(normalizedEnd.year, 1, 1)) {
+      _dashFilterIdx = 4;
+      _dashSelectedYear = normalizedEnd.year;
+      return;
+    }
+    if (normalizedEnd == today && days == 7) {
+      _dashFilterIdx = 0;
+      return;
+    }
+    if (normalizedEnd == today && days == 30) {
+      _dashFilterIdx = 1;
+      return;
+    }
+    if (normalizedEnd == today && days == 90) {
+      _dashFilterIdx = 2;
+      return;
+    }
+    if (normalizedEnd == today && days == 365) {
+      _dashFilterIdx = 3;
+      return;
+    }
+    _dashFilterIdx = 5;
   }
 
   Future<void> _dashboardUpdateFilter(
@@ -1038,17 +1130,15 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
   static String _formatDelta(double? pct) {
     if (pct == null) return '— —';
     if (pct.abs() < 0.0001) return '0.0%';
-    final positive = pct >= 0;
     final abs = pct.abs();
     final shown = abs >= 1000 ? '999+' : abs.toStringAsFixed(1);
-    return '${positive ? '↑' : '↓'} $shown%';
+    return '$shown%';
   }
 
   static String _formatPctPoint(double? pp) {
     if (pp == null) return '— —';
-    final positive = pp >= 0;
     final abs = pp.abs().toStringAsFixed(1);
-    return '${positive ? '↑' : '↓'} ${abs}pp';
+    return '${abs}pp';
   }
 
   static String _formatRange(DateTime? start, DateTime? end) {
@@ -1065,11 +1155,12 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required List<double> profit,
     required List<String> xLabels,
   }) {
-    final data = [revenue, expense, netCash, profit].expand((e) => e).toList();
+    final data = [revenue, expense, netCash, profit].expand((e) => e).where((v) => v.isFinite).toList();
     final minY = data.isEmpty ? -10.0 : data.reduce((a, b) => a < b ? a : b);
     final maxY = data.isEmpty ? 10.0 : data.reduce((a, b) => a > b ? a : b);
     final span = (maxY - minY).abs();
-    final pad = span < 1e-6 ? 8.0 : span * 0.12;
+    final absoluteMax = data.isEmpty ? 10.0 : data.map((e) => e.abs()).reduce((a, b) => a > b ? a : b);
+    final pad = span < 1e-6 ? (absoluteMax == 0 ? 100.0 : absoluteMax * 0.2).clamp(10.0, 500000000.0) : span * 0.12;
     final n = revenue.length;
     final compactX = n > 8;
 
@@ -1102,7 +1193,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                         barTouchData: const BarTouchData(enabled: false),
                         gridData: FlGridData(
                           show: true,
-                          horizontalInterval: (span < 1e-6 ? 1.0 : span / 4).clamp(1, 100000000).toDouble(),
+                          horizontalInterval: _axisInterval(minY - pad, maxY + pad),
                           drawVerticalLine: false,
                           getDrawingHorizontalLine: (_) =>
                               const FlLine(color: Color(0xFF173761), strokeWidth: 1),
@@ -1114,12 +1205,10 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                           leftTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
-                              interval: (span < 1e-6 ? 1.0 : span / 3).clamp(1, 100000000).toDouble(),
+                              interval: _axisInterval(minY - pad, maxY + pad),
                               reservedSize: leftAxis,
                               getTitlesWidget: (value, _) => AppText(
-                                value >= 0
-                                    ? '\$${(value / 1000).toStringAsFixed(0)}K'
-                                    : '-\$${((-value) / 1000).toStringAsFixed(0)}K',
+                                _formatAxisMoney(value),
                                 fontSize: 10,
                                 color: _muted,
                               ),
@@ -1226,7 +1315,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                                 final cash = idx < netCash.length ? netCash[idx] : 0.0;
                                 final prof = idx < profit.length ? profit[idx] : 0.0;
                                 final dateText = idx < xLabels.length ? xLabels[idx] : '';
-                                final money = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
+                                String money(double v) => _money(v);
                                 return LineTooltipItem(
                                   '',
                                   const TextStyle(height: 1.3),
@@ -1240,7 +1329,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                                       ),
                                     ),
                                     TextSpan(
-                                      text: 'Revenue: ${money.format(rev)}\n',
+                                      text: 'Revenue: ${money(rev)}\n',
                                       style: const TextStyle(
                                         color: Color(0xFF19C37D),
                                         fontWeight: FontWeight.w800,
@@ -1248,7 +1337,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                                       ),
                                     ),
                                     TextSpan(
-                                      text: 'Expenses: ${money.format(exp)}\n',
+                                      text: 'Expenses: ${money(exp)}\n',
                                       style: const TextStyle(
                                         color: Color(0xFF2B7FFF),
                                         fontWeight: FontWeight.w800,
@@ -1256,7 +1345,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                                       ),
                                     ),
                                     TextSpan(
-                                      text: 'Net Cash: ${money.format(cash)}\n',
+                                      text: 'Net Cash: ${money(cash)}\n',
                                       style: const TextStyle(
                                         color: Color(0xFFFFC52C),
                                         fontWeight: FontWeight.w900,
@@ -1264,7 +1353,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
                                       ),
                                     ),
                                     TextSpan(
-                                      text: 'Profit: ${money.format(prof)}',
+                                      text: 'Profit: ${money(prof)}',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w900,
@@ -1337,20 +1426,19 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required double netCashChange,
     required double taxDeduction,
   }) {
-    final money = NumberFormat.currency(symbol: '\$', decimalDigits: 2);
     final niPct = _pctChange(netIncome, pNetIncome);
     final eqPct = _pctChange(equity, pEquity);
     final overspend = expenses - income;
     final insights = <String>[
-      'Net income is ${money.format(netIncome)}',
+      'Net income is ${_money(netIncome)}',
       if (overspend > 0)
-        'Expenses exceeded income by ${money.format(overspend)}'
+        'Expenses exceeded income by ${_money(overspend)}'
       else
-        'Income exceeded expenses by ${money.format(-overspend)}',
+        'Income exceeded expenses by ${_money(-overspend)}',
       eqPct == null
           ? 'Equity remains stable'
           : 'Equity ${eqPct >= 0 ? 'increased' : 'decreased'} ${eqPct.abs().toStringAsFixed(1)}%',
-      '${netCashChange >= 0 ? 'Positive' : 'Negative'} cash flow of ${money.format(netCashChange)}',
+      '${netCashChange >= 0 ? 'Positive' : 'Negative'} cash flow of ${_money(netCashChange)}',
       if (taxDeduction > 0)
         'You have ${NumberFormat.currency(symbol: '\$', decimalDigits: 0).format(taxDeduction)} in potential deductions',
       if (niPct != null)
@@ -1482,11 +1570,11 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
               await launchUrl(Uri.parse('https://www.dnb.com'), mode: LaunchMode.externalApplication);
             },
           ),
-          _actionTile(title: 'Reports', onTap: () => _goToTab(2)),
+          _actionTile(title: 'Reports', onTap: () => Get.toNamed(Routes.tax)),
           _actionTile(
             title: 'Accounts',
-            onTap: () async {
-              await hanldePlaidBankConnection();
+            onTap: () {
+              Get.to(() => const BanksListScreen());
             },
           ),
         ];
@@ -1768,10 +1856,12 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     required double debtToEquity,
   }) {
     String primary;
-    if (score <= 40) {
+    if (score < 41) {
       primary = 'Your business is under financial pressure.';
-    } else if (score <= 70) {
+    } else if (score < 61) {
       primary = 'Your business is stable but has areas to improve.';
+    } else if (score < 81) {
+      primary = 'Your business is performing well with room to optimize.';
     } else {
       primary = 'Your business is in strong financial condition.';
     }
@@ -1799,6 +1889,58 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
     final reason = drivers.take(2).join(' and ');
     final support = reason.isEmpty ? trendLine : '$reason. $trendLine';
     return (primary, support);
+  }
+
+  Widget _deltaBadge(double? deltaPct, Color color, {bool isPctPoint = false}) {
+    final isFlat = deltaPct == null || deltaPct.abs() < 0.0001;
+    final positive = (deltaPct ?? 0) >= 0;
+    final text = isPctPoint ? _formatPctPoint(deltaPct) : _formatDelta(deltaPct);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!isFlat) ...[
+          Icon(
+            positive ? Icons.arrow_upward : Icons.arrow_downward,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 2),
+        ],
+        AppText(
+          text,
+          fontSize: 9,
+          color: color,
+          fontWeight: FontWeight.w700,
+          textAlign: TextAlign.center,
+          disableFormat: true,
+        ),
+      ],
+    );
+  }
+
+  String _formatAxisMoney(double value) {
+    final abs = value.abs();
+    if (abs >= 1000000) {
+      final unit = (abs / 1000000).toStringAsFixed(abs >= 10000000 ? 0 : 1);
+      return value >= 0 ? '\$${unit}M' : '-\$${unit}M';
+    }
+    if (abs >= 1000) {
+      final unit = (abs / 1000).toStringAsFixed(abs >= 100000 ? 0 : 1);
+      return value >= 0 ? '\$${unit}K' : '-\$${unit}K';
+    }
+    final whole = abs.toStringAsFixed(0);
+    return value >= 0 ? '\$$whole' : '-\$$whole';
+  }
+
+  double _axisInterval(double minY, double maxY) {
+    final span = (maxY - minY).abs();
+    if (span <= 0) return 1;
+    final rough = span / 4;
+    final exp = (log(rough) / ln10).floor();
+    final base = pow(10, exp).toDouble();
+    final f = rough / base;
+    final nice = f <= 1 ? 1 : (f <= 2 ? 2 : (f <= 5 ? 5 : 10));
+    return (nice * base).clamp(1, 1000000000).toDouble();
   }
 }
 
