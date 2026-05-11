@@ -2830,34 +2830,50 @@ class _CashFlowTabState extends State<CashFlowTab>
     );
   }
 
-  double _cfTrendMinY(List<Map<String, dynamic>> series) {
+  /// Raw Y extents (before [_niceAxisStep]) for the cash flow trend chart. When
+  /// comparing prior period, prior buckets' net must be included or the dashed
+  /// line maps outside the chart (curves can still overshoot slightly — clip the stack).
+  ({double minYRaw, double maxYRaw}) _cfTrendChartRawYBounds(
+    List<Map<String, dynamic>> effectiveSeries,
+    List<Map<String, dynamic>> prevSeries,
+    int n,
+  ) {
     double minVal = 0;
-    for (final d in series) {
+    double maxVal = 0;
+    for (final d in effectiveSeries) {
       final inc = (d['income'] as num?)?.toDouble() ?? 0;
       final exp = (d['expense'] as num?)?.toDouble() ?? 0;
       final net = (d['net'] as num?)?.toDouble() ?? 0;
       if (_showMoneyIn && inc < minVal) minVal = inc;
       if (_showMoneyOut && exp < minVal) minVal = exp;
       if (_showNetCash && net < minVal) minVal = net;
-    }
-    if (minVal == 0) return 0;
-    final interval = minVal.abs() > 50000 ? 10000.0 : 5000.0;
-    return (minVal / interval).floor() * interval;
-  }
-
-  double _cfTrendMaxY(List<Map<String, dynamic>> series) {
-    double maxVal = 0;
-    for (final d in series) {
-      final inc = (d['income'] as num?)?.toDouble() ?? 0;
-      final exp = (d['expense'] as num?)?.toDouble() ?? 0;
-      final net = (d['net'] as num?)?.toDouble() ?? 0;
       if (_showMoneyIn && inc > maxVal) maxVal = inc;
       if (_showMoneyOut && exp > maxVal) maxVal = exp;
       if (_showNetCash && net > maxVal) maxVal = net;
     }
-    if (maxVal == 0) return 10000;
-    final interval = maxVal > 50000 ? 10000.0 : 5000.0;
-    return (maxVal / interval).ceil() * interval;
+    if (_comparePriorPeriod && prevSeries.isNotEmpty) {
+      final limit = prevSeries.length < n ? prevSeries.length : n;
+      for (var i = 0; i < limit; i++) {
+        final net = (prevSeries[i]['net'] as num?)?.toDouble() ?? 0;
+        if (net < minVal) minVal = net;
+        if (net > maxVal) maxVal = net;
+      }
+    }
+    final double minYRaw;
+    if (minVal == 0) {
+      minYRaw = 0;
+    } else {
+      final interval = minVal.abs() > 50000 ? 10000.0 : 5000.0;
+      minYRaw = (minVal / interval).floor() * interval;
+    }
+    final double maxYRaw;
+    if (maxVal == 0) {
+      maxYRaw = 10000;
+    } else {
+      final interval = maxVal > 50000 ? 10000.0 : 5000.0;
+      maxYRaw = (maxVal / interval).ceil() * interval;
+    }
+    return (minYRaw: minYRaw, maxYRaw: maxYRaw);
   }
 
   /// Same as fl_chart [BarChartAlignment.spaceAround] group centers (uniform group width).
@@ -2933,15 +2949,16 @@ class _CashFlowTabState extends State<CashFlowTab>
             .toList();
         const leftAxis = 50.0;
         final usableW = (constraints.maxWidth - leftAxis).clamp(1.0, double.infinity);
-        final minYRaw = _cfTrendMinY(effectiveSeries);
-        final maxYRaw = _cfTrendMaxY(effectiveSeries);
+        final n = effectiveSeries.length;
+        final prev = controller.prevTrendChartSeries;
+        final rawY = _cfTrendChartRawYBounds(effectiveSeries, prev, n);
+        final minYRaw = rawY.minYRaw;
+        final maxYRaw = rawY.maxYRaw;
         final span = (maxYRaw - minYRaw).abs();
         final step = _niceAxisStep(span == 0 ? 1000 : span);
         final minY = (minYRaw / step).floorToDouble() * step;
         final maxY = (maxYRaw / step).ceilToDouble() * step;
-        final n = effectiveSeries.length;
         final bool compactXAxis = n > 6;
-        final prev = controller.prevTrendChartSeries;
         final compareLen = prev.length < n ? prev.length : n;
         final groupW = _cfTrendGroupWidth(n);
         final centers = _cfBarGroupCenterXsSpaceAround(usableW, n, groupW);
@@ -2959,6 +2976,7 @@ class _CashFlowTabState extends State<CashFlowTab>
                 return FlSpot(xn, includeUnrealized ? projectedNet : net);
               }),
               isCurved: true,
+              preventCurveOverShooting: true,
               curveSmoothness: 0.35,
               color: netColor,
               barWidth: 1.5,
@@ -2972,6 +2990,12 @@ class _CashFlowTabState extends State<CashFlowTab>
                   strokeWidth: 1,
                   strokeColor: Colors.white70,
                 ),
+              ),
+              belowBarData: BarAreaData(
+                show: true,
+                applyCutOffY: true,
+                cutOffY: 0,
+                color: const Color(0xFF19C37D).withValues(alpha: 0.22),
               ),
               aboveBarData: BarAreaData(
                 show: true,
@@ -3002,10 +3026,12 @@ class _CashFlowTabState extends State<CashFlowTab>
 
         final tooltipEnabled = _showNetCash && lineBars.isNotEmpty;
 
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            BarChart(
+        return ClipRect(
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
+            fit: StackFit.expand,
+            children: [
+              BarChart(
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
                 maxY: maxY,
@@ -3241,7 +3267,8 @@ class _CashFlowTabState extends State<CashFlowTab>
                     : lineBars,
               ),
             ),
-          ],
+            ],
+          ),
         );
       },
     );

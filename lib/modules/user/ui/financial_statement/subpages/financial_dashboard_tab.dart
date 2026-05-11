@@ -1475,7 +1475,12 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: AppText(insights[i], fontSize: 11, color: _text, fontWeight: FontWeight.w600),
+                        child: AppText(
+                          insights[i],
+                          fontSize: 11,
+                          color: _title,
+                          fontWeight: FontWeight.w400,
+                        ),
                       ),
                     ],
                   ),
