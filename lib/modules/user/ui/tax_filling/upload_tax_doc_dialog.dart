@@ -19,28 +19,24 @@ const List<String> kFinancialStatementCategories = [
 ];
 
 void showUploadTaxDocumentDialog({String? type}) {
-  Get.generalDialog(
-    pageBuilder: (context, animation, secondaryAnimation) {
-      return Align(
-        alignment: Alignment.center,
-        child: Container(
-          margin: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(8),
-            color: Get.isDarkMode
-                ? Get.theme.colorScheme.surface
-                : Colors.white,
-          ),
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: Material(
-            color: Colors.transparent,
-            child: UploadTaxDocWidget(type: type),
-          ),
+  // Use Get.dialog (same overlay stack as review + reconciliation Get.dialog).
+  // Get.generalDialog + nested Get.dialog often breaks Get.back / leaves taps blocked on web.
+  Get.dialog<void>(
+    Dialog(
+      insetPadding: const EdgeInsets.all(20),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      backgroundColor: Get.isDarkMode
+          ? Get.theme.colorScheme.surface
+          : Colors.white,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 480),
+        child: Material(
+          color: Colors.transparent,
+          child: UploadTaxDocWidget(type: type),
         ),
-      );
-    },
+      ),
+    ),
     barrierDismissible: true,
-    barrierLabel: 'showUploadTaxDocumentDialog_${type ?? 'general'}',
   );
 }
 
@@ -55,6 +51,18 @@ class UploadTaxDocWidget extends StatefulWidget {
 
 class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
   static final _dateFmt = DateFormat.yMMMd();
+
+  void _closeDropdownOverlays() {
+    categoryDropdownKey.currentState?.closeDropDownSearch();
+    yearDropdownKey.currentState?.closeDropDownSearch();
+  }
+
+  void _popUploadDialog() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _closeDropdownOverlays();
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).maybePop();
+  }
 
   String get _dialogTitle {
     final t = widget.type?.toLowerCase();
@@ -168,7 +176,7 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
           _isBalanceSheetUpload ? balanceSheetAsOf : null,
     );
     if (fileUrl != null) {
-      Get.back();
+      _popUploadDialog();
       if (!_ctrl.consumeSuppressUploadSuccessSnack()) {
         showSnackBar('Document Uploaded Successfully');
       }
@@ -396,7 +404,8 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
                         "Close",
                         onPressed: () {
                           ctrl.pickedFile = null;
-                          Get.back();
+                          ctrl.update();
+                          _popUploadDialog();
                         },
                       ),
                     ),
@@ -435,6 +444,8 @@ class _UploadTaxDocWidgetState extends State<UploadTaxDocWidget> {
     BuildContext context,
     TaxDocumentController ctrl,
   ) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    _closeDropdownOverlays();
     if (selectedCategory == null || selectedCategory!.isEmpty) {
       showSnackBar('Please select a document category', isError: true);
       return;

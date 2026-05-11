@@ -35,7 +35,11 @@ class CashFlowTab extends StatefulWidget {
   State<CashFlowTab> createState() => _CashFlowTabState();
 }
 
-class _CashFlowTabState extends State<CashFlowTab> {
+class _CashFlowTabState extends State<CashFlowTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final CashFlowManualEntryService _manualEntryService =
       CashFlowManualEntryService();
   DateTime asOfDate = DateTime.now();
@@ -1622,6 +1626,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     const moneyInColor = Color(0xFF19C37D);
     const moneyOutColor = Color(0xFF2B7FFF);
@@ -1635,7 +1640,7 @@ class _CashFlowTabState extends State<CashFlowTab> {
     return GetBuilder<FinancialReportController>(
         tag: getCurrentOrganization!.id.toString(),
         builder: (controller) {
-          if (controller.isLoading.value) {
+          if (controller.isLoading.value && !controller.hasPresentedFinancialData) {
             return const Center(child: CircularProgressIndicator());
           }
 

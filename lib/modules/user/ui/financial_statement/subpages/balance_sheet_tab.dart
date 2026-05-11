@@ -31,7 +31,11 @@ class BalanceSheetTab extends StatefulWidget {
   State<BalanceSheetTab> createState() => _BalanceSheetTabState();
 }
 
-class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderStateMixin {
+class _BalanceSheetTabState extends State<BalanceSheetTab>
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   late DateTime _asOfDate;
   bool _didInitialControllerSync = false;
   bool _isAsOfResyncInProgress = false;
@@ -1373,11 +1377,14 @@ class _BalanceSheetTabState extends State<BalanceSheetTab> with TickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return GetBuilder<FinancialReportController>(
       tag: getCurrentOrganization!.id.toString(),
       builder: (controller) {
-        _syncAsOfFromSelectedRange(controller);
-        if (controller.isLoading.value) {
+        if (TickerMode.of(context)) {
+          _syncAsOfFromSelectedRange(controller);
+        }
+        if (controller.isLoading.value && !controller.hasPresentedFinancialData) {
           return const Center(child: CircularProgressIndicator(color: orangeColor));
         }
 

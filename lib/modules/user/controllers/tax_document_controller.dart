@@ -436,6 +436,7 @@ class TaxDocumentController extends GetxController {
       return null;
     } finally {
       isUploading.value = false;
+      update();
     }
   }
 

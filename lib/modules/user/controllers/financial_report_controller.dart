@@ -14,6 +14,10 @@ class FinancialReportController extends GetxController {
   RxBool isRealizedView = true.obs;
   RxBool isDemoMode = false.obs;
 
+  /// After the first successful aggregate, tabs keep showing prior data during
+  /// refetch instead of replacing the whole screen with a blocking spinner.
+  bool hasPresentedFinancialData = false;
+
   void toggleRealizedView(bool val) {
     isRealizedView.value = val;
     update();
@@ -442,6 +446,7 @@ class FinancialReportController extends GetxController {
             .toList();
         _applyEngineBalanceSheetSnapshot(includeNetIncome: false);
       }
+      hasPresentedFinancialData = true;
     } catch (e, s) {
       log("❌ [FRC] fetchAndAggregateData error: $e");
       log(s.toString());

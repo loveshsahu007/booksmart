@@ -69,7 +69,11 @@ class _ExcelYearBlock {
   final List<int> monthCols;
 }
 
-class _ProfitLossScreenState extends State<ProfitLossScreen> {
+class _ProfitLossScreenState extends State<ProfitLossScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   // 0: 7d, 1: 30d, 2: 3mo, 3: 12mo, 4: Yearly, 5: Custom
   int _selectedFilterIdx = 2;
   int? _selectedYear;
@@ -2854,10 +2858,11 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return GetBuilder<FinancialReportController>(
       tag: getCurrentOrganization!.id.toString(),
       builder: (controller) {
-        if (controller.isLoading.value) {
+        if (controller.isLoading.value && !controller.hasPresentedFinancialData) {
           return const Center(child: CircularProgressIndicator());
         }
 
@@ -3666,17 +3671,21 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                         groupW,
                       );
                       final spotXN = centers.map((c) => c / usableW).toList();
-                      return Stack(
-                        children: [
-                          _buildPnLTrendBarChart(series, isDark),
-                          _buildPnLTrendLineOverlay(
-                            controller,
-                            series,
-                            isDark,
-                            spotXN: spotXN,
-                            compactXAxis: n > 6,
-                          ),
-                        ],
+                      return ClipRect(
+                        child: Stack(
+                          clipBehavior: Clip.hardEdge,
+                          fit: StackFit.expand,
+                          children: [
+                            _buildPnLTrendBarChart(controller, series, isDark),
+                            _buildPnLTrendLineOverlay(
+                              controller,
+                              series,
+                              isDark,
+                              spotXN: spotXN,
+                              compactXAxis: n > 6,
+                            ),
+                          ],
+                        ),
                       );
                     },
                   ),
@@ -3774,8 +3783,14 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     );
   }
 
-  double _trendMinY(List<Map<String, dynamic>> series) {
+  /// Y-axis for the P&L trend bar + line overlay. When comparing prior period,
+  /// prior buckets' net must be included or the dashed line maps outside the chart.
+  ({double minY, double maxY}) _pnlTrendChartYBounds(
+    List<Map<String, dynamic>> series,
+    FinancialReportController controller,
+  ) {
     double minVal = 0;
+    double maxVal = 0;
     for (final d in series) {
       final inc = (d['income'] as num?)?.toDouble() ?? 0;
       final exp = (d['expense'] as num?)?.toDouble() ?? 0;
@@ -3783,25 +3798,32 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
       if (_showRevenue && inc < minVal) minVal = inc;
       if (_showExpenses && exp < minVal) minVal = exp;
       if (_showProfit && net < minVal) minVal = net;
-    }
-    if (minVal == 0) return 0;
-    final interval = minVal.abs() > 50000 ? 10000.0 : 5000.0;
-    return (minVal / interval).floor() * interval;
-  }
-
-  double _trendMaxY(List<Map<String, dynamic>> series) {
-    double maxVal = 0;
-    for (final d in series) {
-      final inc = (d['income'] as num?)?.toDouble() ?? 0;
-      final exp = (d['expense'] as num?)?.toDouble() ?? 0;
-      final net = (d['net'] as num?)?.toDouble() ?? 0;
       if (_showRevenue && inc > maxVal) maxVal = inc;
       if (_showExpenses && exp > maxVal) maxVal = exp;
       if (_showProfit && net > maxVal) maxVal = net;
     }
-    if (maxVal == 0) return 10000;
-    final interval = maxVal > 50000 ? 10000.0 : 5000.0;
-    return (maxVal / interval).ceil() * interval;
+    if (_comparePriorPeriod) {
+      for (final d in controller.prevTrendChartSeries) {
+        final net = (d['net'] as num?)?.toDouble() ?? 0;
+        if (net < minVal) minVal = net;
+        if (net > maxVal) maxVal = net;
+      }
+    }
+    final double minY;
+    if (minVal == 0) {
+      minY = 0;
+    } else {
+      final interval = minVal.abs() > 50000 ? 10000.0 : 5000.0;
+      minY = (minVal / interval).floor() * interval;
+    }
+    final double maxY;
+    if (maxVal == 0) {
+      maxY = 10000;
+    } else {
+      final interval = maxVal > 50000 ? 10000.0 : 5000.0;
+      maxY = (maxVal / interval).ceil() * interval;
+    }
+    return (minY: minY, maxY: maxY);
   }
 
   /// Group center X positions for [BarChartAlignment.spaceAround] (same layout as fl_chart).
@@ -3858,11 +3880,13 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
   }
 
   Widget _buildPnLTrendBarChart(
+    FinancialReportController controller,
     List<Map<String, dynamic>> series,
     bool isDark,
   ) {
-    final minY = _trendMinY(series);
-    final maxY = _trendMaxY(series);
+    final yBounds = _pnlTrendChartYBounds(series, controller);
+    final minY = yBounds.minY;
+    final maxY = yBounds.maxY;
     final n = series.length;
     // Show every bucket on the x-axis (daily, weekly, monthly, quarterly) — user prefers full labels.
     final bool compactXAxis = n > 6;
@@ -4100,8 +4124,9 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
     required List<double> spotXN,
     required bool compactXAxis,
   }) {
-    final minY = _trendMinY(series);
-    final maxY = _trendMaxY(series);
+    final yBounds = _pnlTrendChartYBounds(series, controller);
+    final minY = yBounds.minY;
+    final maxY = yBounds.maxY;
     final n = series.length;
     final profitColor = isDark ? Colors.white : Colors.black87;
     final prev = controller.prevTrendChartSeries;
@@ -4455,6 +4480,18 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                           preventCurveOverShooting: true,
                           color: const Color(0xFF19C37D),
                           barWidth: 3,
+                          belowBarData: BarAreaData(
+                            show: true,
+                            applyCutOffY: true,
+                            cutOffY: 0,
+                            color: const Color(0xFF19C37D).withValues(alpha: 0.2),
+                          ),
+                          aboveBarData: BarAreaData(
+                            show: true,
+                            applyCutOffY: true,
+                            cutOffY: 0,
+                            color: const Color(0xFFE57373).withValues(alpha: 0.2),
+                          ),
                           dotData: FlDotData(show: !hideDenseDots),
                         ),
                         LineChartBarData(
@@ -4474,6 +4511,18 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                           preventCurveOverShooting: true,
                           color: const Color(0xFF2B7FFF),
                           barWidth: 3,
+                          belowBarData: BarAreaData(
+                            show: true,
+                            applyCutOffY: true,
+                            cutOffY: 0,
+                            color: const Color(0xFF2B7FFF).withValues(alpha: 0.2),
+                          ),
+                          aboveBarData: BarAreaData(
+                            show: true,
+                            applyCutOffY: true,
+                            cutOffY: 0,
+                            color: const Color(0xFFE57373).withValues(alpha: 0.2),
+                          ),
                           dotData: FlDotData(show: !hideDenseDots),
                         ),
                       ],
@@ -4747,6 +4796,18 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                           preventCurveOverShooting: true,
                           color: const Color(0xFF19C37D),
                           barWidth: 3,
+                          belowBarData: BarAreaData(
+                            show: true,
+                            applyCutOffY: true,
+                            cutOffY: 0,
+                            color: const Color(0xFF19C37D).withValues(alpha: 0.2),
+                          ),
+                          aboveBarData: BarAreaData(
+                            show: true,
+                            applyCutOffY: true,
+                            cutOffY: 0,
+                            color: const Color(0xFFE57373).withValues(alpha: 0.2),
+                          ),
                           dotData: FlDotData(show: !hideDenseDots),
                         ),
                         LineChartBarData(
@@ -4766,6 +4827,18 @@ class _ProfitLossScreenState extends State<ProfitLossScreen> {
                           preventCurveOverShooting: true,
                           color: orangeColor,
                           barWidth: 3,
+                          belowBarData: BarAreaData(
+                            show: true,
+                            applyCutOffY: true,
+                            cutOffY: 0,
+                            color: orangeColor.withValues(alpha: 0.2),
+                          ),
+                          aboveBarData: BarAreaData(
+                            show: true,
+                            applyCutOffY: true,
+                            cutOffY: 0,
+                            color: const Color(0xFFE57373).withValues(alpha: 0.2),
+                          ),
                           dotData: FlDotData(show: !hideDenseDots),
                         ),
                       ],

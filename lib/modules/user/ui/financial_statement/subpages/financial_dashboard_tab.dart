@@ -20,7 +20,11 @@ class FinancialDashboardTab extends StatefulWidget {
   State<FinancialDashboardTab> createState() => _FinancialDashboardTabState();
 }
 
-class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
+class _FinancialDashboardTabState extends State<FinancialDashboardTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   /// 0: 7d, 1: 30d, 2: 3mo, 3: 12mo, 4: Yearly, 5: Custom — mirrors Profit & Loss filters.
   int _dashFilterIdx = 2;
   int? _dashSelectedYear;
@@ -45,13 +49,14 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Container(
       color: _bg,
       child: GetBuilder<FinancialReportController>(
         tag: getCurrentOrganization!.id.toString(),
         builder: (controller) {
           _syncFilterFromControllerRange(controller);
-          if (controller.isLoading.value) {
+          if (controller.isLoading.value && !controller.hasPresentedFinancialData) {
             return const Center(child: CircularProgressIndicator());
           }
 
