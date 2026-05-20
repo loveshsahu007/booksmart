@@ -1095,8 +1095,8 @@ class _CashFlowTabState extends State<CashFlowTab>
 
       sheet.setColumnWidth(labelCol, 46);
       for (int i = 0; i < keys.length; i++) {
-        sheet.setColumnWidth(symbolCol(i), 2.8);
-        sheet.setColumnWidth(amountCol(i), 8.2);
+        sheet.setColumnWidth(symbolCol(i), 4.2);
+        sheet.setColumnWidth(amountCol(i), 16);
       }
       sheet.setRowHeight(1, 24);
       sheet.setRowHeight(2, 14);
@@ -1216,7 +1216,11 @@ class _CashFlowTabState extends State<CashFlowTab>
         bool darkTotal = false,
       }) {
         for (int i = 0; i < keys.length; i++) {
-          final v = values[keys[i]] ?? 0.0;
+          final String k = keys[i];
+          final double v = values[k] ?? 0.0;
+          final bool isDetail = !total && !cashBand && !darkTotal;
+          final bool emptyDetail =
+              isDetail && (!values.containsKey(k) || v.abs() < 1e-12);
           final symbolStyle = cashBand
               ? cashBandDollarStyle
               : (darkTotal
@@ -1227,6 +1231,25 @@ class _CashFlowTabState extends State<CashFlowTab>
               : (darkTotal
                     ? totalDarkAmountStyle
                     : (total ? totalAmountStyle : amountStyle));
+          if (emptyDetail) {
+            setCell(
+              symbolCol(i),
+              row,
+              excel_lib.TextCellValue(''),
+              symbolStyle,
+            );
+            setCell(
+              amountCol(i),
+              row,
+              excel_lib.TextCellValue(''),
+              excel_lib.CellStyle(
+                fontSize: 8,
+                horizontalAlign: excel_lib.HorizontalAlign.Right,
+                verticalAlign: excel_lib.VerticalAlign.Center,
+              ),
+            );
+            continue;
+          }
           setCell(symbolCol(i), row, excel_lib.TextCellValue('\$'), symbolStyle);
           setCell(amountCol(i), row, excel_lib.DoubleCellValue(v), valueStyle);
         }
@@ -1931,9 +1954,10 @@ class _CashFlowTabState extends State<CashFlowTab>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 AppText(
-                                  "Paid / Unpaid",
+                                  controller.isRealizedView.value ? "Showing: paid" : "Showing: paid + unpaid",
                                   fontSize: 11,
                                   color: isDark ? Colors.white70 : Colors.black54,
+                                  disableFormat: true,
                                 ),
                                 const SizedBox(width: 6),
                                 Switch(
@@ -2007,6 +2031,18 @@ class _CashFlowTabState extends State<CashFlowTab>
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   AppText("Cash Flow Trend", fontSize: 18, fontWeight: FontWeight.bold, color: isDark ? Colors.white : Colors.black87),
+                                  if (_showNetCash) ...[
+                                    const SizedBox(height: 4),
+                                    AppText(
+                                      controller.isRealizedView.value
+                                          ? "Yellow = net cash (paid only). Circles mark each period — not a separate unrealized line."
+                                          : "Yellow = net cash including unpaid/projected. Circles mark each period — still one net line, not two.",
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                      color: isDark ? Colors.white.withValues(alpha: 0.45) : Colors.black54,
+                                      disableFormat: true,
+                                    ),
+                                  ],
                                   const SizedBox(height: 8),
                                   Wrap(
                                     spacing: 8,
@@ -2133,22 +2169,25 @@ class _CashFlowTabState extends State<CashFlowTab>
                             spacing: 24,
                             runSpacing: 8,
                             children: [
-                              if (_showMoneyIn) _LegendItem(color: moneyInColor, label: "Money In"),
-                              if (_showMoneyOut) _LegendItem(color: moneyOutColor, label: "Money Out"),
-                              if (_showNetCash) _LegendItem(color: netCashColor, label: "Net Cash", isLine: true),
-                              if (!controller.isRealizedView.value)
+                              if (_showMoneyIn)
+                                _LegendItem(color: moneyInColor, label: "Money In", swatch: _LegendSwatch.solidSquare),
+                              if (_showMoneyOut)
+                                _LegendItem(color: moneyOutColor, label: "Money Out", swatch: _LegendSwatch.solidSquare),
+                              if (_showNetCash)
                                 _LegendItem(
-                                  color: isDark ? Colors.white60 : Colors.black45,
-                                  label: "Unrealized (Projected)",
-                                  isLine: true,
-                                  isDashed: true,
+                                  color: netCashColor,
+                                  label: "Net Cash",
+                                  swatch: _LegendSwatch.lineSolid,
+                                  subtitle: controller.isRealizedView.value
+                                      ? "Paid transactions only"
+                                      : "Same yellow line; totals include unpaid",
                                 ),
                               if (_comparePriorPeriod)
                                 _LegendItem(
-                                  color: isDark ? Colors.white54 : Colors.black45,
+                                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                   label: "Prior net",
-                                  isLine: true,
-                                  isDashed: true,
+                                  swatch: _LegendSwatch.lineDashedPrior,
+                                  subtitle: "Grey long-dash · prior month",
                                 ),
                             ],
                           ),
@@ -2979,8 +3018,7 @@ class _CashFlowTabState extends State<CashFlowTab>
               preventCurveOverShooting: true,
               curveSmoothness: 0.35,
               color: netColor,
-              barWidth: 1.5,
-              dashArray: includeUnrealized ? [6, 4] : null,
+              barWidth: 3,
               isStrokeCapRound: true,
               dotData: FlDotData(
                 show: true,
@@ -3007,6 +3045,7 @@ class _CashFlowTabState extends State<CashFlowTab>
           );
         }
         if (_comparePriorPeriod && compareLen > 0) {
+          final priorColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
           lineBars.add(
             LineChartBarData(
               spots: List.generate(compareLen, (i) {
@@ -3015,10 +3054,12 @@ class _CashFlowTabState extends State<CashFlowTab>
                 return FlSpot(xn, net);
               }),
               isCurved: true,
+              preventCurveOverShooting: true,
               curveSmoothness: 0.35,
-              color: isDark ? Colors.white54 : Colors.black38,
+              color: priorColor,
               barWidth: 2,
-              dashArray: [6, 4],
+              // Longer dashes than net-unrealized [6,4] so prior vs yellow net are easy to tell apart.
+              dashArray: const [14, 7],
               dotData: const FlDotData(show: false),
             ),
           );
@@ -3491,52 +3532,85 @@ class _CashFlowTabState extends State<CashFlowTab>
   }
 }
 
+/// Swatch shapes for the Cash Flow Trend legend (each series has a distinct marker).
+enum _LegendSwatch {
+  solidSquare,
+  lineSolid,
+  /// Prior-period overlay: two longer segments (matches chart long-dash pattern).
+  lineDashedPrior,
+}
+
 class _LegendItem extends StatelessWidget {
   final Color color;
   final String label;
-  final bool isLine;
-  final bool isDashed;
+  final _LegendSwatch swatch;
+  /// Short hint under the label (e.g. how unrealized relates to the net line).
+  final String? subtitle;
+
   const _LegendItem({
     required this.color,
     required this.label,
-    this.isLine = false,
-    this.isDashed = false,
+    this.swatch = _LegendSwatch.solidSquare,
+    this.subtitle,
   });
+
+  static const double _lineThick = 2;
+
+  Widget _swatch() {
+    final cap = BorderRadius.circular(1);
+    switch (swatch) {
+      case _LegendSwatch.solidSquare:
+        return Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
+        );
+      case _LegendSwatch.lineSolid:
+        return Container(width: 16, height: _lineThick, decoration: BoxDecoration(color: color, borderRadius: cap));
+      case _LegendSwatch.lineDashedPrior:
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 8, height: _lineThick, decoration: BoxDecoration(color: color, borderRadius: cap)),
+            const SizedBox(width: 4),
+            Container(width: 8, height: _lineThick, decoration: BoxDecoration(color: color, borderRadius: cap)),
+          ],
+        );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labelColor = isDark ? Colors.white70 : Colors.black54;
+    final subColor = isDark ? Colors.white38 : Colors.black45;
     return Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (isLine)
-          isDashed
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 5,
-                      height: 2,
-                      decoration: BoxDecoration(
-                        color: color,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    const SizedBox(width: 2),
-                    Container(
-                      width: 5,
-                      height: 2,
-                      decoration: BoxDecoration(
-                        color: color,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ],
-                )
-              : Container(width: 16, height: 2, color: color)
-        else
-          Container(width: 8, height: 8, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: _swatch(),
+        ),
         const SizedBox(width: 8),
-        AppText(label, fontSize: 11, color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppText(label, fontSize: 11, color: labelColor),
+            if (subtitle != null && subtitle!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: AppText(
+                  subtitle!,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w500,
+                  color: subColor,
+                  disableFormat: true,
+                ),
+              ),
+          ],
+        ),
       ],
     );
   }

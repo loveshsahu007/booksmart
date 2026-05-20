@@ -1015,6 +1015,12 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
         boldVal: true,
         backgroundColorHexVal: excel_lib.ExcelColor.fromHexString(totalBand),
       );
+      final emptyPeriodValueStyle = excel_lib.CellStyle(
+        fontSize: 10,
+        fontFamily: excel_lib.getFontFamily(excel_lib.FontFamily.Calibri),
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
 
       void setCell(
         int c,
@@ -1029,9 +1035,9 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
         if (style != null) cell.cellStyle = style;
       }
 
-      // Wider label column for readability; period columns sized for currency.
+      // Wider period columns so currency does not render as ####### in Excel.
       final double descriptionWidth = labels.length <= 4 ? 54.0 : 48.0;
-      final double periodWidth = labels.length <= 4 ? 17.0 : 15.0;
+      final double periodWidth = labels.length <= 4 ? 24.0 : 22.0;
       sheet.setColumnWidth(0, descriptionWidth);
       for (int i = 0; i < labels.length; i++) {
         sheet.setColumnWidth(1 + i, periodWidth);
@@ -1131,12 +1137,16 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
           );
           for (int i = 0; i < labels.length; i++) {
             final double val = i < item.values.length ? item.values[i] : 0.0;
-            setCell(
-              1 + i,
-              row,
-              excel_lib.DoubleCellValue(val),
-              isTotal ? valueTotalStyle : valueStyle,
-            );
+            if (!isTotal && val.abs() < 1e-12) {
+              setCell(1 + i, row, excel_lib.TextCellValue(''), emptyPeriodValueStyle);
+            } else {
+              setCell(
+                1 + i,
+                row,
+                excel_lib.DoubleCellValue(val),
+                isTotal ? valueTotalStyle : valueStyle,
+              );
+            }
           }
         sheet.setRowHeight(row, isTotal ? 21 : 19);
         row++;
@@ -1345,6 +1355,11 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
         fillHex: kTotalFill,
         numberFormatCode: kAccountingFmt,
       );
+      final emptyPeriodValueStyle = baseStyle(
+        fontColor: kTextBody,
+        numberFormatCode: null,
+        hAlign: excel_lib.HorizontalAlign.Right,
+      );
 
       void setCell(
         int c,
@@ -1502,12 +1517,22 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
         );
 
         for (int y = 0; y < 5; y++) {
-          setCell(
-            colYearStart + y,
-            row,
-            excel_lib.DoubleCellValue(valueByYear(y)),
-            amtStyle,
-          );
+          final double yv = valueByYear(y);
+          if (!total && yv.abs() < 1e-12) {
+            setCell(
+              colYearStart + y,
+              row,
+              excel_lib.TextCellValue(''),
+              emptyPeriodValueStyle,
+            );
+          } else {
+            setCell(
+              colYearStart + y,
+              row,
+              excel_lib.DoubleCellValue(yv),
+              amtStyle,
+            );
+          }
         }
         sheet.setRowHeight(row, isNet ? 17.25 : 14.25);
         row++;
@@ -1849,6 +1874,12 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
         boldVal: true,
         backgroundColorHexVal: excel_lib.ExcelColor.fromHexString('FFEAEDF4'),
       );
+      final emptyPeriodValueStyle = excel_lib.CellStyle(
+        fontSize: 10,
+        fontFamily: excel_lib.getFontFamily(excel_lib.FontFamily.Calibri),
+        horizontalAlign: excel_lib.HorizontalAlign.Right,
+        verticalAlign: excel_lib.VerticalAlign.Center,
+      );
 
       void setCell(
         int c,
@@ -1876,9 +1907,9 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
       final lastCol = colCursor - 1;
       sheet.setColumnWidth(0, 50.58);
       for (final b in yearBlocks) {
-        sheet.setColumnWidth(b.totalCol, 16.95);
+        sheet.setColumnWidth(b.totalCol, 22);
         for (final c in b.monthCols) {
-          sheet.setColumnWidth(c, 8.0);
+          sheet.setColumnWidth(c, 13);
         }
       }
 
@@ -1987,10 +2018,28 @@ class _ProfitLossScreenState extends State<ProfitLossScreen>
           setCell(0, row, excel_lib.TextCellValue('     $label'), labelStyle);
           for (final b in yearBlocks) {
             final yVal = yearValue(periodicMap, b.year, category) * (negate ? -1 : 1);
-            setCell(b.totalCol, row, excel_lib.DoubleCellValue(yVal), currencyStyle);
+            if (yVal.abs() < 1e-12) {
+              setCell(b.totalCol, row, excel_lib.TextCellValue(''), emptyPeriodValueStyle);
+            } else {
+              setCell(b.totalCol, row, excel_lib.DoubleCellValue(yVal), currencyStyle);
+            }
             for (int m = 1; m <= 12; m++) {
               final mVal = monthValue(periodicMap, b.year, m, category) * (negate ? -1 : 1);
-              setCell(b.monthCols[m - 1], row, excel_lib.DoubleCellValue(mVal), currencyStyle);
+              if (mVal.abs() < 1e-12) {
+                setCell(
+                  b.monthCols[m - 1],
+                  row,
+                  excel_lib.TextCellValue(''),
+                  emptyPeriodValueStyle,
+                );
+              } else {
+                setCell(
+                  b.monthCols[m - 1],
+                  row,
+                  excel_lib.DoubleCellValue(mVal),
+                  currencyStyle,
+                );
+              }
             }
           }
           sheet.setRowHeight(row, 14.25);

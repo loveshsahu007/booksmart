@@ -317,6 +317,12 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final dropdownFg = isDark ? Colors.white : Colors.black87;
+    final dropdownMenuBg =
+        isDark ? const Color(0xFF1E293B) : theme.colorScheme.surface;
+
     final labels = _isBalanceSheetAdvanced
         ? PdfExportService.buildBalanceSheetSnapshotColumnLabels(
             PdfExportService.buildBalanceSheetSnapshotColumnEnds(
@@ -367,11 +373,30 @@ class _PdfExportDialogState extends State<_PdfExportDialog> {
                     const SizedBox(width: 12),
                     DropdownButton<int>(
                       value: _periodCount,
+                      dropdownColor: dropdownMenuBg,
+                      style: TextStyle(
+                        color: dropdownFg,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      iconEnabledColor: dropdownFg,
+                      underline: Container(
+                        height: 1,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.35)
+                            : Colors.black.withValues(alpha: 0.35),
+                      ),
                       items: [1, 2, 3, 4, 5]
                           .map(
-                            (n) => DropdownMenuItem(
+                            (n) => DropdownMenuItem<int>(
                               value: n,
-                              child: Text('$n'),
+                              child: Text(
+                                '$n',
+                                style: TextStyle(
+                                  color: dropdownFg,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           )
                           .toList(),

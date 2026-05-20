@@ -6,6 +6,7 @@ import 'package:syncfusion_flutter_gauges/gauges.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:booksmart/modules/user/controllers/organization_controller.dart';
 import 'package:booksmart/modules/user/controllers/financial_report_controller.dart';
+import 'package:booksmart/modules/user/controllers/ai_stragey_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:booksmart/modules/user/ui/bank/bank_list_screen.dart';
@@ -349,11 +350,11 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
   Widget _metricCard({
     required String title,
     required String value,
-    required double? deltaPct,
+    required double deltaPct,
     required bool valueIsNegative,
   }) {
-    final isFlat = deltaPct == null || deltaPct.abs() < 0.0001;
-    final positive = (deltaPct ?? 0) >= 0;
+    final isFlat = deltaPct.abs() < 0.0001;
+    final positive = deltaPct >= 0;
     final deltaColor = isFlat ? _muted : (positive ? _green : _red);
     return _glassCard(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -518,10 +519,10 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
           const AppText('Profit & Loss Overview', fontSize: 13, color: _title, fontWeight: FontWeight.w600),
           AppText(dateRange, fontSize: 10, color: _muted),
           const SizedBox(height: 8),
-          _overviewLine('Income', _money(income), _pctChange(income, pIncome), positiveIsGood: true),
-          _overviewLine('Expenses', _money(expenses), _pctChange(expenses, pExpenses), positiveIsGood: false),
-          _overviewLine('Net Income', _money(netIncome), _pctChange(netIncome, pNetIncome), positiveIsGood: true),
-          _overviewLine('% Margin', '${marginCur.toStringAsFixed(1)}%', _absDiff(marginCur, marginPrev), positiveIsGood: true, isPctPoint: true),
+          _overviewLine('Income', _money(income), income, pIncome, positiveIsGood: true),
+          _overviewLine('Expenses', _money(expenses), expenses, pExpenses, positiveIsGood: false),
+          _overviewLine('Net Income', _money(netIncome), netIncome, pNetIncome, positiveIsGood: true),
+          _overviewLine('% Margin', '${marginCur.toStringAsFixed(1)}%', marginCur, marginPrev, positiveIsGood: true, isPctPoint: true),
           const SizedBox(height: 4),
           _viewLink('View Profit & Loss', () => _goToTab(2)),
         ],
@@ -549,13 +550,14 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
             color: _muted,
           ),
           const SizedBox(height: 8),
-          _overviewLine('Total Assets', _money(assets), _pctChange(assets, pAssets), positiveIsGood: true),
-          _overviewLine('Total Liabilities', _money(liabilities), _pctChange(liabilities, pLiabilities), positiveIsGood: false),
-          _overviewLine('Equity', _money(equity), _pctChange(equity, pEquity), positiveIsGood: true),
+          _overviewLine('Total Assets', _money(assets), assets, pAssets, positiveIsGood: true),
+          _overviewLine('Total Liabilities', _money(liabilities), liabilities, pLiabilities, positiveIsGood: false),
+          _overviewLine('Equity', _money(equity), equity, pEquity, positiveIsGood: true),
           _overviewLine(
             'Debt-to-Equity',
             equity.abs() < 0.0001 ? 'N/A' : debtToEquity.toStringAsFixed(2),
-            _pctChange(debtToEquity, pDebtToEquity),
+            debtToEquity,
+            pDebtToEquity,
             positiveIsGood: false,
           ),
           const SizedBox(height: 4),
@@ -581,9 +583,9 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
           const AppText('Cash Flow Overview', fontSize: 13, color: _title, fontWeight: FontWeight.w600),
           AppText(dateRange, fontSize: 10, color: _muted),
           const SizedBox(height: 8),
-          _overviewLine('Money In', _money(cashIn), _pctChange(cashIn, pCashIn), positiveIsGood: true),
-          _overviewLine('Money Out', _money(cashOut), _pctChange(cashOut, pCashOut), positiveIsGood: false),
-          _overviewLine('Net Cash', _money(netCashChange), _pctChange(netCashChange, pNetCash), positiveIsGood: true),
+          _overviewLine('Money In', _money(cashIn), cashIn, pCashIn, positiveIsGood: true),
+          _overviewLine('Money Out', _money(cashOut), cashOut, pCashOut, positiveIsGood: false),
+          _overviewLine('Net Cash', _money(netCashChange), netCashChange, pNetCash, positiveIsGood: true),
           _overviewLineText('Cash Flow Trend', netCashChange >= 0 ? 'Positive' : 'Negative', positive: netCashChange >= 0),
           const SizedBox(height: 4),
           _viewLink('View Cash Flow', () => _goToTab(4)),
@@ -598,14 +600,18 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
     required double expenses,
     List<String> aiInsights = const <String>[],
   }) {
-    final base = expenses > 0 ? expenses : income;
-    final optimizationPct = base <= 0
-        ? 0.0
-        : ((taxDeduction / base) * 100).clamp(0.0, 100.0);
-    final unutilized = (100 - optimizationPct).clamp(0.0, 100.0);
-    final money0 = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
-    final potentialSavings = taxDeduction * 0.24;
-    return _glassCard(
+    final orgTag = getCurrentOrganization!.id.toString();
+    if (!Get.isRegistered<AiStrategyController>(tag: orgTag)) {
+      Get.put(AiStrategyController(), tag: orgTag, permanent: true);
+    }
+    return GetBuilder<AiStrategyController>(
+      tag: orgTag,
+      builder: (aiStrategyController) {
+        final optimizationPct = aiStrategyController.deductionOptimizationPercentDisplay;
+        final unutilized = aiStrategyController.deductionsNotUtilizedPercentDisplay;
+        final additionalDeductionsText = aiStrategyController.additionalDeductionsFoundDisplay;
+        final potentialSavings = aiStrategyController.totalPotentialSavings;
+        return _glassCard(
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -626,7 +632,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
                         height: 76,
                         width: 76,
                         child: CircularProgressIndicator(
-                          value: optimizationPct / 100,
+                          value: AiStrategyController.deductionOptimizationPercent,
                           strokeWidth: 8,
                           backgroundColor: const Color(0xFF1A355F),
                           valueColor: const AlwaysStoppedAnimation<Color>(_green),
@@ -658,10 +664,11 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.center,
                         child: AppText(
-                          money0.format(taxDeduction),
+                          additionalDeductionsText,
                           fontSize: 18,
                           color: _green,
                           fontWeight: FontWeight.w700,
+                          disableFormat: true,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -676,10 +683,11 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
                         fit: BoxFit.scaleDown,
                         alignment: Alignment.center,
                         child: AppText(
-                          money0.format(potentialSavings),
+                          '\$${potentialSavings.toStringAsFixed(0)}',
                           fontSize: 18,
                           color: _text,
                           fontWeight: FontWeight.w700,
+                          disableFormat: true,
                         ),
                       ),
                     ],
@@ -705,21 +713,25 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
             ),
           ],
           const SizedBox(height: 4),
-          _viewLink('View AI Activity', () => Get.toNamed(Routes.aiChat)),
+          _viewLink('View AI Activity', () => Get.toNamed(Routes.aiStrategy)),
         ],
       ),
+        );
+      },
     );
   }
 
   Widget _overviewLine(
     String label,
     String value,
-    double? deltaPct, {
+    double current,
+    double previous, {
     required bool positiveIsGood,
     bool isPctPoint = false,
   }) {
-    final isFlat = deltaPct == null || deltaPct.abs() < 0.0001;
-    final up = (deltaPct ?? 0) > 0;
+    final deltaPct = isPctPoint ? _absDiff(current, previous) : _pctChange(current, previous);
+    final isFlat = deltaPct.abs() < 0.0001;
+    final up = deltaPct > 0;
     final color = isFlat ? _muted : (up == positiveIsGood ? _green : _red);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
@@ -1122,26 +1134,23 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
     );
   }
 
-  static double? _pctChange(double current, double previous) {
-    if (previous.abs() < 0.0001) {
-      if (current.abs() < 0.0001) return 0;
-      return null;
-    }
-    return ((current - previous) / previous.abs()) * 100;
+  static double _pctChange(double current, double previous) {
+    if (previous.abs() < 0.0001) return 0;
+    final pct = ((current - previous) / previous.abs()) * 100;
+    if (pct.isNaN || pct.isInfinite) return 0;
+    return pct;
   }
 
   static double _absDiff(double a, double b) => a - b;
 
-  static String _formatDelta(double? pct) {
-    if (pct == null) return '— —';
+  static String _formatDelta(double pct) {
     if (pct.abs() < 0.0001) return '0.0%';
     final abs = pct.abs();
     final shown = abs >= 1000 ? '999+' : abs.toStringAsFixed(1);
     return '$shown%';
   }
 
-  static String _formatPctPoint(double? pp) {
-    if (pp == null) return '— —';
+  static String _formatPctPoint(double pp) {
     final abs = pp.abs().toStringAsFixed(1);
     return '${abs}pp';
   }
@@ -1160,12 +1169,10 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
     required List<double> profit,
     required List<String> xLabels,
   }) {
-    final data = [revenue, expense, netCash, profit].expand((e) => e).where((v) => v.isFinite).toList();
-    final minY = data.isEmpty ? -10.0 : data.reduce((a, b) => a < b ? a : b);
-    final maxY = data.isEmpty ? 10.0 : data.reduce((a, b) => a > b ? a : b);
-    final span = (maxY - minY).abs();
-    final absoluteMax = data.isEmpty ? 10.0 : data.map((e) => e.abs()).reduce((a, b) => a > b ? a : b);
-    final pad = span < 1e-6 ? (absoluteMax == 0 ? 100.0 : absoluteMax * 0.2).clamp(10.0, 500000000.0) : span * 0.12;
+    final yBounds = _dashTrendChartYBounds(revenue, expense, netCash, profit);
+    final minY = yBounds.minY;
+    final maxY = yBounds.maxY;
+    final yInterval = yBounds.interval;
     final n = revenue.length;
     final compactX = n > 8;
 
@@ -1179,7 +1186,7 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                const leftAxis = 34.0;
+                const leftAxis = 42.0;
                 final usableW = (constraints.maxWidth - leftAxis).clamp(1.0, double.infinity);
                 final groupW = _dashTrendGroupWidth(n);
                 final centers = _barGroupCenterXsSpaceAround(usableW, n, groupW);
@@ -1193,12 +1200,12 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
                       BarChartData(
                         alignment: BarChartAlignment.spaceAround,
                         baselineY: 0,
-                        minY: minY - pad,
-                        maxY: maxY + pad,
+                        minY: minY,
+                        maxY: maxY,
                         barTouchData: const BarTouchData(enabled: false),
                         gridData: FlGridData(
                           show: true,
-                          horizontalInterval: _axisInterval(minY - pad, maxY + pad),
+                          horizontalInterval: yInterval,
                           drawVerticalLine: false,
                           getDrawingHorizontalLine: (_) =>
                               const FlLine(color: Color(0xFF173761), strokeWidth: 1),
@@ -1210,13 +1217,21 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
                           leftTitles: AxisTitles(
                             sideTitles: SideTitles(
                               showTitles: true,
-                              interval: _axisInterval(minY - pad, maxY + pad),
+                              interval: yInterval,
                               reservedSize: leftAxis,
-                              getTitlesWidget: (value, _) => AppText(
-                                _formatAxisMoney(value),
-                                fontSize: 10,
-                                color: _muted,
-                              ),
+                              getTitlesWidget: (value, _) {
+                                if (minY >= 0 && value < -0.01) {
+                                  return const SizedBox.shrink();
+                                }
+                                if (value < minY - 0.01 || value > maxY + 0.01) {
+                                  return const SizedBox.shrink();
+                                }
+                                return AppText(
+                                  _formatAxisMoney(value),
+                                  fontSize: 10,
+                                  color: _muted,
+                                );
+                              },
                             ),
                           ),
                           bottomTitles: AxisTitles(
@@ -1286,8 +1301,8 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
                         minX: 0,
                         maxX: 1,
                         baselineY: 0,
-                        minY: minY - pad,
-                        maxY: maxY + pad,
+                        minY: minY,
+                        maxY: maxY,
                         gridData: const FlGridData(show: false),
                         borderData: FlBorderData(show: false),
                         lineTouchData: LineTouchData(
@@ -1334,34 +1349,66 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
                                       ),
                                     ),
                                     TextSpan(
-                                      text: 'Revenue: ${money(rev)}\n',
+                                      text: 'Revenue: ',
                                       style: const TextStyle(
                                         color: Color(0xFF19C37D),
-                                        fontWeight: FontWeight.w800,
+                                        fontWeight: FontWeight.w600,
                                         fontSize: 12,
                                       ),
                                     ),
                                     TextSpan(
-                                      text: 'Expenses: ${money(exp)}\n',
+                                      text: '${money(rev)}\n',
+                                      style: const TextStyle(
+                                        color: Color(0xFF19C37D),
+                                        fontWeight: FontWeight.w400,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: 'Expenses: ',
                                       style: const TextStyle(
                                         color: Color(0xFF2B7FFF),
-                                        fontWeight: FontWeight.w800,
+                                        fontWeight: FontWeight.w600,
                                         fontSize: 12,
                                       ),
                                     ),
                                     TextSpan(
-                                      text: 'Net Cash: ${money(cash)}\n',
+                                      text: '${money(exp)}\n',
+                                      style: const TextStyle(
+                                        color: Color(0xFF2B7FFF),
+                                        fontWeight: FontWeight.w400,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: 'Net Cash: ',
                                       style: const TextStyle(
                                         color: Color(0xFFFFC52C),
-                                        fontWeight: FontWeight.w900,
+                                        fontWeight: FontWeight.w600,
                                         fontSize: 12,
                                       ),
                                     ),
                                     TextSpan(
-                                      text: 'Profit: ${money(prof)}',
+                                      text: '${money(cash)}\n',
+                                      style: const TextStyle(
+                                        color: Color(0xFFFFC52C),
+                                        fontWeight: FontWeight.w400,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: 'Profit: ',
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontWeight: FontWeight.w900,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: money(prof),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w400,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -1901,9 +1948,13 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
     return (primary, support);
   }
 
-  Widget _deltaBadge(double? deltaPct, Color color, {bool isPctPoint = false}) {
-    final isFlat = deltaPct == null || deltaPct.abs() < 0.0001;
-    final positive = (deltaPct ?? 0) >= 0;
+  Widget _deltaBadge(
+    double deltaPct,
+    Color color, {
+    bool isPctPoint = false,
+  }) {
+    final isFlat = deltaPct.abs() < 0.0001;
+    final positive = deltaPct >= 0;
     final text = isPctPoint ? _formatPctPoint(deltaPct) : _formatDelta(deltaPct);
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1942,15 +1993,71 @@ class _FinancialDashboardTabState extends State<FinancialDashboardTab>
     return value >= 0 ? '\$$whole' : '-\$$whole';
   }
 
-  double _axisInterval(double minY, double maxY) {
-    final span = (maxY - minY).abs();
-    if (span <= 0) return 1;
-    final rough = span / 4;
-    final exp = (log(rough) / ln10).floor();
-    final base = pow(10, exp).toDouble();
-    final f = rough / base;
-    final nice = f <= 1 ? 1 : (f <= 2 ? 2 : (f <= 5 ? 5 : 10));
-    return (nice * base).clamp(1, 1000000000).toDouble();
+  ({double minY, double maxY, double interval}) _dashTrendChartYBounds(
+    List<double> revenue,
+    List<double> expense,
+    List<double> netCash,
+    List<double> profit,
+  ) {
+    double minVal = 0;
+    double maxVal = 0;
+
+    void consider(double v) {
+      if (!v.isFinite) return;
+      if (v < minVal) minVal = v;
+      if (v > maxVal) maxVal = v;
+    }
+
+    for (final v in revenue) {
+      consider(v);
+    }
+    for (final v in expense) {
+      consider(v);
+    }
+    for (final v in profit) {
+      consider(v);
+    }
+    // Cumulative net cash can dip below zero in buckets while bars stay ≥ 0;
+    // only use it for the upper bound so the axis does not extend below $0.
+    for (final v in netCash) {
+      if (v.isFinite && v > maxVal) maxVal = v;
+    }
+
+    // Financial trend bars/lines are anchored at zero; keep axis at 0 unless
+    // plotted values are actually negative (e.g. net loss buckets).
+    final double minY;
+    if (minVal >= -1e-9) {
+      minY = 0;
+    } else {
+      final negInterval = minVal.abs() > 50000 ? 10000.0 : 5000.0;
+      minY = (minVal / negInterval).floor() * negInterval;
+    }
+
+    final interval = _dashNiceAxisInterval(maxVal <= 0 ? 10000 : maxVal);
+    final double maxY;
+    if (maxVal <= 0) {
+      maxY = interval * 4;
+    } else {
+      var computedMax = ((maxVal / interval).ceil() * interval).toDouble();
+      if (computedMax <= maxVal) computedMax += interval;
+      maxY = computedMax;
+    }
+
+    return (minY: minY, maxY: maxY, interval: interval);
+  }
+
+  double _dashNiceAxisInterval(double maxY) {
+    if (maxY <= 0) return 1;
+    final raw = maxY / 4;
+    final exponent = (log(raw) / ln10).floor();
+    final magnitude = pow(10, exponent).toDouble();
+    final normalized = raw / magnitude;
+    final nice = normalized <= 1
+        ? 1
+        : (normalized <= 2
+            ? 2
+            : (normalized <= 5 ? 5 : 10));
+    return nice * magnitude;
   }
 }
 
